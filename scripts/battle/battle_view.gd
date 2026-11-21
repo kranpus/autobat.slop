@@ -91,48 +91,77 @@ func _build_background(tile: String) -> void:
 
 
 func _build_obstacle_layer() -> void:
-	var layer := Node2D.new()
-	layer.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	layer.draw.connect(_draw_obstacles.bind(layer))
-	add_child(layer)
-
-
-## Obstacles are static, so they are drawn once onto their own layer.
-func _draw_obstacles(layer: Node2D) -> void:
-	var tree_textures := [BattleMaps.terrain_texture("tree_green"), BattleMaps.terrain_texture("tree_yellow"), BattleMaps.terrain_texture("tree_red")]
-	for o in BattleMaps.obstacles(sim.map_id):
-		var kind: String = o[0]
-		var info: Dictionary = BattleMaps.OBSTACLE_KINDS[kind]
+	var obstacles := BattleMaps.obstacles(sim.map_id)
+	if obstacles.is_empty():
+		return
+	# 1) soft shadows, 2) textured fills (Polygon2D tiles the texture), 3) outlines + decor.
+	var shadows := Node2D.new()
+	shadows.draw.connect(_draw_obstacle_shadows.bind(shadows, obstacles))
+	add_child(shadows)
+	for o in obstacles:
+		var info: Dictionary = BattleMaps.OBSTACLE_KINDS[o[0]]
+		if info["style"] == "sprite":
+			continue
 		var c := Vector2(float(o[1]), float(o[2]))
 		var r: float = o[3]
-		var tex := BattleMaps.terrain_texture(info["texture"])
-		layer.draw_circle(c + Vector2(4, 7), r, Color(0, 0, 0, 0.35))
-		if info["style"] == "sprite":
-			layer.draw_circle(c, r, Color(0, 0, 0, 0.25))
-			var sz := r * 2.6
-			layer.draw_texture_rect(tex, Rect2(c - Vector2(sz * 0.5, sz * 0.7), Vector2(sz, sz)), false)
-			continue
+		var poly := Polygon2D.new()
 		var pts := PackedVector2Array()
-		var uvs := PackedVector2Array()
 		var segs := clampi(int(r / 4.0), 16, 64)
 		for k in segs:
 			var a := TAU * float(k) / float(segs)
-			var p := c + Vector2(cos(a), sin(a)) * r
-			pts.append(p)
-			uvs.append(p / 32.0)
-		layer.draw_colored_polygon(pts, Color.WHITE, uvs, tex)
-		layer.draw_arc(c, r, 0.0, TAU, segs, Color(0, 0, 0, 0.55), 4.0)
-		if info["style"] == "grove":
+			pts.append(c + Vector2(cos(a), sin(a)) * r)
+		poly.polygon = pts
+		poly.texture = BattleMaps.terrain_texture(info["texture"])
+		poly.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+		add_child(poly)
+	var decor := Node2D.new()
+	decor.draw.connect(_draw_obstacle_decor.bind(decor, obstacles))
+	add_child(decor)
+	_add_obstacle_sprites(obstacles)
+
+
+func _draw_obstacle_shadows(layer: Node2D, obstacles: Array) -> void:
+	for o in obstacles:
+		var r: float = o[3]
+		layer.draw_circle(Vector2(float(o[1]), float(o[2])) + Vector2(4, 7), r, Color(0, 0, 0, 0.35))
+
+
+## Outlines on top of the fills.
+func _draw_obstacle_decor(layer: Node2D, obstacles: Array) -> void:
+	for o in obstacles:
+		var info: Dictionary = BattleMaps.OBSTACLE_KINDS[o[0]]
+		var c := Vector2(float(o[1]), float(o[2]))
+		var r: float = o[3]
+		if info["style"] == "sprite":
+			layer.draw_circle(c, r, Color(0, 0, 0, 0.25))
+		else:
+			layer.draw_arc(c, r, 0.0, TAU, clampi(int(r / 4.0), 16, 64), Color(0, 0, 0, 0.55), 4.0)
+
+
+## Trees (groves) and pillars/statues are Sprite2D nodes.
+func _add_obstacle_sprites(obstacles: Array) -> void:
+	var tree_textures := [BattleMaps.terrain_texture("tree_green"), BattleMaps.terrain_texture("tree_yellow"), BattleMaps.terrain_texture("tree_red")]
+	for o in obstacles:
+		var info: Dictionary = BattleMaps.OBSTACLE_KINDS[o[0]]
+		var c := Vector2(float(o[1]), float(o[2]))
+		var r: float = o[3]
+		if info["style"] == "sprite":
+			var sp := Sprite2D.new()
+			sp.texture = BattleMaps.terrain_texture(info["texture"])
+			sp.scale = Vector2.ONE * (r * 2.6 / 32.0)
+			sp.position = c - Vector2(0, r * 0.2)
+			add_child(sp)
+		elif info["style"] == "grove":
 			var trng := RandomNumberGenerator.new()
 			trng.seed = int(c.x) * 7919 + int(c.y) * 104729
-			var count := maxi(1, int(r * r / 1500.0))
-			for _t in count:
+			for _t in maxi(1, int(r * r / 1500.0)):
 				var ang := trng.randf() * TAU
 				var dist := sqrt(trng.randf()) * r * 0.78
-				var p := c + Vector2(cos(ang), sin(ang)) * dist
-				var tsz := trng.randf_range(40.0, 56.0)
-				var ttex: Texture2D = tree_textures[trng.randi_range(0, 2)]
-				layer.draw_texture_rect(ttex, Rect2(p - Vector2(tsz * 0.5, tsz * 0.8), Vector2(tsz, tsz)), false)
+				var sp := Sprite2D.new()
+				sp.texture = tree_textures[trng.randi_range(0, 2)]
+				sp.scale = Vector2.ONE * (trng.randf_range(40.0, 56.0) / 32.0)
+				sp.position = c + Vector2(cos(ang), sin(ang)) * dist - Vector2(0, 8)
+				add_child(sp)
 
 
 func _build_team_bases() -> void:

@@ -84,6 +84,17 @@ func play_music(key: String) -> void:
 	_music.play()
 
 
+func _exit_tree() -> void:
+	# Release streams so nothing is reported as leaked on quit.
+	if _music:
+		_music.stop()
+		_music.stream = null
+	for p in _pool:
+		p.stop()
+		p.stream = null
+	_cache.clear()
+
+
 func set_music_volume(v: float) -> void:
 	music_volume = clampf(v, 0.0, 1.0)
 	Profile.data["music_volume"] = music_volume

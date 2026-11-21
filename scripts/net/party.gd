@@ -67,6 +67,7 @@ var _names := {}             # peer id -> pname (verified peers)
 var _req_count := {}
 var _req_window := 0
 var _rng := RandomNumberGenerator.new()
+var _local_calls := 0        # >0 while the LAN host runs its own request locally
 
 # LAN discovery.
 var _beacon: PacketPeerUDP
@@ -82,6 +83,9 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_rng.randomize()
 	get_tree().set_multiplayer(mp, get_path())
+	# Clients never talk to each other directly, so don't relay peer
+	# join/leave notices to every client (that would be O(n^2) on a big server).
+	mp.server_relay = false
 	mp.peer_connected.connect(_on_peer_connected)
 	mp.peer_disconnected.connect(_on_peer_disconnected)
 	mp.connected_to_server.connect(_on_connected)
@@ -121,6 +125,10 @@ func server_address() -> String:
 
 
 func _sender() -> int:
+	# A host's own request can run while an incoming RPC is being processed,
+	# so local calls are flagged explicitly instead of trusting the RPC context.
+	if _local_calls > 0:
+		return my_id
 	var id := mp.get_remote_sender_id()
 	return id if id != 0 else my_id
 
@@ -312,7 +320,9 @@ func _drop_connection(reason: String) -> void:
 ## the handler runs directly with our own id as the sender.
 func _request(method: String, args: Array) -> void:
 	if role == Role.HOST:
+		_local_calls += 1
 		callv(method, args)
+		_local_calls -= 1
 	elif role == Role.CLIENT:
 		var call_args: Array = [1, method]
 		call_args.append_array(args)
@@ -528,6 +538,11 @@ func _deliver(id: int, method: String, args: Array) -> void:
 		return
 	if not mp.get_peers().has(id):
 		return
+	var enet := mp.multiplayer_peer as ENetMultiplayerPeer
+	if enet:
+		var pp := enet.get_peer(id)
+		if pp == null or pp.get_state() != ENetPacketPeer.STATE_CONNECTED:
+			return  # peer is disconnecting
 	var call_args: Array = [id, "_rc_" + method]
 	call_args.append_array(args)
 	callv("rpc_id", call_args)

@@ -101,6 +101,18 @@ DigitalOcean "Networking → Firewalls", Oracle "Security Lists"). Add an inboun
    and export the game again. Players then just press **Quick Match**. Anyone can still type a
    different address in the Legion Draft tab (`host` or `host:port`).
 
+### Check it from your computer
+
+With Godot installed, from the project folder:
+
+```bash
+godot --headless -s res://tests/net_smoke_client.gd -- --server=play.yourgame.com --name=Test1 &
+godot --headless -s res://tests/net_smoke_client.gd -- --server=play.yourgame.com --name=Test2
+```
+
+Each test player connects, plays a full Quick Match (bots fill the empty seats) and prints the
+final standings. If they can't connect, check the firewall rules from step 3.
+
 ---
 
 ## 5. Updating

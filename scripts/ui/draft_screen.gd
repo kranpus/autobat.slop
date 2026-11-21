@@ -114,6 +114,8 @@ func _ready() -> void:
 	_overlay_box = UIKit.vbox(8)
 	_overlay.add_child(_overlay_box)
 
+	# Stretch over the whole window (anchors AND offsets).
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	Party.shop_started.connect(_on_shop_started)
 	Party.standings_changed.connect(refresh)
 	Party.match_over.connect(func(_l): refresh())
@@ -361,7 +363,7 @@ func _build_info() -> void:
 	if uid == "":
 		_info.add_child(UIKit.label("Legion Draft", 18, UIKit.ACCENT))
 		_info.add_child(_wrap(UIKit.label("Select a shop item or one of your units to see its details and ability.", 13, UIKit.TEXT_DIM)))
-		_info.add_child(_wrap(UIKit.label("Lv2 at 3 copies, Lv3 at 6. Each level: bigger squad and +40% stats. Shop tier %d/%d." % [run.tier(), DraftData.MAX_TIER], 13, UIKit.TEXT_DIM)))
+		_info.add_child(_wrap(UIKit.label("Lv2 at 3 copies, Lv3 at 6. Each level: bigger squad and +40%% stats. Shop tier %d/%d." % [run.tier(), DraftData.MAX_TIER], 13, UIKit.TEXT_DIM)))
 		return
 	var def: Dictionary = GameData.UNITS[uid]
 	var lvl := DraftData.entry_level(entry) if not entry.is_empty() else 1
