@@ -108,6 +108,8 @@ func _on_over(list: Array) -> void:
 	for p in list:
 		print("[%s] final #%d %s (%d wins, %d losses) +%d gold" % [player, int(p["place"]), p["name"], int(p["wins"]), int(p.get("losses", 0)), int(p.get("gold", 0))])
 	print("[%s] server battle gold multiplier: x%s" % [player, root.get_node("Profile").battle_gold_mult()])
+	print("[%s] server unit locks: %d locked, storm_dragon %s, goblin %s" % [player, UnitLocks.locked_list().size(),
+		"locked" if UnitLocks.is_locked("storm_dragon") else "open", "locked" if UnitLocks.is_locked("goblin") else "open"])
 	quit(0)
 
 

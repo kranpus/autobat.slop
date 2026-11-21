@@ -175,6 +175,287 @@ const UNITS := {
 		"projectile": "fire", "radius": 18.0, "scale": 2.0, "flying": true,
 		"desc": "Blazing, fast and self-healing.",
 	},
+	# --- Locked by default (enable with the server's `unlock` command) ---
+	"jackal": {
+		"name": "Jackal Pack", "rarity": "common", "role": "melee", "locked": true,
+		"hp": 45.0, "dmg": 7.0, "cooldown": 0.6, "range": 5.0, "speed": 105.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 6.0, "scale": 0.7, "flying": false,
+		"desc": "Fast scavengers that hunt in packs.",
+	},
+	"giant_frog": {
+		"name": "Giant Frog", "rarity": "common", "role": "melee", "locked": true,
+		"hp": 70.0, "dmg": 8.0, "cooldown": 0.9, "range": 5.0, "speed": 80.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 7.0, "scale": 0.8, "flying": false,
+		"desc": "Leaps into the fray and soaks up blows.",
+	},
+	"hobgoblin": {
+		"name": "Hobgoblin", "rarity": "common", "role": "melee", "locked": true,
+		"hp": 85.0, "dmg": 10.0, "cooldown": 1.0, "range": 6.0, "speed": 60.0,
+		"damage": "physical", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 7.0, "scale": 0.8, "flying": false,
+		"desc": "Tougher goblin kin with crude shields.",
+	},
+	"gnoll_raider": {
+		"name": "Gnoll Raider", "rarity": "common", "role": "melee", "locked": true,
+		"hp": 75.0, "dmg": 11.0, "cooldown": 0.9, "range": 6.0, "speed": 70.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 7.0, "scale": 0.8, "flying": false,
+		"desc": "Cackling raiders that strike hard and fast.",
+	},
+	"kobold_brute": {
+		"name": "Kobold Brute", "rarity": "common", "role": "melee", "locked": true,
+		"hp": 95.0, "dmg": 9.0, "cooldown": 1.0, "range": 6.0, "speed": 55.0,
+		"damage": "physical", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 8.0, "scale": 0.9, "flying": false,
+		"desc": "The biggest kobold in the warren.",
+	},
+	"cave_bat": {
+		"name": "Cave Bat", "rarity": "common", "role": "melee", "locked": true,
+		"hp": 30.0, "dmg": 6.0, "cooldown": 0.6, "range": 5.0, "speed": 120.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 6.0, "scale": 0.7, "flying": true,
+		"desc": "Flitting swarms that fly over terrain.",
+	},
+	"soldier_ant": {
+		"name": "Soldier Ant", "rarity": "common", "role": "melee", "locked": true,
+		"hp": 55.0, "dmg": 8.0, "cooldown": 0.8, "range": 5.0, "speed": 75.0,
+		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 6.0, "scale": 0.8, "flying": false,
+		"desc": "Armoured insects that come in endless numbers.",
+	},
+	"goblin_archer": {
+		"name": "Goblin Archer", "rarity": "common", "role": "ranged", "locked": true,
+		"hp": 40.0, "dmg": 8.0, "cooldown": 1.1, "range": 170.0, "speed": 60.0,
+		"damage": "pierce", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "arrow", "radius": 7.0, "scale": 0.8, "flying": false,
+		"desc": "Goblins with short bows and shorter tempers.",
+	},
+	"orc_knight": {
+		"name": "Orc Knight", "rarity": "uncommon", "role": "tank", "locked": true,
+		"hp": 260.0, "dmg": 18.0, "cooldown": 1.1, "range": 6.0, "speed": 50.0,
+		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 9.0, "scale": 1.0, "flying": false,
+		"desc": "Plate-armoured orc veterans.",
+	},
+	"elf_knight": {
+		"name": "Elven Knight", "rarity": "uncommon", "role": "melee", "locked": true,
+		"hp": 170.0, "dmg": 20.0, "cooldown": 0.9, "range": 6.0, "speed": 70.0,
+		"damage": "physical", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 8.0, "scale": 0.9, "flying": false,
+		"desc": "Swift blades of the deep elves.",
+	},
+	"hippogriff": {
+		"name": "Hippogriff", "rarity": "uncommon", "role": "melee", "locked": true,
+		"hp": 200.0, "dmg": 16.0, "cooldown": 0.8, "range": 6.0, "speed": 120.0,
+		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 10.0, "scale": 1.1, "flying": true,
+		"desc": "A lighter cousin of the griffon.",
+	},
+	"war_hound": {
+		"name": "War Hound", "rarity": "uncommon", "role": "melee", "locked": true,
+		"hp": 130.0, "dmg": 15.0, "cooldown": 0.7, "range": 6.0, "speed": 115.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 8.0, "scale": 0.8, "flying": false,
+		"desc": "Trained to tear into archers.",
+	},
+	"black_bear": {
+		"name": "Black Bear", "rarity": "uncommon", "role": "tank", "locked": true,
+		"hp": 280.0, "dmg": 20.0, "cooldown": 1.2, "range": 6.0, "speed": 55.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 10.0, "scale": 1.1, "flying": false,
+		"desc": "Thick fur and a thicker skull.",
+	},
+	"elf_mage": {
+		"name": "Elven Mage", "rarity": "uncommon", "role": "caster", "locked": true,
+		"hp": 80.0, "dmg": 22.0, "cooldown": 1.8, "range": 190.0, "speed": 55.0,
+		"damage": "magic", "armor": "light", "aoe": 30.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 7.0, "scale": 0.8, "flying": false,
+		"desc": "Arcane bolts that splash small groups.",
+	},
+	"wight": {
+		"name": "Wight", "rarity": "uncommon", "role": "melee", "locked": true,
+		"hp": 160.0, "dmg": 16.0, "cooldown": 1.0, "range": 6.0, "speed": 50.0,
+		"damage": "physical", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 8.0, "scale": 0.9, "flying": false,
+		"desc": "Restless dead that grow stronger in defeat.",
+	},
+	"naga_warrior": {
+		"name": "Naga Warrior", "rarity": "uncommon", "role": "melee", "locked": true,
+		"hp": 190.0, "dmg": 18.0, "cooldown": 1.0, "range": 6.0, "speed": 50.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 9.0, "scale": 1.0, "flying": false,
+		"desc": "Serpentine fighters that crush in their coils.",
+	},
+	"merfolk_impaler": {
+		"name": "Merfolk Impaler", "rarity": "uncommon", "role": "melee", "locked": true,
+		"hp": 150.0, "dmg": 19.0, "cooldown": 1.1, "range": 18.0, "speed": 55.0,
+		"damage": "pierce", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 8.0, "scale": 0.9, "flying": false,
+		"desc": "Long tridents strike over the front rank.",
+	},
+	"tengu_warrior": {
+		"name": "Tengu Warrior", "rarity": "uncommon", "role": "melee", "locked": true,
+		"hp": 120.0, "dmg": 16.0, "cooldown": 0.8, "range": 6.0, "speed": 110.0,
+		"damage": "physical", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 8.0, "scale": 0.9, "flying": true,
+		"desc": "Winged swordsmen who strike from above.",
+	},
+	"troll": {
+		"name": "Troll", "rarity": "rare", "role": "tank", "locked": true,
+		"hp": 620.0, "dmg": 38.0, "cooldown": 1.4, "range": 8.0, "speed": 50.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 10.0,
+		"projectile": "none", "radius": 12.0, "scale": 1.3, "flying": false,
+		"desc": "Regenerates its wounds in moments.",
+	},
+	"troll_berserker": {
+		"name": "Troll Berserker", "rarity": "rare", "role": "melee", "locked": true,
+		"hp": 480.0, "dmg": 48.0, "cooldown": 1.1, "range": 8.0, "speed": 60.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 12.0, "scale": 1.3, "flying": false,
+		"desc": "Pure fury on two enormous legs.",
+	},
+	"cyclops": {
+		"name": "Cyclops", "rarity": "rare", "role": "ranged", "locked": true,
+		"hp": 520.0, "dmg": 50.0, "cooldown": 2.0, "range": 220.0, "speed": 40.0,
+		"damage": "physical", "armor": "beast", "aoe": 35.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "stone", "radius": 13.0, "scale": 1.4, "flying": false,
+		"desc": "Hurls boulders across the battlefield.",
+	},
+	"minotaur": {
+		"name": "Minotaur", "rarity": "rare", "role": "melee", "locked": true,
+		"hp": 560.0, "dmg": 44.0, "cooldown": 1.2, "range": 8.0, "speed": 65.0,
+		"damage": "physical", "armor": "beast", "aoe": 20.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 12.0, "scale": 1.3, "flying": false,
+		"desc": "Charges through formations horns-first.",
+	},
+	"manticore": {
+		"name": "Manticore", "rarity": "rare", "role": "ranged", "locked": true,
+		"hp": 420.0, "dmg": 34.0, "cooldown": 1.1, "range": 180.0, "speed": 80.0,
+		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "javelin", "radius": 12.0, "scale": 1.3, "flying": false,
+		"desc": "Flings tail spikes while it circles.",
+	},
+	"ettin": {
+		"name": "Ettin", "rarity": "rare", "role": "tank", "locked": true,
+		"hp": 760.0, "dmg": 40.0, "cooldown": 1.5, "range": 8.0, "speed": 45.0,
+		"damage": "physical", "armor": "beast", "aoe": 30.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 13.0, "scale": 1.4, "flying": false,
+		"desc": "Two heads, two clubs, no mercy.",
+	},
+	"salamander_firebrand": {
+		"name": "Salamander Firebrand", "rarity": "rare", "role": "caster", "locked": true,
+		"hp": 200.0, "dmg": 36.0, "cooldown": 1.8, "range": 180.0, "speed": 55.0,
+		"damage": "fire", "armor": "beast", "aoe": 40.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "fire", "radius": 9.0, "scale": 1.0, "flying": false,
+		"desc": "Lobs blazing fireballs into the crowd.",
+	},
+	"vampire_knight": {
+		"name": "Vampire Knight", "rarity": "rare", "role": "melee", "locked": true,
+		"hp": 440.0, "dmg": 36.0, "cooldown": 1.0, "range": 8.0, "speed": 60.0,
+		"damage": "physical", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 6.0,
+		"projectile": "none", "radius": 10.0, "scale": 1.1, "flying": false,
+		"desc": "Drains the life of everything it cuts.",
+	},
+	"orc_warlord": {
+		"name": "Orc Warlord", "rarity": "rare", "role": "tank", "locked": true,
+		"hp": 600.0, "dmg": 40.0, "cooldown": 1.2, "range": 8.0, "speed": 50.0,
+		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 11.0, "scale": 1.2, "flying": false,
+		"desc": "Leads from the front with a giant axe.",
+	},
+	"death_knight": {
+		"name": "Death Knight", "rarity": "rare", "role": "melee", "locked": true,
+		"hp": 520.0, "dmg": 42.0, "cooldown": 1.2, "range": 8.0, "speed": 50.0,
+		"damage": "magic", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 11.0, "scale": 1.2, "flying": false,
+		"desc": "Cursed steel that cuts through plate.",
+	},
+	"stone_giant": {
+		"name": "Stone Giant", "rarity": "epic", "role": "ranged", "locked": true,
+		"hp": 1300.0, "dmg": 80.0, "cooldown": 2.4, "range": 240.0, "speed": 38.0,
+		"damage": "physical", "armor": "beast", "aoe": 45.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "stone", "radius": 16.0, "scale": 1.8, "flying": false,
+		"desc": "Throws boulders the size of houses.",
+	},
+	"frost_giant": {
+		"name": "Frost Giant", "rarity": "epic", "role": "tank", "locked": true,
+		"hp": 1400.0, "dmg": 70.0, "cooldown": 2.0, "range": 10.0, "speed": 40.0,
+		"damage": "magic", "armor": "beast", "aoe": 45.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
+		"desc": "Ice-rimed fists shatter armour.",
+	},
+	"fire_giant": {
+		"name": "Fire Giant", "rarity": "epic", "role": "caster", "locked": true,
+		"hp": 1200.0, "dmg": 75.0, "cooldown": 2.0, "range": 180.0, "speed": 40.0,
+		"damage": "fire", "armor": "beast", "aoe": 55.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "fire", "radius": 16.0, "scale": 1.8, "flying": false,
+		"desc": "Hurls molten iron from its forge.",
+	},
+	"sphinx": {
+		"name": "Sphinx", "rarity": "epic", "role": "caster", "locked": true,
+		"hp": 900.0, "dmg": 55.0, "cooldown": 1.8, "range": 200.0, "speed": 90.0,
+		"damage": "magic", "armor": "beast", "aoe": 40.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 14.0, "scale": 1.6, "flying": true,
+		"desc": "An ancient riddler with withering spells.",
+	},
+	"ice_dragon": {
+		"name": "Ice Dragon", "rarity": "epic", "role": "caster", "locked": true,
+		"hp": 1000.0, "dmg": 60.0, "cooldown": 1.9, "range": 170.0, "speed": 75.0,
+		"damage": "magic", "armor": "beast", "aoe": 60.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 16.0, "scale": 1.8, "flying": true,
+		"desc": "Freezing breath over whole regiments.",
+	},
+	"hydra": {
+		"name": "Hydra", "rarity": "epic", "role": "tank", "locked": true,
+		"hp": 1600.0, "dmg": 50.0, "cooldown": 0.8, "range": 10.0, "speed": 40.0,
+		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 25.0,
+		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
+		"desc": "Cut off one head and two grow back.",
+	},
+	"bone_dragon": {
+		"name": "Bone Dragon", "rarity": "epic", "role": "melee", "locked": true,
+		"hp": 1100.0, "dmg": 65.0, "cooldown": 1.2, "range": 10.0, "speed": 85.0,
+		"damage": "physical", "armor": "undead", "aoe": 30.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": true,
+		"desc": "A dragon that refused to stay dead.",
+	},
+	"juggernaut": {
+		"name": "Juggernaut", "rarity": "epic", "role": "tank", "locked": true,
+		"hp": 1800.0, "dmg": 70.0, "cooldown": 1.6, "range": 10.0, "speed": 45.0,
+		"damage": "physical", "armor": "heavy", "aoe": 40.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
+		"desc": "Nothing stops it. Nothing.",
+	},
+	"shadow_dragon": {
+		"name": "Shadow Dragon", "rarity": "legendary", "role": "caster", "locked": true,
+		"hp": 3000.0, "dmg": 85.0, "cooldown": 2.0, "range": 170.0, "speed": 75.0,
+		"damage": "magic", "armor": "beast", "aoe": 75.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 22.0, "scale": 2.4, "flying": true,
+		"desc": "Darkness given wings and hunger.",
+	},
+	"storm_dragon": {
+		"name": "Storm Dragon", "rarity": "legendary", "role": "caster", "locked": true,
+		"hp": 2800.0, "dmg": 80.0, "cooldown": 1.6, "range": 190.0, "speed": 85.0,
+		"damage": "magic", "armor": "beast", "aoe": 65.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 22.0, "scale": 2.4, "flying": true,
+		"desc": "Calls lightning down on the enemy lines.",
+	},
+	"seraph": {
+		"name": "Seraph", "rarity": "legendary", "role": "healer", "locked": true,
+		"hp": 2000.0, "dmg": 40.0, "cooldown": 1.2, "range": 180.0, "speed": 90.0,
+		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 120.0, "regen": 0.0,
+		"projectile": "magic", "radius": 18.0, "scale": 2.0, "flying": true,
+		"desc": "Heals whole squads with radiant light.",
+	},
+	"grand_avatar": {
+		"name": "Grand Avatar", "rarity": "legendary", "role": "tank", "locked": true,
+		"hp": 4000.0, "dmg": 100.0, "cooldown": 1.8, "range": 12.0, "speed": 45.0,
+		"damage": "magic", "armor": "heavy", "aoe": 60.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 22.0, "scale": 2.4, "flying": false,
+		"desc": "A god's will in physical form.",
+	},
 }
 
 # Expedition regions: where specific units can be found.
@@ -183,27 +464,27 @@ const REGIONS := {
 	"warrens": {
 		"name": "Goblin Warrens", "tile": "warrens", "cost_maps": 1, "min_rating": 0,
 		"desc": "Damp tunnels crawling with greenskins.",
-		"drops": {"goblin": 34, "kobold_slinger": 28, "rat_swarm": 18, "orc_warrior": 12, "ogre": 6, "hill_giant": 2},
+		"drops": {"goblin": 34, "kobold_slinger": 28, "rat_swarm": 18, "orc_warrior": 12, "ogre": 6, "hill_giant": 2, "jackal": 14, "hobgoblin": 16, "gnoll_raider": 8, "kobold_brute": 12, "goblin_archer": 14, "orc_knight": 8, "war_hound": 8, "troll": 4, "cyclops": 3, "ettin": 4, "orc_warlord": 3},
 	},
 	"crypt": {
 		"name": "Haunted Crypt", "tile": "crypt", "cost_maps": 1, "min_rating": 0,
 		"desc": "The dead do not rest here.",
-		"drops": {"skeleton": 38, "rat_swarm": 22, "gnoll_shaman": 18, "orc_sorcerer": 12, "lich": 4},
+		"drops": {"skeleton": 38, "rat_swarm": 22, "gnoll_shaman": 18, "orc_sorcerer": 12, "lich": 4, "giant_frog": 10, "gnoll_raider": 12, "cave_bat": 14, "wight": 12, "naga_warrior": 4, "minotaur": 5, "vampire_knight": 5, "death_knight": 4, "sphinx": 2, "hydra": 2, "bone_dragon": 2, "shadow_dragon": 1},
 	},
 	"forest": {
 		"name": "Whispering Forest", "tile": "forest", "cost_maps": 1, "min_rating": 1000,
 		"desc": "Elves, wolves and older things beneath the canopy.",
-		"drops": {"elf_archer": 30, "dire_wolf": 30, "centaur": 14, "treant": 12, "griffon": 5, "phoenix": 1},
+		"drops": {"elf_archer": 30, "dire_wolf": 30, "centaur": 14, "treant": 12, "griffon": 5, "phoenix": 1, "jackal": 10, "giant_frog": 8, "soldier_ant": 12, "elf_knight": 8, "hippogriff": 7, "war_hound": 8, "black_bear": 8, "elf_mage": 6, "seraph": 1},
 	},
 	"deep": {
 		"name": "Dwarven Deeps", "tile": "deep", "cost_maps": 2, "min_rating": 1050,
 		"desc": "Forgotten halls under the mountain.",
-		"drops": {"dwarf_berserker": 30, "kobold_slinger": 22, "naga_sharpshooter": 14, "ogre": 12, "hill_giant": 4, "titan": 1},
+		"drops": {"dwarf_berserker": 30, "kobold_slinger": 22, "naga_sharpshooter": 14, "ogre": 12, "hill_giant": 4, "titan": 1, "kobold_brute": 10, "cave_bat": 12, "soldier_ant": 8, "elf_mage": 6, "naga_warrior": 8, "merfolk_impaler": 7, "troll": 6, "troll_berserker": 5, "minotaur": 4, "ettin": 4, "stone_giant": 3, "fire_giant": 2, "hydra": 2, "juggernaut": 2, "grand_avatar": 1},
 	},
 	"peaks": {
 		"name": "Dragon Peaks", "tile": "peaks", "cost_maps": 3, "min_rating": 1150,
 		"desc": "Only the bold climb where dragons nest.",
-		"drops": {"orc_sorcerer": 24, "centaur": 20, "griffon": 16, "hill_giant": 12, "lich": 10, "golden_dragon": 3, "phoenix": 2, "titan": 2},
+		"drops": {"orc_sorcerer": 24, "centaur": 20, "griffon": 16, "hill_giant": 12, "lich": 10, "golden_dragon": 3, "phoenix": 2, "titan": 2, "hippogriff": 8, "tengu_warrior": 8, "cyclops": 6, "manticore": 6, "salamander_firebrand": 7, "stone_giant": 3, "frost_giant": 3, "fire_giant": 3, "sphinx": 2, "ice_dragon": 2, "shadow_dragon": 1, "storm_dragon": 2},
 	},
 }
 
@@ -222,6 +503,16 @@ const PITY := [
 const ROWS := ["front", "middle", "back"]
 
 const STARTER_UNITS := ["goblin", "kobold_slinger", "rat_swarm"]
+
+
+## A region's drop table without locked units.
+static func region_drops(region_id: String) -> Dictionary:
+	var out := {}
+	var drops: Dictionary = REGIONS[region_id]["drops"]
+	for id in drops:
+		if not UnitLocks.is_locked(id):
+			out[id] = drops[id]
+	return out
 
 
 static func unit_ids_sorted() -> Array:

@@ -86,8 +86,9 @@ func _make_region(rid: String) -> Control:
 	v.add_child(UIKit.label(region["name"], 19, UIKit.ACCENT if unlocked else UIKit.TEXT_DIM))
 	v.add_child(UIKit.label(region["desc"], 13, UIKit.TEXT_DIM))
 	var drops := UIKit.hbox(10)
-	var ids: Array = region["drops"].keys()
-	ids.sort_custom(func(a, b): return int(region["drops"][a]) > int(region["drops"][b]))
+	var region_drops := GameData.region_drops(rid)
+	var ids: Array = region_drops.keys()
+	ids.sort_custom(func(a, b): return int(region_drops[a]) > int(region_drops[b]))
 	for id in ids:
 		var dv := UIKit.vbox(0)
 		var owned := Profile.owns(id)

@@ -210,6 +210,12 @@ Ctrl+P then Ctrl+Q to detach again.
 | `gold draft-table 500 300 200 100` | Base Legion Draft payout for 1st, 2nd, 3rd…; the last number applies to every lower place. |
 | `gold reset` | Back to the defaults (x1, x1, 400/250/150/60). |
 | `say Server restarting in 5 minutes` | Show a message to every connected player. |
+| `units` | List all 60 units and whether each is locked or open. |
+| `lock Storm Dragon` / `lock goblin ogre` | Lock units by name or id. Locked units stop appearing in expeditions, draft shops and ranked opponents, are removed from army codes, and don't deploy in battles. Useful for emergency balance fixes. |
+| `unlock storm_dragon` | Unlock units again. |
+| `unlock new` / `lock new` | Release (or re-lock) the 40 not-yet-released units all at once. |
+| `unlock all` | Unlock every unit. |
+| `lock reset` | Back to the default locks (the 40 new units locked, everything else open). |
 
 Notes:
 - **Settings persist:** they're saved to `server_config.json` in the server's Godot user data
@@ -217,6 +223,10 @@ Notes:
 - **Draft payouts** are calculated by the server and apply to matches still in progress.
 - **The battle multiplier** is sent to players when they connect and whenever you change it.
   Their game remembers it, so it applies to all their battles.
+- **Unit locks** are saved with the gold settings and sent to players the same way. Legion Draft
+  matches already running pick up a change at their next shop phase. Units already on a draft
+  board stay for that match. Players who own a locked unit keep it, but it sits out of battles
+  until it's unlocked.
 - **Startup flags:** you can also set values when starting the server, e.g.
   `-- --server --battle-gold=1.5 --draft-gold=2`. These override the saved file for that run.
 

@@ -19,6 +19,7 @@ func _initialize() -> void:
 	test_board_sizes()
 	test_room_rule_toggles()
 	test_server_gold_commands()
+	test_unit_locks()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -345,3 +346,83 @@ func test_server_gold_commands() -> void:
 	check(party.run_command("gold nonsense").begins_with("Usage"), "bad command shows usage")
 	party.run_command("gold reset")
 	check(is_equal_approx(float(party.rewards["battle_mult"]), 1.0), "gold reset restores defaults")
+
+
+func test_unit_locks() -> void:
+	print("unit locks")
+	var profile := root.get_node("Profile")
+	var party := root.get_node("Party")
+	var backup: Dictionary = profile.data.duplicate(true)
+	UnitLocks.set_locked_list(UnitLocks.defaults())
+	var locked := UnitLocks.locked_list()
+	check(locked.size() == 40 and GameData.UNITS.size() == 60, "60 units, the 40 new ones locked by default")
+	var assets_ok := true
+	for id in locked:
+		var in_region := false
+		for rid in GameData.REGIONS:
+			if GameData.REGIONS[rid]["drops"].has(id):
+				in_region = true
+		if load("res://assets/sprites/units/%s.png" % id) == null or not DraftData.ABILITIES.has(id) or not in_region:
+			assets_ok = false
+			print("    missing data for ", id)
+	check(assets_ok, "every new unit has a sprite, a draft ability and a region")
+	# Expeditions never offer locked units.
+	var leaked := false
+	for i in 400:
+		profile.data["maps"] = 99
+		profile.data["pending_choice"] = {}
+		profile.data["rating"] = 5000
+		var region: String = GameData.REGIONS.keys()[i % GameData.REGIONS.size()]
+		for o in profile.explore(region)["options"]:
+			if UnitLocks.is_locked(o["unit"]):
+				leaked = true
+	profile.data["pending_choice"] = {}
+	check(not leaked, "400 expeditions never offered a locked unit")
+	# Draft shops never offer them, even at the top tier.
+	var run := DraftRun.new(321)
+	run.battles_played = 30
+	run.gold = 1000
+	run.begin_turn()
+	var shop_leak := false
+	for i in 300:
+		for su in run.shop_units:
+			if UnitLocks.is_locked(su["unit"]):
+				shop_leak = true
+		run.reroll()
+	check(not shop_leak, "300 tier-6 draft shops never offered a locked unit")
+	# Ranked ghosts and army codes skip them.
+	var ghost_leak := false
+	for i in 50:
+		for sq in Army.generate_opponent(80000.0, 1500, i)["squads"]:
+			if UnitLocks.is_locked(sq["unit"]):
+				ghost_leak = true
+	check(not ghost_leak, "ranked opponents never use locked units")
+	var code := Army.encode("X", 1000, [{"unit": "storm_dragon", "level": 5, "tier": 2, "row": "back"}, {"unit": "goblin", "level": 1, "tier": 0, "row": "front"}])
+	var dec := Army.decode(code)
+	check(dec["squads"].size() == 1 and dec["squads"][0]["unit"] == "goblin", "army codes drop locked units")
+	profile.data["units"]["storm_dragon"] = {"level": 1, "tier": 0, "shards": 0}
+	profile.data["army"] = [{"unit": "storm_dragon", "row": "back"}, {"unit": "goblin", "row": "front"}]
+	check(profile.army_squads().size() == 2 and profile.battle_squads().size() == 1, "an owned locked unit stays in the army but doesn't deploy")
+	# Server commands.
+	party.run_command("unlock Storm Dragon")
+	check(not UnitLocks.is_locked("storm_dragon") and GameData.region_drops("peaks").has("storm_dragon"), "'unlock Storm Dragon' makes it available")
+	check(profile.battle_squads().size() == 2, "unlocked unit deploys again")
+	party.run_command("lock goblin")
+	check(UnitLocks.is_locked("goblin") and not DraftData.units_for_tier(1, UnitLocks.as_dict()).has("goblin"), "'lock goblin' removes an original unit from shops")
+	check(party.run_command("lock nosuchunit").contains("Unknown"), "unknown names are reported")
+	party.run_command("unlock new")
+	check(UnitLocks.locked_list() == ["goblin"], "'unlock new' releases all 40 new units")
+	party.run_command("lock reset")
+	check(UnitLocks.locked_list().size() == 40 and not UnitLocks.is_locked("goblin"), "'lock reset' restores the defaults")
+	# A server-run match syncs the lock list into every run state.
+	var room := MatchRoom.new("LOCKS", {"max_players": 2}, true, false)
+	var states: Array = []
+	room.outbox.connect(func(id: int, method: String, args: Array):
+		if method == "shop":
+			states.append(args[2]))
+	room.add_player(5, "P")
+	room.add_bot(5)
+	room.start(5)
+	check(not states.is_empty() and (states[0]["excluded"] as Array).size() == 40, "match state carries the server's locks to clients")
+	profile.data = backup
+	profile.save()

@@ -134,12 +134,12 @@ func _ready() -> void:
 func refresh() -> void:
 	if not is_inside_tree():
 		return
-	var my := Profile.army_squads()
+	var my := Profile.battle_squads()
 	_record_label.text = "Rating %d   ·   Wins %d   ·   Losses %d   ·   Your power %s" % [Profile.rating(), int(Profile.data["wins"]), int(Profile.data["losses"]), Army.format_power(Army.army_power(my))]
 
 
 func _find_opponents() -> void:
-	var my_power := maxf(500.0, Army.army_power(Profile.army_squads()))
+	var my_power := maxf(500.0, Army.army_power(Profile.battle_squads()))
 	var rating := Profile.rating()
 	_opponents.clear()
 	var rng := RandomNumberGenerator.new()
@@ -188,7 +188,7 @@ func _fight_code() -> void:
 
 
 func _start(opp: Dictionary, mode: String) -> void:
-	var mine := Profile.army_squads()
+	var mine := Profile.battle_squads()
 	if mine.is_empty():
 		_status.text = "Build an army first (Army tab)."
 		return

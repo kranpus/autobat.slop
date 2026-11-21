@@ -67,6 +67,46 @@ const ABILITIES := {
 	"golden_dragon":     {"name": "Hoard",           "trigger": "turn_start",  "effect": "gold",      "amount": 1,  "target": "self",    "text": "Start of turn: gain +1 gold."},
 	"titan":             {"name": "Colossus",        "trigger": "buy",         "effect": "buff_both", "amount": 8,  "target": "others",  "text": "When bought: all other allies get +8% HP and damage."},
 	"phoenix":           {"name": "Rekindle",        "trigger": "sell",        "effect": "buff_both", "amount": 10, "target": "others",  "text": "When sold: all other allies get +10% HP and damage."},
+	"jackal": {"name": "Pack Call", "trigger": "turn_end", "effect": "count", "amount": 2, "target": "self", "text": "End of turn: +2 jackals join this squad."},
+	"giant_frog": {"name": "Croak", "trigger": "buy", "effect": "buff_hp", "amount": 5, "target": "adjacent", "text": "When bought: neighbouring allies get +5% HP."},
+	"hobgoblin": {"name": "Shield Wall", "trigger": "turn_start", "effect": "buff_hp", "amount": 4, "target": "front", "text": "Start of turn: other front-row allies get +4% HP."},
+	"gnoll_raider": {"name": "Plunder", "trigger": "battle_won", "effect": "gold", "amount": 1, "target": "self", "text": "After a won battle: +1 gold."},
+	"kobold_brute": {"name": "Bully", "trigger": "sell", "effect": "buff_hp", "amount": 6, "target": "random2", "text": "When sold: 2 random allies get +6% HP."},
+	"cave_bat": {"name": "Echolocation", "trigger": "turn_start", "effect": "buff_dmg", "amount": 3, "target": "back", "text": "Start of turn: back-row allies get +3% damage."},
+	"soldier_ant": {"name": "Colony", "trigger": "level_up", "effect": "count", "amount": 6, "target": "self", "text": "On level up: +6 ants join this squad."},
+	"goblin_archer": {"name": "Potshot", "trigger": "turn_end", "effect": "buff_dmg", "amount": 3, "target": "random1", "text": "End of turn: a random ally gets +3% damage."},
+	"orc_knight": {"name": "Iron Discipline", "trigger": "turn_end", "effect": "buff_hp", "amount": 5, "target": "self", "text": "End of turn: +5% HP."},
+	"elf_knight": {"name": "Duelist", "trigger": "battle_won", "effect": "buff_dmg", "amount": 6, "target": "self", "text": "After a won battle: +6% damage."},
+	"hippogriff": {"name": "Updraft", "trigger": "buy", "effect": "buff_dmg", "amount": 5, "target": "back", "text": "When bought: back-row allies get +5% damage."},
+	"war_hound": {"name": "Hunting Pack", "trigger": "buy", "effect": "buff_dmg", "amount": 6, "target": "beasts", "text": "When bought: other beast allies get +6% damage."},
+	"black_bear": {"name": "Hibernate", "trigger": "turn_start", "effect": "buff_hp", "amount": 5, "target": "self", "text": "Start of turn: +5% HP."},
+	"elf_mage": {"name": "Focus", "trigger": "turn_end", "effect": "buff_dmg", "amount": 4, "target": "self", "text": "End of turn: +4% damage."},
+	"wight": {"name": "Grave Chill", "trigger": "battle_lost", "effect": "buff_both", "amount": 5, "target": "self", "text": "After a lost battle: +5% HP and damage."},
+	"naga_warrior": {"name": "Coils", "trigger": "trinket", "effect": "buff_dmg", "amount": 10, "target": "self", "text": "When given a trinket: +10% damage."},
+	"merfolk_impaler": {"name": "Tide Call", "trigger": "turn_start", "effect": "buff_hp", "amount": 4, "target": "random2", "text": "Start of turn: 2 random allies get +4% HP."},
+	"tengu_warrior": {"name": "Swoop", "trigger": "level_up", "effect": "buff_dmg", "amount": 10, "target": "others", "text": "On level up: all other allies get +10% damage."},
+	"troll": {"name": "Regrowth", "trigger": "turn_end", "effect": "buff_hp", "amount": 6, "target": "self", "text": "End of turn: +6% HP."},
+	"troll_berserker": {"name": "Bloodlust", "trigger": "battle_won", "effect": "buff_dmg", "amount": 10, "target": "self", "text": "After a won battle: +10% damage."},
+	"cyclops": {"name": "Boulder Pile", "trigger": "turn_start", "effect": "buff_dmg", "amount": 6, "target": "front", "text": "Start of turn: front-row allies get +6% damage."},
+	"minotaur": {"name": "Labyrinth Rage", "trigger": "ally_sold", "effect": "buff_both", "amount": 6, "target": "self", "text": "When an ally is sold: +6% HP and damage."},
+	"manticore": {"name": "Tail Spikes", "trigger": "buy", "effect": "buff_dmg", "amount": 8, "target": "back", "text": "When bought: back-row allies get +8% damage."},
+	"ettin": {"name": "Two Heads", "trigger": "level_up", "effect": "buff_hp", "amount": 10, "target": "front", "text": "On level up: other front-row allies get +10% HP."},
+	"salamander_firebrand": {"name": "Kindle", "trigger": "turn_end", "effect": "buff_dmg", "amount": 5, "target": "adjacent", "text": "End of turn: neighbouring allies get +5% damage."},
+	"vampire_knight": {"name": "Blood Pact", "trigger": "trinket", "effect": "buff_both", "amount": 8, "target": "self", "text": "When given a trinket: +8% HP and damage."},
+	"orc_warlord": {"name": "Warlord's Call", "trigger": "turn_start", "effect": "buff_dmg", "amount": 5, "target": "others", "text": "Start of turn: all other allies get +5% damage."},
+	"death_knight": {"name": "Dark Oath", "trigger": "battle_lost", "effect": "buff_dmg", "amount": 10, "target": "others", "text": "After a lost battle: all other allies get +10% damage."},
+	"stone_giant": {"name": "Avalanche", "trigger": "buy", "effect": "buff_hp", "amount": 10, "target": "front", "text": "When bought: other front-row allies get +10% HP."},
+	"frost_giant": {"name": "Permafrost", "trigger": "turn_end", "effect": "buff_hp", "amount": 8, "target": "front", "text": "End of turn: other front-row allies get +8% HP."},
+	"fire_giant": {"name": "Forge Heart", "trigger": "level_up", "effect": "buff_dmg", "amount": 12, "target": "others", "text": "On level up: all other allies get +12% damage."},
+	"sphinx": {"name": "Ancient Wisdom", "trigger": "turn_start", "effect": "buff_both", "amount": 4, "target": "random2", "text": "Start of turn: 2 random allies get +4% HP and damage."},
+	"ice_dragon": {"name": "Frost Breath", "trigger": "buy", "effect": "buff_hp", "amount": 10, "target": "others", "text": "When bought: all other allies get +10% HP."},
+	"hydra": {"name": "Many Heads", "trigger": "turn_end", "effect": "count", "amount": 1, "target": "self", "text": "End of turn: +1 hydra joins this squad."},
+	"bone_dragon": {"name": "Necrotic Bond", "trigger": "ally_sold", "effect": "buff_hp", "amount": 15, "target": "self", "text": "When an ally is sold: +15% HP."},
+	"juggernaut": {"name": "Unstoppable", "trigger": "battle_lost", "effect": "buff_hp", "amount": 15, "target": "self", "text": "After a lost battle: +15% HP."},
+	"shadow_dragon": {"name": "Eclipse", "trigger": "sell", "effect": "buff_dmg", "amount": 12, "target": "others", "text": "When sold: all other allies get +12% damage."},
+	"storm_dragon": {"name": "Tempest", "trigger": "turn_start", "effect": "buff_dmg", "amount": 4, "target": "others", "text": "Start of turn: all other allies get +4% damage."},
+	"seraph": {"name": "Benediction", "trigger": "turn_end", "effect": "buff_hp", "amount": 6, "target": "others", "text": "End of turn: all other allies get +6% HP."},
+	"grand_avatar": {"name": "Ascendance", "trigger": "level_up", "effect": "buff_both", "amount": 15, "target": "others", "text": "On level up: all other allies get +15% HP and damage."},
 }
 
 # --- Trinkets ---------------------------------------------------------------
@@ -121,9 +161,12 @@ static func xp_text(xp: int) -> String:
 	return "%d/2 to Lv2" % (xp - 1)
 
 
-static func units_for_tier(tier: int) -> Array:
+## Units the shop can offer at a tier, minus `excluded` (locked units).
+static func units_for_tier(tier: int, excluded: Dictionary = {}) -> Array:
 	var out: Array = []
 	for id in GameData.UNITS:
+		if excluded.has(id):
+			continue
 		if int(RARITY_TIER[GameData.UNITS[id]["rarity"]]) <= tier:
 			out.append(id)
 	return out

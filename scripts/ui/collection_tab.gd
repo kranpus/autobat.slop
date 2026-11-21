@@ -43,7 +43,12 @@ func refresh() -> void:
 	if not is_inside_tree():
 		return
 	UIKit.clear(_grid)
+	if UnitLocks.is_locked(_selected) and not Profile.owns(_selected):
+		_selected = GameData.STARTER_UNITS[0]
 	for id in GameData.unit_ids_sorted():
+		# Locked units stay hidden unless you already own one.
+		if UnitLocks.is_locked(id) and not Profile.owns(id):
+			continue
 		_grid.add_child(_make_card(id))
 	_build_detail()
 
@@ -76,7 +81,11 @@ func _make_card(id: String) -> Control:
 	var info_l := UIKit.label(info, 12, UIKit.TEXT_DIM)
 	info_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(info_l)
-	if owned and (Profile.can_tier_up(id) or Profile.can_level_up(id)):
+	if UnitLocks.is_locked(id):
+		var lk := UIKit.label("🔒 locked by server", 11, UIKit.BAD)
+		lk.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(lk)
+	elif owned and (Profile.can_tier_up(id) or Profile.can_level_up(id)):
 		var up := UIKit.label("▲ upgrade ready", 11, UIKit.GOOD)
 		up.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(up)
@@ -102,11 +111,16 @@ func _build_detail() -> void:
 	head.add_child(hv)
 	_detail.add_child(head)
 
+	if UnitLocks.is_locked(id):
+		var note := UIKit.label("🔒 Locked by the server: this unit can't be found or deployed until it's unlocked. You keep it and its upgrades.", 13, UIKit.BAD)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note.custom_minimum_size = Vector2(240, 0)
+		_detail.add_child(note)
 	if not owned:
 		_detail.add_child(UIKit.label("You haven't found this unit yet.", 15, UIKit.BAD))
 		_detail.add_child(UIKit.label("Where to find it:", 14, UIKit.ACCENT))
 		for rid in GameData.REGIONS:
-			if GameData.REGIONS[rid]["drops"].has(id):
+			if GameData.region_drops(rid).has(id):
 				_detail.add_child(UIKit.label("  • %s: %.1f%% chance to be offered per expedition" % [GameData.REGIONS[rid]["name"], Profile.drop_chance(rid, id) * 100.0], 14))
 		_add_stats(id, 1)
 		return
@@ -175,7 +189,7 @@ func _build_detail() -> void:
 			var army: Array = Profile.data["army"].duplicate()
 			army.append({"unit": id, "row": GameData.default_row_for(id)})
 			Profile.set_army(army))
-		add.disabled = Profile.data["army"].size() >= GameData.MAX_SQUADS
+		add.disabled = Profile.data["army"].size() >= GameData.MAX_SQUADS or UnitLocks.is_locked(id)
 		_detail.add_child(add)
 
 

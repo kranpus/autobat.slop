@@ -95,7 +95,8 @@ func refresh() -> void:
 		return
 	var squads := Profile.army_squads()
 	var counts := Army.deploy_counts(squads)
-	_summary.text = "Army: %d units     Power: %s     Squads: %d / %d" % [Army.total_units(squads), Army.format_power(Army.army_power(squads)), squads.size(), GameData.MAX_SQUADS]
+	var deploy := Profile.battle_squads()
+	_summary.text = "Army: %d units     Power: %s     Squads: %d / %d" % [Army.total_units(deploy), Army.format_power(Army.army_power(deploy)), squads.size(), GameData.MAX_SQUADS]
 	for row in COLUMNS:
 		var list: VBoxContainer = _columns[row]["list"]
 		UIKit.clear(list)
@@ -105,6 +106,8 @@ func refresh() -> void:
 		for i in squads.size():
 			if squads[i]["row"] == row:
 				indexes.append(i)
+				if UnitLocks.is_locked(squads[i]["unit"]):
+					continue  # locked squads don't deploy
 				units += int(counts[i])
 				power += Army.unit_power(squads[i]["unit"], int(squads[i]["level"])) * float(counts[i])
 		(_columns[row]["header"] as Label).text = "%d squad%s · %d units · Power %s" % [indexes.size(), "" if indexes.size() == 1 else "s", units, Army.format_power(power)]
@@ -123,7 +126,7 @@ func refresh() -> void:
 	for sq in squads:
 		in_army[sq["unit"]] = true
 	for id in GameData.unit_ids_sorted():
-		if Profile.owns(id) and not in_army.has(id):
+		if Profile.owns(id) and not in_army.has(id) and not UnitLocks.is_locked(id):
 			_add_picker.add_item("%s  (Lv %d, x%d)" % [GameData.UNITS[id]["name"], int(Profile.unit(id)["level"]), Profile.squad_size(id)])
 			_add_picker.set_item_metadata(_add_picker.item_count - 1, id)
 	_add_button.disabled = _add_picker.item_count == 0 or squads.size() >= GameData.MAX_SQUADS
@@ -144,7 +147,10 @@ func _make_card(index: int, sq: Dictionary, deployed: int, first: bool, last: bo
 	var name_l := UIKit.label(GameData.UNITS[id]["name"], 15, GameData.rarity_color(GameData.UNITS[id]["rarity"]))
 	name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	info.add_child(name_l)
-	info.add_child(UIKit.label("Lv %d · x%d · Power %s" % [int(sq["level"]), deployed, Army.format_power(Army.unit_power(id, int(sq["level"])) * float(deployed))], 12, UIKit.TEXT_DIM))
+	if UnitLocks.is_locked(id):
+		info.add_child(UIKit.label("🔒 Locked by server: won't deploy", 12, UIKit.BAD))
+	else:
+		info.add_child(UIKit.label("Lv %d · x%d · Power %s" % [int(sq["level"]), deployed, Army.format_power(Army.unit_power(id, int(sq["level"])) * float(deployed))], 12, UIKit.TEXT_DIM))
 	h.add_child(info)
 	v.add_child(h)
 	var buttons := UIKit.hbox(4)

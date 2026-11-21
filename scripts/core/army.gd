@@ -117,7 +117,7 @@ static func decode(code: String) -> Dictionary:
 		if typeof(entry) != TYPE_ARRAY or entry.size() < 4:
 			continue
 		var uid := str(entry[0])
-		if not GameData.UNITS.has(uid):
+		if not GameData.UNITS.has(uid) or UnitLocks.is_locked(uid):
 			continue
 		var tier := clampi(int(entry[2]), 0, GameData.MAX_TIER)
 		var level := clampi(int(entry[1]), 1, max_level_for_tier(tier))
@@ -155,7 +155,7 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int)
 	if rating >= 1300:
 		max_rarity = 4
 	var pool: Array = []
-	for id in GameData.UNITS:
+	for id in UnitLocks.unlocked_ids():
 		if int(GameData.RARITIES[GameData.UNITS[id]["rarity"]]["order"]) <= max_rarity:
 			pool.append(id)
 	var squad_count := rng.randi_range(3, GameData.MAX_SQUADS)

@@ -13,10 +13,14 @@ var lives := 5
 var wins := 0
 var log_lines: Array = []        # recent ability messages for the UI
 var rng := RandomNumberGenerator.new()
+## Units this run's shop must never offer (locked units). Set by the match
+## authority and synced with the run state, so every copy rolls the same shop.
+var excluded := {}
 
 
 func _init(seed_value: int = 0, board_slots: int = DraftData.BOARD_SLOTS) -> void:
 	slots = DraftData.valid_slots(board_slots)
+	excluded = UnitLocks.as_dict()
 	if seed_value == 0:
 		rng.randomize()
 	else:
@@ -83,7 +87,7 @@ func _roll_shop(keep_frozen: bool) -> void:
 		for s in shop_trinkets:
 			if bool(s["frozen"]):
 				kept_trinkets.append(s)
-	var unit_pool := DraftData.units_for_tier(t)
+	var unit_pool := DraftData.units_for_tier(t, excluded)
 	var trinket_pool := DraftData.trinkets_for_tier(t)
 	shop_units = kept_units
 	while shop_units.size() < int(DraftData.SHOP_UNIT_SLOTS[t - 1]):
@@ -468,12 +472,15 @@ func to_dict() -> Dictionary:
 		"board": board.duplicate(true), "shop_units": shop_units.duplicate(true),
 		"shop_trinkets": shop_trinkets.duplicate(true), "gold": gold,
 		"battles_played": battles_played, "lives": lives, "wins": wins,
-		"seed": rng.seed, "state": rng.state, "log": log_lines.duplicate(), "slots": slots,
+		"seed": rng.seed, "state": rng.state, "log": log_lines.duplicate(), "slots": slots, "excluded": excluded.keys(),
 	}
 
 
 func load_dict(d: Dictionary) -> void:
 	slots = DraftData.valid_slots(int(d.get("slots", slots)))
+	excluded = {}
+	for id in d.get("excluded", []):
+		excluded[str(id)] = true
 	board = DraftData.sanitize_board(d.get("board", []), slots)
 	shop_units = []
 	for s in d.get("shop_units", []):

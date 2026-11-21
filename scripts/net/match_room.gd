@@ -260,8 +260,10 @@ func _begin_shop() -> void:
 	_shop_ready.clear()
 	_deadline = Time.get_ticks_msec() + int(settings["turn_time"]) * 1000 if settings["use_timer"] else 0
 	phase = "shop"
+	var locked := UnitLocks.as_dict()
 	for id in _active_ids():
 		var r: DraftRun = _runs[id]
+		r.excluded = locked   # server's current locks apply from this shop on
 		r.begin_turn()
 		if players[id]["bot"]:
 			r.auto_play()

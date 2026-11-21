@@ -62,6 +62,22 @@ touch controls and pinch-to-zoom. See **[MOBILE.md](MOBILE.md)** for how to buil
    - **Battlefield picker:** choose one of the 20 maps (or Random) for friend challenges and duels
      you host. Each ranked opponent card shows the map you'll fight on.
 
+## Locked units
+
+There are **60 units**. The original 20 are open. **40 more are locked** until you release them:
+- **Commons:** Jackals, Hobgoblins, Cave Bats, Goblin Archers and more.
+- **Uncommons:** Knights, Hippogriffs, War Hounds, Elven Mages and more.
+- **Rares:** Trolls, Cyclopes, Minotaurs, Vampire Knights and more.
+- **Epics:** Giants, the Sphinx, an Ice Dragon, a Hydra, a Bone Dragon and a Juggernaut.
+- **Legendaries:** the Shadow Dragon, Storm Dragon, Seraph and Grand Avatar.
+
+Locked units don't appear anywhere: not in expeditions, draft shops or ranked opponents, and not
+in army codes. Locked units you own sit out of battles.
+
+The Legion Draft server controls the locks (`units`, `lock`, `unlock`; see HOSTING.md). Any
+unit, old or new, can be locked as an emergency balance fix. Players' games pick up the server's
+locks when they connect. The defaults live in `scripts/core/game_data.gd` (`"locked": true`).
+
 ## Legion Draft (multiplayer game mode)
 
 A separate mode for a group of players, picked from the **Legion Draft** tab. It uses no

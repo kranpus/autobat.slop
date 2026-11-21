@@ -16,6 +16,9 @@ var data: Dictionary = {}
 ## before the scene tree is ready (e.g. from tool or test scripts).
 func _init() -> void:
 	load_profile()
+	# Unit locks last received from the server (or the built-in defaults).
+	if typeof(data.get("unit_locks")) == TYPE_ARRAY:
+		UnitLocks.set_locked_list(data["unit_locks"])
 
 
 func default_profile() -> Dictionary:
@@ -209,7 +212,8 @@ func region_unlocked(region_id: String) -> bool:
 
 
 func can_explore(region_id: String) -> bool:
-	return not has_pending_choice() and region_unlocked(region_id) and maps() >= int(GameData.REGIONS[region_id]["cost_maps"])
+	return not has_pending_choice() and region_unlocked(region_id) and maps() >= int(GameData.REGIONS[region_id]["cost_maps"]) \
+		and not GameData.region_drops(region_id).is_empty()
 
 
 func has_pending_choice() -> bool:
@@ -232,7 +236,7 @@ func explore(region_id: String) -> Dictionary:
 	data["maps"] = int(data["maps"]) - int(region["cost_maps"])
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var pool: Dictionary = (region["drops"] as Dictionary).duplicate()
+	var pool: Dictionary = GameData.region_drops(region_id)
 	var picks: Array = []
 	for _i in mini(GameData.FINDS_PER_EXPEDITION, pool.size()):
 		var picked := _weighted_pick(pool, rng)
@@ -271,7 +275,7 @@ func pity_remaining(rarity: String) -> int:
 ## Force rarer units into the offer when a pity counter is due, then update
 ## the counters. Returns the unit that was guaranteed ("" if none).
 func _apply_pity(region_id: String, picks: Array, rng: RandomNumberGenerator) -> String:
-	var drops: Dictionary = GameData.REGIONS[region_id]["drops"]
+	var drops: Dictionary = GameData.region_drops(region_id)
 	var pity: Dictionary = data.get("pity", {})
 	var guaranteed := ""
 	# Highest tier first, so one forced legendary also satisfies rare/epic.
@@ -349,7 +353,7 @@ func _weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
 
 ## Probability that a unit is among the offered choices in a region.
 func drop_chance(region_id: String, unit_id: String) -> float:
-	var drops: Dictionary = GameData.REGIONS[region_id]["drops"]
+	var drops: Dictionary = GameData.region_drops(region_id)
 	if not drops.has(unit_id):
 		return 0.0
 	return 1.0 - _miss_chance(drops, unit_id, mini(GameData.FINDS_PER_EXPEDITION, drops.size()))
@@ -391,7 +395,16 @@ func set_army(entries: Array) -> void:
 
 
 func army_code() -> String:
-	return Army.encode(player_name(), rating(), army_squads())
+	return Army.encode(player_name(), rating(), battle_squads())
+
+
+## The army as it actually deploys: squads of locked units stay out.
+func battle_squads() -> Array:
+	var out: Array = []
+	for sq in army_squads():
+		if not UnitLocks.is_locked(sq["unit"]):
+			out.append(sq)
+	return out
 
 
 # --- battle results ---------------------------------------------------------
