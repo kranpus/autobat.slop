@@ -26,6 +26,7 @@ func _ready() -> void:
 	if "--server" in OS.get_cmdline_user_args():
 		_run_dedicated_server()
 		return
+	UIKit.apply_ui_scale(get_tree())
 	menu_layer = CanvasLayer.new()
 	add_child(menu_layer)
 	var root := Control.new()
@@ -40,9 +41,8 @@ func _ready() -> void:
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 12)
 	root.add_child(margin)
+	UIKit.apply_margins(margin, 8 if UIKit.is_compact(self) else 12)
 
 	var layout := UIKit.vbox(8)
 	margin.add_child(layout)
@@ -114,14 +114,22 @@ func _run_dedicated_server() -> void:
 
 
 func _build_top_bar() -> Control:
+	var compact := UIKit.is_compact(self)
 	var p := UIKit.panel(UIKit.PANEL)
-	var h := UIKit.hbox(24)
+	if compact:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = UIKit.PANEL
+		sb.set_corner_radius_all(6)
+		sb.set_content_margin_all(6)
+		p.add_theme_stylebox_override("panel", sb)
+	var h := UIKit.hbox(14 if compact else 24)
 	p.add_child(h)
-	h.add_child(UIKit.label("AUTOBAT LEGIONS", 22, UIKit.ACCENT))
+	h.add_child(UIKit.label("AUTOBAT LEGIONS", 17 if compact else 22, UIKit.ACCENT))
 	h.add_child(UIKit.spacer())
-	_gold_label = UIKit.label("", 17, Color("ffd76a"))
-	_maps_label = UIKit.label("", 17, Color("9fd3ff"))
-	_rating_label = UIKit.label("", 17, Color("ffffff"))
+	var fs := 14 if compact else 17
+	_gold_label = UIKit.label("", fs, Color("ffd76a"))
+	_maps_label = UIKit.label("", fs, Color("9fd3ff"))
+	_rating_label = UIKit.label("", fs, Color("ffffff"))
 	h.add_child(_gold_label)
 	h.add_child(_maps_label)
 	h.add_child(_rating_label)
@@ -135,7 +143,7 @@ func _refresh_top_bar() -> void:
 	if next >= 0:
 		@warning_ignore("integer_division")
 		timer_text = "  (+1 in %d:%02d)" % [next / 60, next % 60]
-	_maps_label.text = "Scouting Maps: %d/%d%s" % [Profile.maps(), Profile.MAX_MAPS, timer_text]
+	_maps_label.text = "%s: %d/%d%s" % ["Maps" if UIKit.is_compact(self) else "Scouting Maps", Profile.maps(), Profile.MAX_MAPS, timer_text]
 	_rating_label.text = "Rating: %d   W/L %d/%d" % [Profile.rating(), int(Profile.data["wins"]), int(Profile.data["losses"])]
 
 
@@ -168,6 +176,24 @@ func _on_battle_closed() -> void:
 		return
 	menu_layer.visible = true
 	Profile.changed.emit()
+
+
+## Android back button / gesture: close a finished battle, otherwise step
+## back to the first tab, and quit from there.
+func _notification(what: int) -> void:
+	if what != NOTIFICATION_WM_GO_BACK_REQUEST or menu_layer == null:
+		return
+	if _battle != null:
+		var sim = _battle.get("sim")
+		if sim != null and sim.finished:
+			_battle.emit_signal("closed")
+		return
+	if draft_layer.visible:
+		return  # use the Leave button so a match isn't quit by accident
+	if tabs.current_tab != 0:
+		tabs.current_tab = 0
+	else:
+		get_tree().quit()
 
 
 func _show_draft() -> void:

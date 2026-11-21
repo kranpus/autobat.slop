@@ -41,9 +41,14 @@ func _ready() -> void:
 	scroll.add_child(_opponents_box)
 
 	# --- Right column: friend challenge + live duel ------------------------
+	# Right column scrolls so it also fits short (phone) screens.
+	var right_scroll := ScrollContainer.new()
+	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	right_scroll.custom_minimum_size = Vector2(380 if UIKit.is_compact(self) else 420, 0)
+	add_child(right_scroll)
 	var right := UIKit.vbox(12)
-	right.custom_minimum_size = Vector2(420, 0)
-	add_child(right)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_scroll.add_child(right)
 
 	var fp := UIKit.panel(UIKit.PANEL_LIGHT)
 	var mp := UIKit.panel(UIKit.PANEL_LIGHT)

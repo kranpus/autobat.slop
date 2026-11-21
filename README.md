@@ -20,6 +20,9 @@ All art, sound and music are **CC0 open-source assets** (see [CREDITS.md](CREDIT
 
 The first time it opens, the editor imports the assets, which takes a few seconds.
 
+**Phones and tablets:** the game also runs on Android and iOS, with scaled-up text and buttons,
+touch controls and pinch-to-zoom. See **[MOBILE.md](MOBILE.md)** for how to build it.
+
 ## The gameplay loop
 
 1. **Find units: Expeditions tab.** Spend *Scouting Maps* to search a region. Your scouts come

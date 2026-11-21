@@ -140,3 +140,71 @@ static func squad_strip(squads: Array, px: int = 28) -> HBoxContainer:
 		v.add_child(l)
 		h.add_child(v)
 	return h
+
+
+# --- screen size / mobile -------------------------------------------------------
+
+const UI_SCALES := ["auto", "1.0", "1.25", "1.5", "1.75", "2.0"]
+
+
+static func is_mobile() -> bool:
+	return OS.has_feature("mobile") or OS.has_feature("web_android") or OS.has_feature("web_ios")
+
+
+## Interface scale chosen from the physical screen size: 1.0 on desktop, larger
+## on phones so text and buttons are big enough to read and tap.
+static func auto_ui_scale() -> float:
+	if not is_mobile():
+		return 1.0
+	var screen := DisplayServer.screen_get_size()
+	var dpi := maxf(96.0, float(DisplayServer.screen_get_dpi()))
+	var short_side_inches := float(mini(screen.x, screen.y)) / dpi
+	# Aim for roughly 110 logical pixels per inch of screen height...
+	var logical_height := clampf(short_side_inches * 110.0, 430.0, 720.0)
+	var factor := 720.0 / logical_height
+	# ...but keep the layout at least 960 logical pixels wide.
+	var aspect := float(maxi(screen.x, screen.y)) / float(maxi(1, mini(screen.x, screen.y)))
+	return clampf(minf(factor, 720.0 * aspect / 960.0), 1.0, 2.0)
+
+
+## Apply the player's interface size (Settings) or the automatic one.
+## `--ui-scale=1.6` on the command line overrides it (handy for testing).
+static func apply_ui_scale(tree: SceneTree) -> void:
+	var setting := str(Profile.data.get("ui_scale", "auto"))
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--ui-scale="):
+			setting = arg.get_slice("=", 1)
+	var factor := auto_ui_scale() if setting == "auto" or not setting.is_valid_float() else clampf(float(setting), 0.75, 2.5)
+	tree.root.content_scale_factor = factor
+
+
+## True on short screens (phones in landscape): screens use tighter layouts.
+static func is_compact(node: Node) -> bool:
+	var size := node.get_viewport().get_visible_rect().size
+	return size.y < 560.0 or size.x < 1100.0
+
+
+## Extra margins (in UI pixels) that keep content clear of notches and
+## rounded corners on phones. Zero on desktop.
+static func safe_margins(node: Node) -> Dictionary:
+	var out := {"left": 0.0, "top": 0.0, "right": 0.0, "bottom": 0.0}
+	if not is_mobile():
+		return out
+	var safe := DisplayServer.get_display_safe_area()
+	var screen := DisplayServer.screen_get_size()
+	var view := node.get_viewport().get_visible_rect().size
+	if safe.size.x <= 0 or screen.x <= 0:
+		return out
+	var k := view.x / float(screen.x)
+	out["left"] = float(safe.position.x) * k
+	out["top"] = float(safe.position.y) * k
+	out["right"] = float(screen.x - safe.end.x) * k
+	out["bottom"] = float(screen.y - safe.end.y) * k
+	return out
+
+
+## Apply a base margin plus the safe-area insets to a MarginContainer.
+static func apply_margins(m: MarginContainer, base: int) -> void:
+	var safe := safe_margins(m)
+	for side in ["left", "top", "right", "bottom"]:
+		m.add_theme_constant_override("margin_" + side, base + int(safe[side]))

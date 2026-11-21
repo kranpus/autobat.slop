@@ -43,8 +43,10 @@ var _drag_events: Array = []
 
 ## Queue a real mouse drag (press, several moves, release) between two controls.
 func _queue_drag(from: Control, to: Control) -> void:
-	var a := from.get_global_rect().get_center()
-	var b := to.get_global_rect().get_center()
+	# Convert UI coordinates to window pixels (they differ when the UI is scaled).
+	var to_window := root.get_final_transform()
+	var a := to_window * from.get_global_rect().get_center()
+	var b := to_window * to.get_global_rect().get_center()
 	var press := InputEventMouseButton.new()
 	press.button_index = MOUSE_BUTTON_LEFT
 	press.pressed = true

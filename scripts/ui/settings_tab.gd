@@ -44,6 +44,25 @@ func _ready() -> void:
 		Audio.set_sfx_volume(v)
 		Audio.play_sfx("click")))
 
+	grid.add_child(UIKit.label("Interface size", 15))
+	var size_pick := OptionButton.new()
+	var current := str(Profile.data.get("ui_scale", "auto"))
+	for opt in UIKit.UI_SCALES:
+		var o: String = opt
+		size_pick.add_item("Auto (%d%%)" % roundi(UIKit.auto_ui_scale() * 100.0) if o == "auto" else "%d%%" % roundi(float(o) * 100.0))
+		size_pick.set_item_metadata(size_pick.item_count - 1, o)
+		if o == current:
+			size_pick.selected = size_pick.item_count - 1
+	size_pick.tooltip_text = "Bigger text and buttons for phones and tablets. Auto picks a size from your screen."
+	size_pick.item_selected.connect(func(i: int):
+		Profile.data["ui_scale"] = size_pick.get_item_metadata(i)
+		Profile.save()
+		UIKit.apply_ui_scale(get_tree())
+		# Rebuild the menus so every screen lays itself out for the new size.
+		if not Party.is_in_match():
+			get_tree().reload_current_scene.call_deferred())
+	grid.add_child(size_pick)
+
 	var confirm := ConfirmationDialog.new()
 	confirm.dialog_text = "Erase all progress and start over?"
 	confirm.confirmed.connect(func(): Profile.reset())

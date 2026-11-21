@@ -22,8 +22,10 @@ func _ready() -> void:
 	add_theme_constant_override("separation", 10)
 	_summary = UIKit.label("", 18, UIKit.ACCENT)
 	add_child(_summary)
+	var compact := UIKit.is_compact(self)
 	var tip := UIKit.label("Every squad fights at full size. Drag squads between columns (or use ◀ ▶) to choose where they fight; ▲ ▼ set the order within a column. Your army deploys on the left of the battlefield, so the Front line column faces the enemy.", 13, UIKit.TEXT_DIM)
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tip.visible = not compact   # phones: room goes to the columns
 	add_child(tip)
 
 	var cols := UIKit.hbox(10)
@@ -65,7 +67,11 @@ func _ready() -> void:
 	_add_button.tooltip_text = "Added to the column that suits the unit's role; drag it elsewhere if you like."
 	add_row.add_child(_add_button)
 	add_row.add_child(UIKit.spacer())
-	add_row.add_child(UIKit.button("Auto-build strongest", _auto_build))
+	add_row.add_child(UIKit.button("Auto-build" if compact else "Auto-build strongest", _auto_build))
+	if compact:
+		add_row.add_child(UIKit.button("Copy army code", func():
+			DisplayServer.clipboard_set(Profile.army_code())
+			Audio.play_sfx("scroll")))
 	add_child(add_row)
 
 	var code_row := UIKit.hbox(8)
@@ -77,6 +83,7 @@ func _ready() -> void:
 	code_row.add_child(UIKit.button("Copy", func():
 		DisplayServer.clipboard_set(_code_edit.text)
 		Audio.play_sfx("scroll")))
+	code_row.visible = not compact
 	add_child(code_row)
 
 	Profile.changed.connect(refresh)

@@ -25,20 +25,21 @@ var _end_btn: Button
 var _overlay: PanelContainer
 var _overlay_box: VBoxContainer
 var _slot_buttons := {}    # slot -> Button, for live drop highlights
+var _compact := false       # short (phone) screens: smaller cards and fonts
 
 
 func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	theme = UIKit.make_theme()
+	_compact = UIKit.is_compact(self)
 	var bg := ColorRect.new()
 	bg.color = UIKit.BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 10)
 	add_child(margin)
+	UIKit.apply_margins(margin, 6 if _compact else 10)
 	var root := UIKit.vbox(8)
 	margin.add_child(root)
 
@@ -47,12 +48,12 @@ func _ready() -> void:
 	root.add_child(top)
 	var th := UIKit.hbox(10)
 	top.add_child(th)
-	_top_label = UIKit.label("", 17)
+	_top_label = UIKit.label("", 14 if _compact else 17)
 	th.add_child(_top_label)
 	th.add_child(UIKit.spacer())
-	_timer_label = UIKit.label("", 20, UIKit.ACCENT)
+	_timer_label = UIKit.label("", 16 if _compact else 20, UIKit.ACCENT)
 	th.add_child(_timer_label)
-	_reroll_btn = UIKit.button("Reroll (%dg)" % DraftData.REROLL_COST, _on_reroll)
+	_reroll_btn = UIKit.button(("Reroll %dg" if _compact else "Reroll (%dg)") % DraftData.REROLL_COST, _on_reroll)
 	th.add_child(_reroll_btn)
 	_freeze_btn = UIKit.button("Freeze", _on_freeze)
 	th.add_child(_freeze_btn)
@@ -60,10 +61,24 @@ func _ready() -> void:
 	_sell_btn.tooltip_text = "Sell the selected unit, or drag a unit here."
 	_sell_btn.set_drag_forwarding(Callable(), _can_drop_sell, _drop_sell)
 	th.add_child(_sell_btn)
-	_end_btn = UIKit.button("End Turn ▶", func(): Party.submit_turn())
-	_end_btn.add_theme_font_size_override("font_size", 18)
+	_end_btn = UIKit.button("End Turn" if _compact else "End Turn ▶", func(): Party.submit_turn())
+	_end_btn.add_theme_font_size_override("font_size", 15 if _compact else 18)
 	th.add_child(_end_btn)
-	th.add_child(UIKit.button("Leave", func(): leave_requested.emit()))
+	if not _compact:
+		th.add_child(UIKit.button("Leave", func(): leave_requested.emit()))
+	else:
+		# Phones: tighter buttons so the whole bar fits; Leave lives in the Players panel.
+		var colors := {"normal": Color("3a4157"), "hover": Color("4a5370"), "pressed": Color("5d4a1f"), "disabled": Color("2a2e3a")}
+		for b in [_reroll_btn, _freeze_btn, _sell_btn, _end_btn]:
+			for state in colors:
+				var sb := StyleBoxFlat.new()
+				sb.bg_color = colors[state]
+				sb.set_corner_radius_all(5)
+				sb.content_margin_left = 7
+				sb.content_margin_right = 7
+				sb.content_margin_top = 5
+				sb.content_margin_bottom = 5
+				(b as Button).add_theme_stylebox_override(state, sb)
 
 	var body := UIKit.hbox(10)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -72,24 +87,25 @@ func _ready() -> void:
 	main_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(main_col)
 
-	main_col.add_child(UIKit.label("Your Legion   (back row  ←→  front row, facing the enemy)", 16, UIKit.ACCENT))
+	main_col.add_child(UIKit.label("Your Legion  (back ←→ front)" if _compact else "Your Legion   (back row  ←→  front row, facing the enemy)", 13 if _compact else 16, UIKit.ACCENT))
 	_board_row = UIKit.hbox(8)
 	main_col.add_child(_board_row)
-	main_col.add_child(UIKit.label("Shop", 16, UIKit.ACCENT))
+	main_col.add_child(UIKit.label("Shop", 13 if _compact else 16, UIKit.ACCENT))
 	_shop_row = UIKit.hbox(8)
 	main_col.add_child(_shop_row)
 	_msg = UIKit.label("Drag shop items onto your board. Drag units between slots to move or merge duplicates, or onto Sell. (Clicking an item and then a slot works too.)", 13, UIKit.TEXT_DIM)
 	_msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	main_col.add_child(_msg)
+	_msg.visible = not _compact   # phones: the tip costs too much height
 	_log = RichTextLabel.new()
 	_log.bbcode_enabled = true
 	_log.scroll_following = true
 	_log.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_log.custom_minimum_size = Vector2(0, 80)
+	_log.custom_minimum_size = Vector2(0, 36 if _compact else 80)
 	main_col.add_child(_log)
 
 	var side_col := UIKit.vbox(8)
-	side_col.custom_minimum_size = Vector2(340, 0)
+	side_col.custom_minimum_size = Vector2(250 if _compact else 340, 0)
 	body.add_child(side_col)
 	var ip := UIKit.panel(UIKit.PANEL_LIGHT)
 	ip.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -185,8 +201,12 @@ func refresh() -> void:
 			round_text += "/%d" % int(s.get("max_rounds", 15))
 		var lives_text := "Lives %d/%d" % [int(me.get("lives", run.lives)), int(s["lives"])] if s.get("use_lives", true) else "Losses %d" % int(me.get("losses", 0))
 		var wins_text := "Wins %d/%d" % [int(me.get("wins", run.wins)), int(s["wins"])] if s.get("use_wins", true) else "Wins %d" % int(me.get("wins", run.wins))
-		_top_label.text = "%s   ·   Shop tier %d%s   ·   Gold %d   ·   %s   ·   %s" % [
-			round_text, tier, ("" if next < 0 else " (next in %d)" % next), run.gold, lives_text, wins_text]
+		if _compact:
+			_top_label.text = "%s · Tier %d%s · Gold %d · %s · %s" % [
+				round_text, tier, ("" if next < 0 else " (%d)" % next), run.gold, lives_text, wins_text]
+		else:
+			_top_label.text = "%s   ·   Shop tier %d%s   ·   Gold %d   ·   %s   ·   %s" % [
+				round_text, tier, ("" if next < 0 else " (next in %d)" % next), run.gold, lives_text, wins_text]
 	_reroll_btn.disabled = not shopping or run.gold < DraftData.REROLL_COST
 	_end_btn.disabled = not shopping
 	_sell_btn.disabled = not shopping or _sel_kind != "board"
@@ -247,12 +267,12 @@ func _build_board(shopping: bool) -> void:
 	if run == null:
 		return
 	_slot_buttons.clear()
-	var card_w := 132.0 if run.slots <= 6 else 104.0
+	var card_w := _board_card_width(run.slots)
 	# Back row on the left, front row on the right (facing the enemy).
 	for slot in range(run.slots - 1, -1, -1):
 		var e: Dictionary = run.board[slot]
 		var s: int = slot
-		var b := _card(Vector2(card_w, 178), Color("4a5068"), 2, func(): _on_slot(s))
+		var b := _card(Vector2(card_w, 128 if _compact else 178), Color("4a5068"), 2, func(): _on_slot(s))
 		b.set_drag_forwarding(_drag_from_slot.bind(s), _can_drop_on_slot.bind(s), _drop_on_slot.bind(s))
 		_slot_buttons[slot] = b
 		var v := _card_content(b)
@@ -261,7 +281,7 @@ func _build_board(shopping: bool) -> void:
 			v.add_child(_centered(UIKit.label("(empty)", 13, UIKit.TEXT_DIM)))
 		else:
 			var uid: String = e["unit"]
-			var ic := UIKit.unit_icon(uid, 52)
+			var ic := UIKit.unit_icon(uid, 34 if _compact else 52)
 			ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 			v.add_child(ic)
@@ -298,6 +318,17 @@ func _apply_slot_styles(shopping: bool) -> void:
 			b.add_theme_stylebox_override(st, sb)
 
 
+## Board cards share the width left of the side panel.
+func _board_card_width(slots: int) -> float:
+	var side := 250.0 if _compact else 340.0
+	var avail := get_viewport_rect().size.x - side - 40.0
+	return clampf((avail - float(slots - 1) * 8.0) / float(slots), 76.0, 132.0)
+
+
+func _shop_card_size() -> Vector2:
+	return Vector2(96, 112) if _compact else Vector2(118, 150)
+
+
 func _slot_is_target(slot: int) -> bool:
 	var run := Party.run
 	var e: Dictionary = run.board[slot]
@@ -329,10 +360,10 @@ func _build_shop(shopping: bool) -> void:
 			border = UIKit.ACCENT
 			width = 4
 		var idx: int = i
-		var b := _card(Vector2(118, 150), border, width, func(): _select("unit", idx))
+		var b := _card(_shop_card_size(), border, width, func(): _select("unit", idx))
 		b.set_drag_forwarding(_drag_from_shop.bind("unit", idx), Callable(), Callable())
 		var v := _card_content(b)
-		var ic := UIKit.unit_icon(uid, 48)
+		var ic := UIKit.unit_icon(uid, 32 if _compact else 48)
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		v.add_child(ic)
@@ -353,10 +384,10 @@ func _build_shop(shopping: bool) -> void:
 			border = UIKit.ACCENT
 			width = 4
 		var idx: int = i
-		var b := _card(Vector2(118, 150), border, width, func(): _select("trinket", idx))
+		var b := _card(_shop_card_size(), border, width, func(): _select("trinket", idx))
 		b.set_drag_forwarding(_drag_from_shop.bind("trinket", idx), Callable(), Callable())
 		var v := _card_content(b)
-		var ic := UIKit.icon(DraftData.trinket_texture(tid), 44)
+		var ic := UIKit.icon(DraftData.trinket_texture(tid), 30 if _compact else 44)
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ic.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		v.add_child(ic)
@@ -441,13 +472,18 @@ func _build_info() -> void:
 
 func _wrap(l: Label) -> Label:
 	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	l.custom_minimum_size = Vector2(300, 0)
+	l.custom_minimum_size = Vector2(215 if _compact else 300, 0)
 	return l
 
 
 func _build_standings() -> void:
 	UIKit.clear(_standings)
-	_standings.add_child(UIKit.label("Players", 16, UIKit.ACCENT))
+	var head := UIKit.hbox(6)
+	head.add_child(UIKit.label("Players", 16, UIKit.ACCENT))
+	if _compact:
+		head.add_child(UIKit.spacer())
+		head.add_child(UIKit.button("Leave", func(): leave_requested.emit()))
+	_standings.add_child(head)
 	var ids: Array = Party.players.keys()
 	ids.sort_custom(func(a, b):
 		var pa: Dictionary = Party.players[a]

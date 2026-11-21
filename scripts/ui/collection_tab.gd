@@ -14,14 +14,18 @@ func _ready() -> void:
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(scroll)
 	_grid = GridContainer.new()
-	_grid.columns = 5
+	# Start with as many columns as fit next to the details panel.
+	var detail_w := 310.0 if UIKit.is_compact(self) else 400.0
+	_grid.columns = clampi(int((get_viewport_rect().size.x - detail_w - 120.0) / 136.0), 2, 8)
 	_grid.add_theme_constant_override("h_separation", 8)
 	_grid.add_theme_constant_override("v_separation", 8)
 	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_grid)
+	# Fit as many card columns as the width allows (phones get fewer).
+	scroll.resized.connect(func(): _grid.columns = clampi(int(scroll.size.x / 136.0), 2, 8))
 
 	var dp := UIKit.panel(UIKit.PANEL_LIGHT)
-	dp.custom_minimum_size = Vector2(400, 0)
+	dp.custom_minimum_size = Vector2(310 if UIKit.is_compact(self) else 400, 0)
 	add_child(dp)
 	var dscroll := ScrollContainer.new()
 	dscroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -87,13 +91,13 @@ func _build_detail() -> void:
 	var rarity: Dictionary = GameData.RARITIES[def["rarity"]]
 
 	var head := UIKit.hbox(12)
-	head.add_child(UIKit.unit_icon(id, 96, not owned))
+	head.add_child(UIKit.unit_icon(id, 64 if UIKit.is_compact(self) else 96, not owned))
 	var hv := UIKit.vbox(2)
 	hv.add_child(UIKit.label(def["name"], 22, GameData.rarity_color(def["rarity"])))
 	hv.add_child(UIKit.label("%s %s" % [rarity["name"], String(def["role"]).capitalize()], 14, UIKit.TEXT_DIM))
 	var desc := UIKit.label(def["desc"], 13)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size = Vector2(240, 0)
+	desc.custom_minimum_size = Vector2(170 if UIKit.is_compact(self) else 240, 0)
 	hv.add_child(desc)
 	head.add_child(hv)
 	_detail.add_child(head)

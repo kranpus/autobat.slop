@@ -29,6 +29,7 @@ var _dragging := false
 var _finished_emitted := false
 var _big_units := PackedInt32Array()
 var _overlay: Node2D                 # draws FX and health bars above the sprites
+var _touches := {}                   # touch index -> position (pinch zoom on phones)
 
 
 func setup(battle: BattleSim) -> void:
@@ -392,6 +393,32 @@ func _draw_overlay() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if _camera == null:
 		return
+	# Touch screens: two fingers pinch to zoom and drag to pan. (One finger
+	# arrives as an emulated mouse drag and pans via the code below.)
+	if event is InputEventScreenTouch:
+		var t := event as InputEventScreenTouch
+		if t.pressed:
+			_touches[t.index] = t.position
+		else:
+			_touches.erase(t.index)
+		if _touches.size() >= 2:
+			_dragging = false
+		return
+	if event is InputEventScreenDrag:
+		var d := event as InputEventScreenDrag
+		var before: Vector2 = _touches.get(d.index, d.position)
+		_touches[d.index] = d.position
+		if _touches.size() == 2:
+			var other := Vector2.ZERO
+			for k in _touches:
+				if k != d.index:
+					other = _touches[k]
+			var old_dist := before.distance_to(other)
+			var new_dist := d.position.distance_to(other)
+			if old_dist > 8.0:
+				_zoom_at(new_dist / old_dist, (d.position + other) * 0.5)
+			_camera.position -= (d.relative * 0.5) / _camera.zoom
+		return
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
@@ -400,7 +427,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_zoom_at(1.0 / 1.15, mb.position)
 		elif mb.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT, MOUSE_BUTTON_MIDDLE]:
 			_dragging = mb.pressed
-	elif event is InputEventMouseMotion and _dragging:
+	elif event is InputEventMouseMotion and _dragging and _touches.size() < 2:
 		_camera.position -= (event as InputEventMouseMotion).relative / _camera.zoom
 	elif event is InputEventMagnifyGesture:
 		_zoom_at((event as InputEventMagnifyGesture).factor, get_viewport_rect().size * 0.5)

@@ -108,7 +108,7 @@ func _build_hud() -> void:
 			_begin()
 			view.skip_to_end()))
 
-	var hint := UIKit.label("Mouse wheel: zoom    Drag: pan", 12, UIKit.TEXT_DIM)
+	var hint := UIKit.label("Pinch: zoom    Drag: pan" if UIKit.is_mobile() else "Mouse wheel: zoom    Drag: pan", 12, UIKit.TEXT_DIM)
 	hint.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	hint.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	hint.offset_left = 12
