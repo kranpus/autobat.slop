@@ -26,7 +26,7 @@ signal left_match(reason: String)
 ## similar rating). Empty when the server can't be reached.
 signal ranked_opponents(list: Array)
 
-const GAME_VERSION := "legion-draft-6"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-7"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server
 const DISCOVERY_PORT := 24701
@@ -108,19 +108,29 @@ func _ready() -> void:
 	mp.peer_disconnected.connect(_on_peer_disconnected)
 	mp.connected_to_server.connect(_on_connected)
 	mp.connection_failed.connect(func():
-		if _ranked_only:
+		if online:
+			_check_cert_changed.call_deferred()
+		if _auth_waiting:
+			_auth_failed("Could not reach the server at %s." % server_address())
+		elif _ranked_only:
 			_ranked_failed()
 		elif _sync_only:
 			disconnect_all(true)  # background sync: stay quiet if the server is unreachable
 		else:
 			_drop_connection("Could not connect."))
 	mp.server_disconnected.connect(func():
-		if _ranked_only:
+		if _auth_waiting:
+			_auth_failed("The server closed the connection.")
+		elif _ranked_only:
 			_ranked_failed()
 		elif _sync_only:
 			disconnect_all(true)
 		else:
-			_drop_connection("Lost connection to the server."))
+			var was_session := _session_live
+			_drop_connection("Lost connection to the server." + (" Reconnecting..." if was_session else ""))
+			if was_session:
+				_reconnect_at = Time.get_ticks_msec() + 3000
+				session_changed.emit())
 
 
 # --- state helpers ----------------------------------------------------------
@@ -150,7 +160,7 @@ func me() -> Dictionary:
 
 
 func server_address() -> String:
-	var a := str(Profile.data.get("server_address", ""))
+	var a := str(Profile.settings.get("server_address", ""))
 	return a if a != "" else DEFAULT_SERVER
 
 
@@ -188,10 +198,19 @@ func start_server(port: int = SERVER_PORT) -> Error:
 	if err != OK:
 		print("ERROR: could not listen on UDP port %d (error %d)" % [port, err])
 		return err
+	# Encrypt every connection (passwords and tokens included) with DTLS.
+	err = peer.host.dtls_server_setup(_server_tls())
+	if err != OK:
+		print("ERROR: could not set up encryption (error %d)" % err)
+		peer.close()
+		return err
 	mp.multiplayer_peer = peer
 	role = Role.SERVER
 	my_id = 1
+	_start_cert_service(port + CERT_PORT_OFFSET)
 	_load_config()
+	accounts = AccountStore.new()
+	_log("Accounts: %d (passwords stored as salted PBKDF2-SHA256 hashes)" % accounts.count())
 	ranked_pool = RankedPool.new()
 	ranked_pool.load_file()
 	for arg in OS.get_cmdline_user_args():
@@ -258,7 +277,10 @@ func run_command(line: String) -> String:
   lock reset                      back to the defaults (the new units and regions locked)
   ranked                          how many player armies are saved for ranked matchmaking
   ranked clear                    delete all saved ranked armies
-  say <message>                   show a message to every connected player"""
+  say <message>                   show a message to every connected player
+  accounts                        number of accounts and who is signed in
+  accounts reset-password <user>  give a player who forgot their password a new
+                                  temporary one (shown once) and sign them out"""
 		"status":
 			out = "%d players online, %d rooms. %s" % [_names.size(), _rooms.size(), _gold_text()]
 		"rooms":
@@ -323,6 +345,8 @@ func run_command(line: String) -> String:
 			for id in _names:
 				_deliver(id, "notice", ["[Server] " + msg])
 			out = "Sent: " + msg
+		"accounts":
+			out = _account_command(a)
 		_:
 			out = "Unknown command '%s'. Type 'help'." % a[0]
 	_log(out)
@@ -543,6 +567,9 @@ func online_list(pname: String) -> void:
 
 func _online_request(pname: String, req: Array) -> void:
 	player_name = pname
+	if logged_in and not session_active():
+		status.emit("Reconnecting to the server... try again in a moment.")
+		return
 	if role == Role.CLIENT and online and phase != "connecting" and not _sync_only and not _ranked_only:
 		if phase == "lobby" and req[0] != "_rq_list":
 			_request("_rq_leave_room", [])
@@ -563,12 +590,27 @@ func _send_request(req: Array) -> void:
 
 
 func _connect_to(address: String, port: int, pname: String, is_online: bool, pending: Array) -> Error:
+	if is_online and _server_cert(address, port) == null:
+		status.emit("Contacting the server...")
+		_ensure_cert(address, port, func(ok: bool):
+			if ok:
+				_connect_to(address, port, pname, is_online, pending)
+			else:
+				status.emit("Could not reach the server at %s:%d." % [address, port]))
+		return OK
 	disconnect_all(true)
-	var peer := ENetMultiplayerPeer.new()
-	var err := peer.create_client(address, port)
-	if err != OK:
-		status.emit("Could not connect to %s:%d (error %d)." % [address, port, err])
-		return err
+	var peer: ENetMultiplayerPeer
+	if is_online:
+		peer = _server_client_peer(address, port)   # dedicated server: encrypted
+		if peer == null:
+			status.emit("Could not connect to %s:%d." % [address, port])
+			return FAILED
+	else:
+		peer = ENetMultiplayerPeer.new()
+		var err := peer.create_client(address, port)
+		if err != OK:
+			status.emit("Could not connect to %s:%d (error %d)." % [address, port, err])
+			return err
 	mp.multiplayer_peer = peer
 	role = Role.CLIENT
 	online = is_online
@@ -583,6 +625,11 @@ func _connect_to(address: String, port: int, pname: String, is_online: bool, pen
 
 func _on_connected() -> void:
 	my_id = mp.get_unique_id()
+	if not _auth_request.is_empty():
+		var req := _auth_request
+		_auth_request = []   # don't keep the password around
+		_request(str(req[0]), req.slice(1))
+		return
 	if _ranked_only:
 		_request("_rq_ranked", _ranked_request)
 		return
@@ -603,18 +650,24 @@ func request_ranked_opponents(pid: String, pname: String, rating: int, code: Str
 	if role == Role.CLIENT and online and phase not in ["connecting", "syncing"] and not _sync_only and not _ranked_only:
 		_request("_rq_ranked", req)  # already connected to the server
 		return
+	if logged_in:
+		_ranked_failed()  # signed in but reconnecting
+		return
 	if _sync_only:
 		disconnect_all(true)
 	if role != Role.NONE:
 		_ranked_failed()  # busy with a LAN match: use generated opponents
 		return
-	var addr := server_address().strip_edges()
-	var port := SERVER_PORT
-	if addr.count(":") == 1:
-		port = int(addr.get_slice(":", 1))
-		addr = addr.get_slice(":", 0)
-	var peer := ENetMultiplayerPeer.new()
-	if addr == "" or peer.create_client(addr, port) != OK:
+	var a := _split_address()
+	if _server_cert(a[0], a[1]) == null:
+		_ensure_cert(a[0], a[1], func(ok: bool):
+			if ok and _awaiting_ranked:
+				request_ranked_opponents(pid, pname, rating, code)
+			else:
+				_ranked_failed())
+		return
+	var peer := _server_client_peer(a[0], a[1])
+	if peer == null:
 		_ranked_failed()
 		return
 	mp.multiplayer_peer = peer
@@ -630,7 +683,7 @@ func _ranked_failed() -> void:
 		_awaiting_ranked = false
 		ranked_opponents.emit([])
 	if _ranked_only:
-		disconnect_all.call_deferred(true)
+		_hang_up_later()
 
 
 @rpc("any_peer", "reliable")
@@ -642,6 +695,10 @@ func _rq_ranked(version: String, pid: String, pname: String, rating: int, code: 
 		return
 	if version != GAME_VERSION:
 		_deliver(id, "error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), GAME_VERSION]])
+		return
+	if _sessions.has(id):
+		# Signed in: the server uses the account's own army and rating.
+		_deliver(id, "ranked_offers", [_ranked_offer_for(id)])
 		return
 	if ranked_pool.add(pid, pname, rating, code):
 		ranked_pool.save_file()
@@ -656,24 +713,23 @@ func _rc_ranked(list: Array) -> void:
 	_awaiting_ranked = false
 	ranked_opponents.emit(list)
 	if _ranked_only:
-		disconnect_all.call_deferred(true)
+		_hang_up_later()
 
 
 ## Background check-in: fetch the server's unit/region locks and gold
 ## settings, then disconnect. Lets offline play (expeditions, collection,
 ## ranked) follow what the server admin unlocked. Silent if unreachable.
 func sync_from_server() -> void:
-	if role != Role.NONE or OS.get_cmdline_user_args().has("--server"):
+	if role != Role.NONE or logged_in or OS.get_cmdline_user_args().has("--server"):
 		return
-	var addr := server_address().strip_edges()
-	var port := SERVER_PORT
-	if addr.count(":") == 1:
-		port = int(addr.get_slice(":", 1))
-		addr = addr.get_slice(":", 0)
-	if addr == "":
+	var a := _split_address()
+	if _server_cert(a[0], a[1]) == null:
+		_ensure_cert(a[0], a[1], func(ok: bool):
+			if ok:
+				sync_from_server())
 		return
-	var peer := ENetMultiplayerPeer.new()
-	if peer.create_client(addr, port) != OK:
+	var peer := _server_client_peer(a[0], a[1])
+	if peer == null:
 		return
 	mp.multiplayer_peer = peer
 	role = Role.CLIENT
@@ -699,7 +755,7 @@ func _rc_synced(info: Dictionary) -> void:
 	_rc_rewards(info.get("rewards", {}))
 	_rc_locks(info.get("locked", []), info.get("locked_regions", []))
 	if _sync_only:
-		disconnect_all.call_deferred(true)
+		_hang_up_later()
 
 
 ## Leave the current room/match. Online players stay connected to the server.
@@ -724,6 +780,11 @@ func disconnect_all(silent: bool = false) -> void:
 	var was := role != Role.NONE and not _sync_only and not _ranked_only
 	_sync_only = false
 	_ranked_only = false
+	_session_live = false
+	_auth_waiting = false
+	_auth_request = []
+	_sessions.clear()
+	_ranked_offers.clear()
 	role = Role.NONE
 	online = false
 	phase = "idle"
@@ -947,6 +1008,8 @@ func _create_room(code: String, new_settings: Dictionary, is_public: bool, quick
 	r.rewards = rewards
 	r.outbox.connect(_deliver)
 	r.room_log.connect(_log)
+	if role == Role.SERVER:
+		r.finished.connect(_credit_draft)   # draft rewards go to signed-in accounts
 	_rooms[code] = r
 	return r
 
@@ -994,6 +1057,7 @@ func _on_peer_disconnected(id: int) -> void:
 	if role == Role.SERVER and _names.has(id):
 		_log("%s disconnected" % _names[id])
 	_names.erase(id)
+	_end_session(id)
 	_req_count.erase(id)
 
 
@@ -1036,19 +1100,22 @@ func _rc_welcome(info: Dictionary) -> void:
 @rpc("authority", "reliable")
 func _rc_rewards(r: Dictionary) -> void:
 	if r.has("battle_mult"):
-		Profile.data["server_rewards"] = {"battle_mult": clampf(float(r["battle_mult"]), 0.0, 100.0)}
-		Profile.save()
+		Profile.settings["server_rewards"] = {"battle_mult": clampf(float(r["battle_mult"]), 0.0, 100.0)}
+		Profile.save_settings()
+		Profile.logic.gold_mult = Profile.battle_gold_mult()
+		Profile.changed.emit()
 
 
-## The server's unit locks. Remembered in the profile so they also apply to
-## expeditions, ranked battles and army codes while offline.
+## The server's unit locks. Remembered in the device settings so they also
+## apply to expeditions, ranked battles and army codes while offline.
 @rpc("authority", "reliable")
 func _rc_locks(list: Array, regions: Array) -> void:
 	UnitLocks.set_locked_list(list)
 	UnitLocks.set_locked_regions(regions)
-	Profile.data["unit_locks"] = UnitLocks.locked_list()
-	Profile.data["region_locks"] = UnitLocks.locked_regions()
-	Profile.save()
+	Profile.settings["unit_locks"] = UnitLocks.locked_list()
+	Profile.settings["region_locks"] = UnitLocks.locked_regions()
+	Profile.save_settings()
+	Profile.changed.emit()
 
 
 @rpc("authority", "reliable")
@@ -1062,7 +1129,7 @@ func _rc_error(text: String) -> void:
 	if _ranked_only or _awaiting_ranked:
 		_ranked_failed()
 	if _sync_only:
-		disconnect_all.call_deferred(true)
+		_hang_up_later()
 	elif phase == "connecting":
 		_drop_connection(text)
 
@@ -1297,6 +1364,12 @@ func _process(delta: float) -> void:
 	if _awaiting_ranked and Time.get_ticks_msec() > _ranked_deadline:
 		_ranked_failed()
 	_poll_discovery(delta)
+	_poll_cert_fetch()
+	if role == Role.SERVER:
+		_poll_cert_service()
+		_poll_auth_jobs()
+		_poll_ranked_jobs()
+	_client_session_tick()
 	if _authority():
 		for c in _rooms.keys():
 			if _rooms.has(c):
@@ -1317,3 +1390,827 @@ func _process(delta: float) -> void:
 			status.emit("No open matches on your network, so you're hosting one. Add bots or wait for players.")
 		else:
 			join_lan(best["ip"], int(best["port"]), player_name)
+
+
+# ==============================================================================
+# Accounts: logins, server-side profiles and server-run ranked battles
+# ==============================================================================
+
+const TLS_KEY_PATH := "user://server_tls.key"
+const TLS_CERT_PATH := "user://server_tls.crt"
+## Ship your server's certificate here (copied from its user data folder) to
+## pin it: the game then refuses to talk to any other server at that address.
+const PINNED_CERT_PATH := "res://server_cert.crt"
+const CERT_CACHE_DIR := "user://server_certs"
+const CERT_PORT_OFFSET := 1            # certificate service: UDP SERVER_PORT + 1
+const CERT_MAGIC := "AUTOBAT-CERT1"
+const CERT_REQUEST_SIZE := 1400
+const LOGIN_FAILURE_LIMIT := 5
+const LOGIN_LOCKOUT_SEC := 300
+const MAX_AUTH_JOBS := 8         # password hashes running at once (~1 s each)
+
+## Login attempt finished: ok, message.
+signal login_result(ok: bool, message: String)
+## Logged in / logged out / reconnecting changed.
+signal session_changed
+## A server-run ranked battle finished: {gold, maps, rating, score, ...}.
+signal ranked_result(summary: Dictionary)
+
+# Client side.
+var logged_in := false          # signed in to an account (survives brief disconnects)
+var _session_live := false      # connected and authenticated right now
+var _session_user := ""
+var _session_token := ""
+var _remember := false
+var _auth_request: Array = []   # login request to send once connected
+var _auth_waiting := false      # waiting for the server to answer a login
+var _reconnect_at := 0
+var last_ranked_summary: Dictionary = {}
+## The server presented a different certificate than the one saved here.
+var cert_changed := false
+var _last_server: Array = []
+var _cert_fetch: PacketPeerUDP
+var _cert_fetch_key := ""
+var _cert_fetch_target: Array = []
+var _cert_waiters: Array = []
+var _cert_deadline := 0
+var _cert_next_send := 0
+
+# Server side.
+var accounts: AccountStore
+var _sessions := {}             # peer id -> account key
+var _auth_jobs: Array = []      # background password hashing jobs
+var _failures := {}             # account key -> {count, until}
+var _ranked_offers := {}        # peer id -> offered opponents
+var _ranked_jobs: Array = []    # server-simulated ranked battles
+var _cert_server: PacketPeerUDP
+var _cert_pem: X509Certificate
+var _cert_reply := PackedByteArray()
+var _cert_window := 0
+var _cert_sent := 0
+
+
+## Close the current client connection after this frame (or `delay` seconds),
+## unless a new connection has replaced it by then.
+func _hang_up_later(delay: float = 0.0) -> void:
+	var peer := mp.multiplayer_peer
+	var hang_up := func():
+		if mp.multiplayer_peer == peer and role == Role.CLIENT:
+			disconnect_all(true)
+	if delay > 0.0:
+		get_tree().create_timer(delay).timeout.connect(hang_up)
+	else:
+		hang_up.call_deferred()
+
+
+func session_active() -> bool:
+	return _session_live and role == Role.CLIENT
+
+
+# --- encryption (DTLS) -----------------------------------------------------------
+
+## Server certificate: generated once (self-signed) and kept in user data.
+func _server_tls() -> TLSOptions:
+	var crypto := Crypto.new()
+	var key := CryptoKey.new()
+	var cert := X509Certificate.new()
+	var have := FileAccess.file_exists(TLS_KEY_PATH) and FileAccess.file_exists(TLS_CERT_PATH)
+	if not have or key.load(TLS_KEY_PATH) != OK or cert.load(TLS_CERT_PATH) != OK:
+		key = crypto.generate_rsa(2048)
+		cert = crypto.generate_self_signed_certificate(key, "CN=autobat-legions-server,O=Autobat Legions,C=US", "20250101000000", "20450101000000")
+		key.save(TLS_KEY_PATH)
+		cert.save(TLS_CERT_PATH)
+		print("Created a new TLS certificate: %s" % ProjectSettings.globalize_path(TLS_CERT_PATH))
+	print("Connections are encrypted (DTLS). Certificate: %s" % ProjectSettings.globalize_path(TLS_CERT_PATH))
+	return TLSOptions.server(key, cert)
+
+
+## The certificate to pin for a server: one bundled with the game, or the one
+## saved the first time this device talked to that server (trust on first use,
+## like SSH). null if neither exists yet.
+func _server_cert(addr: String, port: int) -> X509Certificate:
+	var cert := X509Certificate.new()
+	if FileAccess.file_exists(PINNED_CERT_PATH) and cert.load(PINNED_CERT_PATH) == OK:
+		return cert
+	var path := _cert_cache_path(addr, port)
+	if FileAccess.file_exists(path) and cert.load(path) == OK:
+		return cert
+	return null
+
+
+func _cert_cache_path(addr: String, port: int) -> String:
+	var safe := ""
+	for c in addr.to_lower():
+		safe += c if (c >= "a" and c <= "z") or (c >= "0" and c <= "9") or c in [".", "-"] else "_"
+	return "%s/%s_%d.crt" % [CERT_CACHE_DIR, safe, port]
+
+
+## Forget the saved certificate for the current server (e.g. after the
+## server was reinstalled and made a new one).
+func forget_server_certificate() -> void:
+	var a := _split_address()
+	var path := _cert_cache_path(a[0], a[1])
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(path)
+	cert_changed = false
+	status.emit("Saved server certificate forgotten; the next connection will trust the server's current one.")
+
+
+## A client connection to the dedicated server, encrypted with DTLS and
+## pinned to the server's certificate. null on failure (or no certificate yet:
+## call _ensure_cert first).
+func _server_client_peer(addr: String, port: int) -> ENetMultiplayerPeer:
+	var cert := _server_cert(addr, port)
+	if cert == null:
+		return null
+	var peer := ENetMultiplayerPeer.new()
+	if addr == "" or peer.create_client(addr, port) != OK:
+		return null
+	# The certificate itself is the trust anchor (the server is self-signed),
+	# so its name doesn't have to match the address players typed in.
+	if peer.host.dtls_client_setup(addr, TLSOptions.client_unsafe(cert)) != OK:
+		peer.close()
+		return null
+	_last_server = [addr, port]
+	return peer
+
+
+## Make sure we have the server's certificate, fetching it the first time.
+## Calls `then(ok)` (right away if we already have it).
+func _ensure_cert(addr: String, port: int, then: Callable) -> void:
+	if addr == "":
+		then.call(false)
+		return
+	if _server_cert(addr, port) != null:
+		then.call(true)
+		return
+	var key := "%s:%d" % [addr, port]
+	if _cert_fetch != null and _cert_fetch_key != key:
+		_finish_cert_fetch(false)
+	_cert_waiters.append(then)
+	if _cert_fetch != null:
+		return
+	var ip := addr if addr.is_valid_ip_address() else IP.resolve_hostname(addr)
+	if ip == "":
+		_finish_cert_fetch(false)
+		return
+	_cert_fetch = PacketPeerUDP.new()
+	_cert_fetch.set_dest_address(ip, port + CERT_PORT_OFFSET)
+	_cert_fetch_key = key
+	_cert_fetch_target = [addr, port]
+	_cert_deadline = Time.get_ticks_msec() + 4000
+	_cert_next_send = 0
+
+
+func _poll_cert_fetch() -> void:
+	if _cert_fetch == null:
+		return
+	var now := Time.get_ticks_msec()
+	while _cert_fetch.get_available_packet_count() > 0:
+		var pkt := _cert_fetch.get_packet().get_string_from_utf8()
+		if not pkt.begins_with(CERT_MAGIC):
+			continue
+		var cert := X509Certificate.new()
+		if cert.load_from_string(pkt.substr(CERT_MAGIC.length())) != OK:
+			continue
+		DirAccess.make_dir_recursive_absolute(CERT_CACHE_DIR)
+		cert.save(_cert_cache_path(_cert_fetch_target[0], _cert_fetch_target[1]))
+		_finish_cert_fetch(true)
+		return
+	if now > _cert_deadline:
+		_finish_cert_fetch(false)
+	elif now >= _cert_next_send:
+		_cert_next_send = now + 500
+		# Padded so the reply is never much bigger than the request (no use
+		# as a traffic amplifier).
+		var req := (CERT_MAGIC + "?").to_utf8_buffer()
+		req.resize(CERT_REQUEST_SIZE)
+		_cert_fetch.put_packet(req)
+
+
+func _finish_cert_fetch(ok: bool) -> void:
+	if _cert_fetch:
+		_cert_fetch.close()
+	_cert_fetch = null
+	_cert_fetch_key = ""
+	var waiters := _cert_waiters
+	_cert_waiters = []
+	for w in waiters:
+		w.call(ok)
+
+
+## A connection to the server failed. If the server now presents a different
+## certificate than the one saved here, say so instead of silently trusting it.
+func _check_cert_changed() -> void:
+	if _last_server.is_empty() or FileAccess.file_exists(PINNED_CERT_PATH):
+		return
+	var addr: String = _last_server[0]
+	var port: int = _last_server[1]
+	var saved := _server_cert(addr, port)
+	if saved == null:
+		return
+	var path := _cert_cache_path(addr, port)
+	DirAccess.rename_absolute(path, path + ".old")
+	_ensure_cert(addr, port, func(ok: bool):
+		var fresh := _server_cert(addr, port)
+		if ok and fresh != null and fresh.save_to_string() != saved.save_to_string():
+			# Keep trusting the old one until the player says otherwise.
+			DirAccess.remove_absolute(path)
+			DirAccess.rename_absolute(path + ".old", path)
+			cert_changed = true
+			session_changed.emit()
+			status.emit("Warning: the server's security certificate has changed. If the server was reinstalled, choose 'Trust new server certificate' in Settings; otherwise someone may be impersonating it.")
+		else:
+			if FileAccess.file_exists(path + ".old"):
+				if FileAccess.file_exists(path):
+					DirAccess.remove_absolute(path + ".old")
+				else:
+					DirAccess.rename_absolute(path + ".old", path))
+
+
+# --- server: certificate service -------------------------------------------------
+
+func _start_cert_service(cert_port: int) -> void:
+	_cert_pem = X509Certificate.new()
+	var pem := ""
+	if (_cert_pem as X509Certificate).load(TLS_CERT_PATH) == OK:
+		pem = (_cert_pem as X509Certificate).save_to_string()
+	_cert_reply = (CERT_MAGIC + pem).to_utf8_buffer()
+	_cert_server = PacketPeerUDP.new()
+	if _cert_server.bind(cert_port) != OK:
+		print("WARNING: could not listen on UDP port %d; new players can't fetch the server certificate." % cert_port)
+		_cert_server = null
+	else:
+		print("Certificate service on UDP port %d (new players fetch the certificate here once)." % cert_port)
+
+
+func _poll_cert_service() -> void:
+	if _cert_server == null:
+		return
+	var now := Time.get_ticks_msec()
+	if now - _cert_window >= 1000:
+		_cert_window = now
+		_cert_sent = 0
+	while _cert_server.get_available_packet_count() > 0:
+		var pkt := _cert_server.get_packet()
+		if pkt.size() < CERT_REQUEST_SIZE or _cert_sent >= 50:
+			continue
+		if pkt.slice(0, CERT_MAGIC.length()).get_string_from_utf8() != CERT_MAGIC:
+			continue
+		_cert_sent += 1
+		_cert_server.set_dest_address(_cert_server.get_packet_ip(), _cert_server.get_packet_port())
+		_cert_server.put_packet(_cert_reply)
+
+
+func _split_address() -> Array:
+	var addr := server_address().strip_edges()
+	var port := SERVER_PORT
+	if addr.count(":") == 1:
+		port = int(addr.get_slice(":", 1))
+		addr = addr.get_slice(":", 0)
+	return [addr, port]
+
+
+# --- client: logging in -----------------------------------------------------------
+
+func login(username: String, password: String, remember: bool) -> void:
+	_start_auth(["_rq_login", GAME_VERSION, username.strip_edges(), password], remember)
+
+
+func register(username: String, password: String, remember: bool) -> void:
+	_start_auth(["_rq_register", GAME_VERSION, username.strip_edges(), password], remember)
+
+
+## Sign in with a saved "remember me" token (no password needed).
+func login_with_token(username: String, token: String, remember: bool = true) -> void:
+	_start_auth(["_rq_login_token", GAME_VERSION, username, token], remember)
+
+
+## Try the token saved by "remember me", if any. Returns false if none.
+func try_auto_login() -> bool:
+	var saved: Dictionary = Profile.settings.get("account", {})
+	if str(saved.get("user", "")) == "" or str(saved.get("token", "")) == "":
+		return false
+	login_with_token(str(saved["user"]), str(saved["token"]), true)
+	return true
+
+
+func _start_auth(request: Array, remember: bool) -> void:
+	_remember = remember
+	var a := _split_address()
+	if _server_cert(a[0], a[1]) == null:
+		status.emit("Contacting the server...")
+		_ensure_cert(a[0], a[1], func(ok: bool):
+			if ok:
+				_start_auth(request, remember)
+			else:
+				_auth_failed("Could not reach the server at %s." % server_address()))
+		return
+	disconnect_all(true)
+	var peer := _server_client_peer(a[0], a[1])
+	if peer == null:
+		login_result.emit(false, "Could not reach the server at %s." % server_address())
+		return
+	mp.multiplayer_peer = peer
+	role = Role.CLIENT
+	online = true
+	phase = "connecting"
+	_auth_request = request
+	_auth_waiting = true
+	_sync_deadline = Time.get_ticks_msec() + 15000   # give up if nobody answers
+	status.emit("Signing in...")
+
+
+func logout() -> void:
+	if session_active():
+		_request("_rq_logout", [_session_token])
+	logged_in = false
+	_session_live = false
+	_session_user = ""
+	_session_token = ""
+	Profile.settings.erase("account")
+	Profile.save_settings()
+	# Give the logout message a moment to reach the server before hanging up
+	# (unless something else has replaced the connection by then).
+	_hang_up_later(0.3)
+	Profile.leave_online()
+	session_changed.emit()
+
+
+func change_password(old_password: String, new_password: String) -> void:
+	if not session_active():
+		status.emit("Not connected to the server.")
+		return
+	_request("_rq_change_password", [old_password, new_password])
+
+
+## Send a progress action (level up, explore...) for the server to apply.
+func profile_action(action: Array) -> void:
+	if not session_active():
+		status.emit("Not connected to the server; reconnecting...")
+		return
+	_request("_rq_profile_action", [action])
+
+
+func request_ranked_battle(index: int) -> void:
+	if session_active():
+		_request("_rq_ranked_battle", [index])
+
+
+@rpc("authority", "reliable")
+func _rc_login_ok(info: Dictionary) -> void:
+	_auth_waiting = false
+	logged_in = true
+	_session_live = true
+	_session_user = str(info.get("username", ""))
+	_session_token = str(info.get("token", ""))
+	if _remember:
+		Profile.settings["account"] = {"user": _session_user, "token": _session_token}
+	else:
+		Profile.settings.erase("account")
+	Profile.save_settings()
+	phase = "online"
+	_rc_rewards(info.get("rewards", {}))
+	_rc_locks(info.get("locked", []), info.get("locked_regions", []))
+	Profile.enter_online(_session_user, info.get("profile", {}))
+	status.emit("Signed in as %s." % _session_user)
+	login_result.emit(true, "Signed in as %s." % _session_user)
+	session_changed.emit()
+	online_changed.emit()
+	lobby_changed.emit()
+
+
+@rpc("authority", "reliable")
+func _rc_auth_error(message: String) -> void:
+	_auth_waiting = false
+	if not _session_live:
+		# A saved token that no longer works is forgotten.
+		if logged_in or Profile.settings.has("account"):
+			Profile.settings.erase("account")
+			Profile.save_settings()
+		if logged_in:
+			logged_in = false
+			Profile.leave_online()
+			session_changed.emit()
+		_hang_up_later()
+	status.emit(message)
+	login_result.emit(false, message)
+
+
+## A login attempt couldn't reach the server (a saved login is kept for retrying).
+func _auth_failed(message: String) -> void:
+	disconnect_all(true)
+	status.emit(message)
+	login_result.emit(false, message)
+	if logged_in:
+		_reconnect_at = Time.get_ticks_msec() + 10000
+		session_changed.emit()
+
+
+@rpc("authority", "reliable")
+func _rc_ranked_offers(list: Array) -> void:
+	_awaiting_ranked = false
+	ranked_opponents.emit(list)
+
+
+@rpc("authority", "reliable")
+func _rc_session_ended(message: String) -> void:
+	# Signed in somewhere else (or the password changed).
+	logged_in = false
+	_session_live = false
+	Profile.settings.erase("account")
+	Profile.save_settings()
+	_hang_up_later()
+	Profile.leave_online()
+	status.emit(message)
+	session_changed.emit()
+
+
+@rpc("authority", "reliable")
+func _rc_profile(profile_data: Dictionary, event: String, payload: Dictionary) -> void:
+	Profile.apply_server_profile(profile_data)
+	match event:
+		"choice":
+			Profile.choice_ready.emit(payload)
+		"recruit":
+			Profile.recruit_result.emit(payload)
+
+
+@rpc("authority", "reliable")
+func _rc_ranked_start(cfg: Dictionary) -> void:
+	last_ranked_summary = {}
+	battle_ready.emit(cfg)
+
+
+@rpc("authority", "reliable")
+func _rc_ranked_result(summary: Dictionary) -> void:
+	last_ranked_summary = summary
+	ranked_result.emit(summary)
+
+
+@rpc("authority", "reliable")
+func _rc_password_changed(token: String) -> void:
+	_session_token = token
+	if Profile.settings.has("account"):
+		Profile.settings["account"] = {"user": _session_user, "token": token}
+		Profile.save_settings()
+	status.emit("Password changed. Other devices have been signed out.")
+
+
+## Keep a signed-in player connected: reconnect with the session token after
+## the connection drops (or after a LAN match ends).
+func _client_session_tick() -> void:
+	if _auth_waiting and Time.get_ticks_msec() > _sync_deadline:
+		_auth_failed("The server didn't answer.")
+	if logged_in and role == Role.NONE and _session_token != "" and Time.get_ticks_msec() > _reconnect_at:
+		_reconnect_at = Time.get_ticks_msec() + 10000
+		login_with_token(_session_user, _session_token, Profile.settings.has("account"))
+
+
+# --- server: authentication ---------------------------------------------------------
+
+func _auth_ok_version(id: int, version: String) -> bool:
+	if version != GAME_VERSION:
+		_deliver(id, "auth_error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), GAME_VERSION]])
+		return false
+	return true
+
+
+func _locked_out(key: String) -> bool:
+	var f: Dictionary = _failures.get(key, {})
+	return int(f.get("until", 0)) > int(Time.get_unix_time_from_system())
+
+
+func _note_failure(key: String) -> void:
+	var f: Dictionary = _failures.get(key, {"count": 0, "until": 0})
+	f["count"] = int(f["count"]) + 1
+	if int(f["count"]) >= LOGIN_FAILURE_LIMIT:
+		f["until"] = int(Time.get_unix_time_from_system()) + LOGIN_LOCKOUT_SEC
+		f["count"] = 0
+	_failures[key] = f
+
+
+func _busy_with_auth(id: int) -> bool:
+	if _auth_jobs.size() >= MAX_AUTH_JOBS:
+		_deliver(id, "auth_error", ["The server is busy signing other players in. Try again in a few seconds."])
+		return true
+	for j in _auth_jobs:
+		if int(j["peer"]) == id:
+			return true
+	return false
+
+
+## Run password hashing on a worker thread so the server keeps running.
+func _queue_auth(id: int, kind: String, username: String, work: Callable, holder: Dictionary) -> void:
+	_auth_jobs.append({"task": WorkerThreadPool.add_task(work, false, "password hash"), "peer": id, "kind": kind, "user": username, "holder": holder})
+
+
+@rpc("any_peer", "reliable")
+func _rq_register(version: String, username: String, password: String) -> void:
+	if role != Role.SERVER or accounts == null:
+		return
+	var id := _sender()
+	if not _allow(id) or not _auth_ok_version(id, version) or _busy_with_auth(id):
+		return
+	var problem := AccountStore.check_username(username)
+	if problem == "":
+		problem = Passwords.check_new_password(password)
+	if problem == "" and accounts.exists(username):
+		problem = "That username is taken."
+	if problem != "":
+		_deliver(id, "auth_error", [problem])
+		return
+	var holder := {}
+	_queue_auth(id, "register", username.strip_edges(), func(): holder["record"] = Passwords.make_record(password), holder)
+
+
+@rpc("any_peer", "reliable")
+func _rq_login(version: String, username: String, password: String) -> void:
+	if role != Role.SERVER or accounts == null:
+		return
+	var id := _sender()
+	if not _allow(id) or not _auth_ok_version(id, version) or _busy_with_auth(id):
+		return
+	var key := AccountStore.key_of(username)
+	if _locked_out(key):
+		_deliver(id, "auth_error", ["Too many failed attempts. Try again in a few minutes."])
+		return
+	var record := accounts.get_record(username)
+	var stored: Dictionary = record.get("password", {})
+	var holder := {}
+	# Unknown usernames are hashed too, so timing doesn't reveal which exist.
+	var check := stored if not stored.is_empty() else {"salt": "00000000000000000000000000000000", "hash": "00", "iterations": Passwords.ITERATIONS}
+	_queue_auth(id, "login", username.strip_edges(), func(): holder["ok"] = Passwords.verify(password, check) and not stored.is_empty(), holder)
+
+
+@rpc("any_peer", "reliable")
+func _rq_login_token(version: String, username: String, token: String) -> void:
+	if role != Role.SERVER or accounts == null:
+		return
+	var id := _sender()
+	if not _allow(id) or not _auth_ok_version(id, version):
+		return
+	if not accounts.check_token(username, token):
+		_deliver(id, "auth_error", ["Your saved login has expired. Please sign in again."])
+		return
+	accounts.revoke_token(username, token)   # tokens are single-use; a new one is issued
+	_finish_login(id, username)
+
+
+@rpc("any_peer", "reliable")
+func _rq_logout(token: String) -> void:
+	if role != Role.SERVER:
+		return
+	var id := _sender()
+	if _sessions.has(id):
+		accounts.revoke_token(_sessions[id], token)
+		_end_session(id)
+
+
+@rpc("any_peer", "reliable")
+func _rq_change_password(old_password: String, new_password: String) -> void:
+	if role != Role.SERVER:
+		return
+	var id := _sender()
+	if not _sessions.has(id) or not _allow(id) or _busy_with_auth(id):
+		return
+	var problem := Passwords.check_new_password(new_password)
+	if problem != "":
+		_deliver(id, "notice", [problem])
+		return
+	var user: String = _sessions[id]
+	var stored: Dictionary = accounts.get_record(user).get("password", {})
+	var holder := {}
+	_queue_auth(id, "change_password", user, func():
+		holder["ok"] = Passwords.verify(old_password, stored)
+		if holder["ok"]:
+			holder["record"] = Passwords.make_record(new_password), holder)
+
+
+func _poll_auth_jobs() -> void:
+	var still: Array = []
+	for j in _auth_jobs:
+		if not WorkerThreadPool.is_task_completed(int(j["task"])):
+			still.append(j)
+			continue
+		WorkerThreadPool.wait_for_task_completion(int(j["task"]))
+		var id := int(j["peer"])
+		var user: String = j["user"]
+		var holder: Dictionary = j["holder"]
+		match str(j["kind"]):
+			"register":
+				if accounts.exists(user):
+					_deliver(id, "auth_error", ["That username is taken."])
+				else:
+					accounts.create(user, holder["record"])
+					_log("New account: %s (%d accounts)" % [user, accounts.count()])
+					_finish_login(id, user)
+			"login":
+				if bool(holder.get("ok", false)):
+					_failures.erase(AccountStore.key_of(user))
+					_finish_login(id, user)
+				else:
+					_note_failure(AccountStore.key_of(user))
+					_deliver(id, "auth_error", ["Wrong username or password."])
+			"change_password":
+				if bool(holder.get("ok", false)):
+					accounts.set_password(user, holder["record"])
+					# Sign out this account's other sessions.
+					for p in _sessions.keys():
+						if p != id and _sessions[p] == AccountStore.key_of(user):
+							_deliver(p, "session_ended", ["Your password was changed. Please sign in again."])
+							_end_session(p)
+					_deliver(id, "password_changed", [accounts.issue_token(user)])
+				else:
+					_deliver(id, "notice", ["Your current password was wrong."])
+	_auth_jobs = still
+
+
+func _finish_login(id: int, username: String) -> void:
+	if not mp.get_peers().has(id):
+		return
+	var key := AccountStore.key_of(username)
+	# One session per account: the newest login wins.
+	for p in _sessions.keys():
+		if p != id and _sessions[p] == key:
+			_deliver(p, "session_ended", ["You signed in on another device."])
+			_end_session(p)
+	var record := accounts.get_record(username)
+	var display := str(record.get("username", username))
+	_sessions[id] = key
+	_names[id] = display
+	var pl := accounts.logic(username)
+	pl.gold_mult = float(rewards["battle_mult"])
+	_deliver(id, "login_ok", [{
+		"username": display, "token": accounts.issue_token(username), "profile": pl.data,
+		"rewards": {"battle_mult": rewards["battle_mult"]},
+		"locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(),
+	}])
+	_log("%s signed in (%d online)" % [display, _sessions.size()])
+
+
+func _end_session(id: int) -> void:
+	_sessions.erase(id)
+	_ranked_offers.erase(id)
+
+
+# --- server: profile actions -----------------------------------------------------------
+
+@rpc("any_peer", "reliable")
+func _rq_profile_action(action: Array) -> void:
+	if role != Role.SERVER:
+		return
+	var id := _sender()
+	if not _sessions.has(id) or not _allow(id) or action.is_empty() or action.size() > 3:
+		return
+	var user: String = _sessions[id]
+	var pl := accounts.logic(user)
+	var event := ""
+	var payload := {}
+	match str(action[0]):
+		"level_up":
+			pl.level_up(str(action[1]) if action.size() > 1 else "")
+		"tier_up":
+			pl.tier_up(str(action[1]) if action.size() > 1 else "")
+		"explore":
+			var region := str(action[1]) if action.size() > 1 else ""
+			if GameData.REGIONS.has(region) and pl.can_explore(region):
+				payload = pl.explore(region)
+				event = "choice"
+		"choose_recruit":
+			payload = pl.choose_recruit(int(action[1]) if action.size() > 1 else -1)
+			event = "recruit" if not payload.is_empty() else ""
+		"set_army":
+			if action.size() > 1 and typeof(action[1]) == TYPE_ARRAY:
+				pl.set_army(action[1])
+		_:
+			return
+	accounts.save(user)
+	_deliver(id, "profile", [pl.data, event, payload])
+
+
+func _account_command(a: PackedStringArray) -> String:
+	if accounts == null:
+		return "Accounts are only available on the dedicated server."
+	if a.size() == 1:
+		var online_names: Array = []
+		for id in _sessions:
+			online_names.append(_names.get(id, _sessions[id]))
+		return "%d accounts, %d signed in%s" % [accounts.count(), _sessions.size(), (": " + ", ".join(PackedStringArray(online_names))) if not online_names.is_empty() else ""]
+	if a.size() == 3 and a[1].to_lower() == "reset-password":
+		if not accounts.exists(a[2]):
+			return "No account called '%s'." % a[2]
+		var temp := Passwords.random_token().left(12)
+		accounts.set_password(a[2], Passwords.make_record(temp))
+		for p in _sessions.keys():
+			if _sessions[p] == AccountStore.key_of(a[2]):
+				_deliver(p, "session_ended", ["Your password was reset by the server admin. Sign in with your new password."])
+				_end_session(p)
+		_failures.erase(AccountStore.key_of(a[2]))
+		return "New temporary password for %s: %s  (tell them to change it in Settings)" % [a[2], temp]
+	return "Usage: accounts | accounts reset-password <user>"
+
+
+func _credit_draft(list: Array) -> void:
+	for p in list:
+		var id := int(p["id"])
+		if not _sessions.has(id) or int(p.get("place", 0)) <= 0:
+			continue
+		var user: String = _sessions[id]
+		var pl := accounts.logic(user)
+		pl.add_draft_reward(int(p.get("gold", 0)), int(p.get("maps", 0)), int(p.get("place", 0)))
+		accounts.save(user)
+		_deliver(id, "profile", [pl.data, "", {}])
+
+
+# --- server: ranked battles ---------------------------------------------------------------
+
+## Ranked opponents for a signed-in player: real saved armies near their
+## rating plus generated ones to fill three slots. Remembered so the player
+## can then pick one to fight.
+func _ranked_offer_for(id: int) -> Array:
+	var user: String = _sessions[id]
+	var pl := accounts.logic(user)
+	var rating := pl.rating()
+	var offers: Array = []
+	var code := pl.army_code()
+	if ranked_pool.add("acct:" + user, str(pl.data.get("name", user)), rating, code):
+		ranked_pool.save_file()
+	for e in ranked_pool.find(rating, "acct:" + user, 3):
+		var army := Army.decode(str(e["code"]))
+		if army.is_empty():
+			continue
+		var r := int(e["rating"])
+		offers.append({"name": e["name"], "rating": r, "squads": army["squads"], "player": true, "saved_at": e["saved_at"],
+			"difficulty": "Easy" if r < rating - 25 else ("Hard" if r > rating + 25 else "Even")})
+	var power := maxf(500.0, Army.army_power(pl.battle_squads()))
+	for t in [[0.8, -60, "Easy"], [1.0, 0, "Even"], [1.25, 70, "Hard"]]:
+		if offers.size() >= 3:
+			break
+		var taken := false
+		for o in offers:
+			if o["difficulty"] == t[2]:
+				taken = true
+		if taken:
+			continue
+		var ghost := Army.generate_opponent(power * float(t[0]) * _rng.randf_range(0.95, 1.05), maxi(0, rating + int(t[1]) + _rng.randi_range(-15, 15)), _rng.randi())
+		offers.append({"name": ghost["name"], "rating": ghost["rating"], "squads": ghost["squads"], "player": false, "saved_at": 0, "difficulty": t[2]})
+	for i in offers.size():
+		offers[i]["map"] = BattleMaps.random_map_id(_rng)
+		offers[i]["index"] = i
+	_ranked_offers[id] = offers
+	return offers
+
+
+@rpc("any_peer", "reliable")
+func _rq_ranked_battle(index: int) -> void:
+	if role != Role.SERVER:
+		return
+	var id := _sender()
+	if not _sessions.has(id) or not _allow(id):
+		return
+	var offers: Array = _ranked_offers.get(id, [])
+	if index < 0 or index >= offers.size():
+		_deliver(id, "notice", ["That opponent is no longer available. Find opponents again."])
+		return
+	_ranked_offers.erase(id)   # one battle per search
+	var opp: Dictionary = offers[index]
+	var user: String = _sessions[id]
+	var pl := accounts.logic(user)
+	var mine := pl.battle_squads()
+	if mine.is_empty():
+		_deliver(id, "notice", ["Build an army first."])
+		return
+	var seed_value := _rng.randi()
+	var sim := BattleSim.new()
+	sim.setup(mine, opp["squads"], seed_value, opp["map"])
+	var task := WorkerThreadPool.add_task(sim.run_to_end.bind(200000), false, "ranked battle")
+	_ranked_jobs.append({"task": task, "sim": sim, "peer": id, "user": user, "opp": opp})
+	_deliver(id, "ranked_start", [{
+		"mode": "ranked_online", "seed": seed_value, "map": opp["map"], "squads_a": mine, "squads_b": opp["squads"],
+		"name_a": str(pl.data.get("name", user)), "name_b": opp["name"], "rating_a": pl.rating(), "rating_b": int(opp["rating"]),
+		"local_team": 0,
+	}])
+
+
+func _poll_ranked_jobs() -> void:
+	var still: Array = []
+	for j in _ranked_jobs:
+		if not WorkerThreadPool.is_task_completed(int(j["task"])):
+			still.append(j)
+			continue
+		WorkerThreadPool.wait_for_task_completion(int(j["task"]))
+		var sim: BattleSim = j["sim"]
+		var score := 1.0 if sim.winner == 0 else (0.0 if sim.winner == 1 else 0.5)
+		var killed := sim.start_count[1] - sim.alive_count[1]
+		var user: String = j["user"]
+		var pl := accounts.logic(user)
+		pl.gold_mult = float(rewards["battle_mult"])
+		var summary := pl.apply_battle_result("ranked", score, int(j["opp"]["rating"]), killed)
+		summary["score"] = score
+		accounts.save(user)
+		var id := int(j["peer"])
+		if _sessions.get(id, "") == user:
+			_deliver(id, "ranked_result", [summary])
+			_deliver(id, "profile", [pl.data, "", {}])
+	_ranked_jobs = still

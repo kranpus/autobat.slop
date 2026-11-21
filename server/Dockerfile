@@ -20,11 +20,14 @@ RUN useradd --create-home --shell /usr/sbin/nologin godot
 WORKDIR /game
 COPY --chown=godot:godot . /game
 USER godot
+# Server data (accounts, ranked armies, TLS key): mount a volume here.
+RUN mkdir -p /home/godot/.local/share/godot
 
 # Import assets and register script classes once at build time.
 RUN godot --headless --path /game --import || true \
  && test -f /game/.godot/global_script_class_cache.cfg
 
 ENV PORT=24702
-EXPOSE 24702/udp
+# 24702: game connections (DTLS-encrypted). 24703: certificate service.
+EXPOSE 24702/udp 24703/udp
 CMD ["godot", "--headless", "--path", "/game", "--", "--server"]

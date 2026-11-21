@@ -18,6 +18,7 @@ var _result_panel: PanelContainer
 var _verify_label: Label
 var _local_team := 0
 var _auto_start_timer: Timer
+var _rewards_box: VBoxContainer
 
 
 func _ready() -> void:
@@ -220,9 +221,12 @@ func _on_finished(winner: int) -> void:
 	var enemy := 1 - _local_team
 	var killed := sim.start_count[enemy] - sim.alive_count[enemy]
 	var opp_rating := int(config.get("rating_b", 1000)) if _local_team == 0 else int(config.get("rating_a", 1000))
-	# Draft battles are decided and rewarded by the match host, not here.
+	# Draft battles are decided and rewarded by the match host, and signed-in
+	# ranked battles by the server, not here.
 	var summary := {"gold": 0, "maps": 0, "rating": 0}
-	if mode != "draft":
+	if mode == "ranked_online":
+		summary = Party.last_ranked_summary
+	elif mode != "draft":
 		summary = Profile.apply_battle_result(mode, score, opp_rating, killed)
 	if mode == "live":
 		Net.report_result(sim.checksum())
@@ -250,12 +254,13 @@ func _on_finished(winner: int) -> void:
 		var note := "Win: +1 win." if score >= 1.0 else (loss_note if score <= 0.0 else "Draw: no change.")
 		v.add_child(UIKit.label(note, 16, title_color))
 	else:
-		v.add_child(UIKit.label("+%d gold" % int(summary["gold"]), 16, Color("ffd76a")))
-	if int(summary["maps"]) > 0:
-		v.add_child(UIKit.label("+%d scouting map" % int(summary["maps"]), 16, Color("9fd3ff")))
-	if mode == "ranked" or mode == "live":
-		var d := int(summary["rating"])
-		v.add_child(UIKit.label("Rating %s%d  (now %d)" % ["+" if d >= 0 else "", d, Profile.rating()], 16, UIKit.GOOD if d >= 0 else UIKit.BAD))
+		_rewards_box = UIKit.vbox(6)
+		v.add_child(_rewards_box)
+		if mode == "ranked_online" and summary.is_empty():
+			_rewards_box.add_child(UIKit.label("Waiting for the server's result...", 14, UIKit.TEXT_DIM))
+			Party.ranked_result.connect(_show_rewards.bind(mode), CONNECT_ONE_SHOT)
+		else:
+			_show_rewards(summary, mode)
 	if mode == "live":
 		_verify_label = UIKit.label("Verifying result with opponent...", 13, UIKit.TEXT_DIM)
 		v.add_child(_verify_label)
@@ -263,6 +268,23 @@ func _on_finished(winner: int) -> void:
 	cont.custom_minimum_size = Vector2(0, 40)
 	v.add_child(cont)
 	_result_panel.visible = true
+
+
+func _show_rewards(summary: Dictionary, mode: String) -> void:
+	if not is_instance_valid(_rewards_box):
+		return
+	UIKit.clear(_rewards_box)
+	if Profile.online and mode in ["practice", "live"]:
+		_rewards_box.add_child(UIKit.label("While signed in, only ranked battles and Legion Draft earn rewards.", 13, UIKit.TEXT_DIM))
+		return
+	_rewards_box.add_child(UIKit.label("+%d gold" % int(summary.get("gold", 0)), 16, Color("ffd76a")))
+	if int(summary.get("maps", 0)) > 0:
+		_rewards_box.add_child(UIKit.label("+%d scouting map" % int(summary["maps"]), 16, Color("9fd3ff")))
+	if mode in ["ranked", "ranked_online", "live"]:
+		var d := int(summary.get("rating", 0))
+		_rewards_box.add_child(UIKit.label("Rating %s%d  (now %d)" % ["+" if d >= 0 else "", d, Profile.rating()], 16, UIKit.GOOD if d >= 0 else UIKit.BAD))
+	if mode == "ranked_online":
+		_rewards_box.add_child(UIKit.label("Battle checked and rewarded by the server.", 12, UIKit.TEXT_DIM))
 
 
 func _on_verified(ok: bool) -> void:

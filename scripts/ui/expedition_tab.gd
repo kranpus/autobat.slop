@@ -55,6 +55,11 @@ func _ready() -> void:
 	add_child(_result_dialog)
 
 	Profile.changed.connect(refresh)
+	# Signed in: the server rolls the expedition and applies the recruit.
+	Profile.choice_ready.connect(func(_c: Dictionary):
+		Audio.play_sfx("scroll")
+		_show_choice())
+	Profile.recruit_result.connect(_show_result)
 	refresh()
 
 
@@ -126,6 +131,9 @@ func _make_region(rid: String) -> Control:
 
 
 func _explore(rid: String) -> void:
+	if Profile.online:
+		Profile.explore(rid)   # the choice arrives through choice_ready
+		return
 	if Profile.explore(rid).is_empty():
 		return
 	Audio.play_sfx("scroll")
@@ -244,6 +252,11 @@ func _special_text(s: Dictionary) -> String:
 func _choose(index: int) -> void:
 	var res := Profile.choose_recruit(index)
 	_choice_popup.hide()
+	if not res.is_empty():
+		_show_result(res)   # offline; online it arrives through recruit_result
+
+
+func _show_result(res: Dictionary) -> void:
 	if res.is_empty():
 		return
 	var id: String = res["unit"]

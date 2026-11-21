@@ -45,8 +45,8 @@ func _ready() -> void:
 		_pool.append(p)
 	_music = AudioStreamPlayer.new()
 	add_child(_music)
-	music_volume = float(Profile.data.get("music_volume", 0.6))
-	sfx_volume = float(Profile.data.get("sfx_volume", 0.8))
+	music_volume = float(Profile.settings.get("music_volume", 0.6))
+	sfx_volume = float(Profile.settings.get("sfx_volume", 0.8))
 	_apply_music_volume()
 
 
@@ -97,13 +97,13 @@ func _exit_tree() -> void:
 
 func set_music_volume(v: float) -> void:
 	music_volume = clampf(v, 0.0, 1.0)
-	Profile.data["music_volume"] = music_volume
+	Profile.settings["music_volume"] = music_volume
 	_apply_music_volume()
 
 
 func set_sfx_volume(v: float) -> void:
 	sfx_volume = clampf(v, 0.0, 1.0)
-	Profile.data["sfx_volume"] = sfx_volume
+	Profile.settings["sfx_volume"] = sfx_volume
 
 
 func _apply_music_volume() -> void:

@@ -83,8 +83,8 @@ func _ready() -> void:
 	_server.text = Party.server_address()
 	_server.placeholder_text = "play.example.com  (or host:port)"
 	_server.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_server.text_changed.connect(func(t: String): Profile.data["server_address"] = t.strip_edges())
-	_server.focus_exited.connect(func(): Profile.save())
+	_server.text_changed.connect(func(t: String): Profile.settings["server_address"] = t.strip_edges())
+	_server.focus_exited.connect(func(): Profile.save_settings())
 	srow.add_child(_server)
 	_conn_label = UIKit.label("", 13, UIKit.TEXT_DIM)
 	srow.add_child(_conn_label)

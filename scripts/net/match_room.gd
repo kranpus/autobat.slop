@@ -10,6 +10,8 @@ extends RefCounted
 
 signal outbox(peer_id: int, method: String, args: Array)
 signal room_log(text: String)
+## The match ended: final placements with rewards (the server credits accounts).
+signal finished(placements: Array)
 
 const READY_TIMEOUT_MS := 200000
 const AUTO_START_MS := 30000          # quick-match rooms start this long after 2+ players join
@@ -460,3 +462,4 @@ func _end_match() -> void:
 	list.sort_custom(func(x, y): return int(x["place"]) < int(y["place"]))
 	room_log.emit("Room %s finished; winner %s" % [code, list[0]["name"] if not list.is_empty() else "-"])
 	_send_all("over", [list])
+	finished.emit(list)

@@ -8,6 +8,8 @@ extends SceneTree
 ##   ... -- --lan-host --name=Host        host a LAN match, start once someone joins
 ##   ... -- --lan-join=127.0.0.1 --name=P2  join a LAN host by IP
 ##   ... -- --lan-quick --name=P3           find a LAN match via broadcast, else host
+## Signed in (checks the server credits the draft reward to the account):
+##   ... -- --server=HOST --name=Bot1 --login=user:password
 ##
 ## Exit code 0 when the match finished, 1 on timeout or disconnect.
 
@@ -16,6 +18,8 @@ var player := "Smoke"
 var started := 0
 var turns := 0
 var done := false
+var login := ""
+var gold_before := 0
 
 
 func _initialize() -> void:
@@ -34,12 +38,14 @@ func _initialize() -> void:
 		elif arg.begins_with("--ranked="):
 			mode = "ranked"
 			lan_ip = arg.get_slice("=", 1)  # the rating to save the army at
+		elif arg.begins_with("--login="):
+			login = arg.substr(8)
 		elif arg.begins_with("--lan-join="):
 			mode = "lan-join"
 			lan_ip = arg.get_slice("=", 1)
 	started = Time.get_ticks_msec()
 	party = root.get_node("Party")
-	root.get_node("Profile").data["server_address"] = server
+	root.get_node("Profile").settings["server_address"] = server
 	party.status.connect(func(t: String): print("[%s] status: %s" % [player, t]))
 	party.match_started.connect(func(): print("[%s] match started with %d players" % [player, party.players.size()]))
 	party.shop_started.connect(_on_shop)
@@ -53,6 +59,20 @@ func _initialize() -> void:
 			quit(1))
 	party.lobby_changed.connect(_on_lobby)
 	var settings := {"wins": 3, "lives": 2, "max_players": 4, "turn_time": 20}
+	if login != "" and mode == "online":
+		var user := login.get_slice(":", 0)
+		var pw := login.substr(user.length() + 1)
+		party.register(user, pw, false)
+		var res: Array = await _login_finished()
+		if not res[0]:
+			party.login(user, pw, false)
+			res = await _login_finished()
+		if not res[0]:
+			print("[%s] LOGIN FAILED: %s" % [player, res[1]])
+			quit(1)
+			return
+		gold_before = root.get_node("Profile").gold()
+		print("[%s] signed in as %s with %d gold" % [player, user, gold_before])
 	match mode:
 		"online":
 			party.online_quick(player, settings)
@@ -65,7 +85,7 @@ func _initialize() -> void:
 		"ranked":
 			# Save this player's army at the given rating and print the matches.
 			var profile = root.get_node("Profile")
-			profile.data["server_address"] = server
+			profile.settings["server_address"] = server
 			profile.data["rating"] = int(lan_ip)
 			profile.data["name"] = player
 			party.ranked_opponents.connect(func(list: Array):
@@ -120,8 +140,26 @@ func _on_shop(r: int, _s: int) -> void:
 	party.submit_turn()
 
 
+func _login_finished() -> Array:
+	var out: Array = []
+	var cb := func(ok: bool, msg: String): out.append_array([ok, msg])
+	party.login_result.connect(cb, CONNECT_ONE_SHOT)
+	while out.is_empty():
+		await process_frame
+	return out
+
+
 func _on_over(list: Array) -> void:
 	done = true
+	if login != "":
+		await create_timer(1.0).timeout
+		var profile = root.get_node("Profile")
+		var mine := 0
+		for p in list:
+			if int(p["id"]) == party.my_id:
+				mine = int(p.get("gold", 0))
+		print("[%s] account gold %d -> %d (draft reward %d, credited by the server: %s)" % [player, gold_before, profile.gold(), mine,
+			"yes" if profile.gold() == gold_before + mine else "NO"])
 	for p in list:
 		print("[%s] final #%d %s (%d wins, %d losses) +%d gold" % [player, int(p["place"]), p["name"], int(p["wins"]), int(p.get("losses", 0)), int(p.get("gold", 0))])
 	print("[%s] server battle gold multiplier: x%s" % [player, root.get_node("Profile").battle_gold_mult()])

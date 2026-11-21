@@ -20,6 +20,8 @@ func _initialize() -> void:
 			out_dir = arg.get_slice("=", 1)
 	DirAccess.make_dir_recursive_absolute(out_dir)
 	var p = root.get_node("Profile")
+	p.settings.erase("account")         # show the sign-in screen first
+	p.settings.erase("start_offline")
 	p.reset()
 	p.data["gold"] = 5000
 	for id in ["goblin", "kobold_slinger", "rat_swarm", "skeleton", "orc_warrior", "elf_archer", "ogre", "lich", "golden_dragon"]:
@@ -38,6 +40,7 @@ func _battle(map: String) -> void:
 
 
 var check_log: Array = []
+var _login_shot := false
 var _drag_events: Array = []
 
 
@@ -85,6 +88,13 @@ func _process(_delta: float) -> bool:
 		return false
 	wait = 0
 	step += 1
+	if not _login_shot:
+		_login_shot = true
+		_shot("00_login")
+		for c in main.login_layer.get_children():
+			c.queue_free()
+		step -= 1
+		return false
 	match step:
 		1:
 			main.collection_tab.refresh()

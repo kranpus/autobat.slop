@@ -170,7 +170,7 @@ static func auto_ui_scale() -> float:
 ## Apply the player's interface size (Settings) or the automatic one.
 ## `--ui-scale=1.6` on the command line overrides it (handy for testing).
 static func apply_ui_scale(tree: SceneTree) -> void:
-	var setting := str(Profile.data.get("ui_scale", "auto"))
+	var setting := str(Profile.settings.get("ui_scale", "auto"))
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--ui-scale="):
 			setting = arg.get_slice("=", 1)

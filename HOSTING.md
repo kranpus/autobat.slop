@@ -15,7 +15,14 @@ A single server process:
   code, so a modified game can't fake its army.
 - **Decides every battle** on worker threads, then sends each player a replay of their fight.
 
-It speaks ENet over **UDP port 24702**. That's all it needs: no database and no web server.
+- **Holds player accounts.** Each player's collection, army, gold and rating live on the
+  server, and every change goes through the server's rules. Ranked battles are simulated and
+  rewarded by the server. Passwords are stored only as salted PBKDF2-SHA256 hashes. See
+  [Accounts and security](#accounts-and-security).
+
+It speaks ENet over **UDP port 24702**, encrypted with DTLS. It also answers on **UDP port 24703**,
+where a new player's game fetches the server's certificate once. That's all it needs: no
+database and no web server.
 
 ---
 
@@ -61,8 +68,11 @@ Tips:
   ("DHCP reservation").
 - **Other computers need the game too.** Either open the same project in Godot and press F5, or
   export a Windows build (Project → Export; Godot will offer to download export templates).
-- **Playing outside the house** later needs a port forward of UDP 24702 on your router to this
-  PC, and friends connect to your public IP.
+- **Playing outside the house** later needs a port forward of UDP 24702 and 24703 on your
+  router to this PC, and friends connect to your public IP.
+- **Back up player accounts** by copying the server's user data folder:
+  `%APPDATA%\Godot\app_userdata\Autobat Legions` (the `accounts` folder, `ranked_armies.json`,
+  `server_config.json` and `server_tls.*`).
 
 ## 2. Pick a host
 
@@ -111,13 +121,13 @@ docker logs -f legion-draft-server
 
 ```bash
 sudo ufw allow 22/tcp        # keep SSH working
-sudo ufw allow 24702/udp
+sudo ufw allow 24702:24703/udp
 sudo ufw enable
 ```
 
 Most providers also have a **cloud firewall** in their web dashboard (Hetzner "Firewalls",
 DigitalOcean "Networking → Firewalls", Oracle "Security Lists"). Add an inbound rule there too:
-**UDP, port 24702, from anywhere**.
+**UDP, ports 24702-24703, from anywhere**.
 
 ---
 
@@ -239,6 +249,75 @@ Notes:
 - **Startup flags:** you can also set values when starting the server, e.g.
   `-- --server --battle-gold=1.5 --draft-gold=2`. These override the saved file for that run.
 
+## Accounts and security
+
+When the game starts, players **sign in** or **create an account** on the server. They can also
+choose **Play offline (guest)**, which keeps a separate local profile on that device and
+works as before. While signed in:
+
+- **The profile lives on the server.** Collection, army, gold, scouting maps and rating are
+  stored in `accounts/<name>.json` in the server's user data folder. The game sends actions
+  such as "level up the goblins", "explore the Warrens" or "recruit option 2". The server checks
+  and applies them with the same rules code, then sends the profile back. Editing the game or
+  its save file changes nothing.
+- **Ranked battles run on the server.** Opponents come from the server; the player picks one;
+  the server simulates the battle on a worker thread, pays the gold and rating, and sends the
+  same seed so the player watches an identical replay.
+- **Legion Draft rewards** are paid into the account by the server when a match ends.
+- **Practice and live duels** still work but give no rewards while signed in, because their
+  result can't be checked.
+- **One device at a time:** signing in elsewhere signs the older session out. If the connection
+  drops, the game reconnects by itself.
+
+### Passwords
+
+- **Never stored or logged.** The account file keeps only a random 16-byte salt and a
+  **PBKDF2-HMAC-SHA256** hash with **600,000 iterations** (the OWASP recommendation). This is
+  one-way hashing rather than reversible encryption: a stolen account folder can't be decrypted
+  back into passwords, and each guess costs an attacker the full 600,000 rounds. Hashing takes
+  about a second on a background thread, so the server keeps running. At most 8 run at once;
+  further sign-ins are asked to retry.
+- **Brute force:** after 5 wrong passwords an account refuses logins for 5 minutes. Unknown
+  usernames take as long to check as real ones, so timing doesn't reveal which names exist.
+- **"Keep me signed in"** stores a random 256-bit token on the player's device. The server keeps
+  only its SHA-256 hash, issues a fresh token at every sign-in (each works once), keeps at most
+  5 per account, and expires them after 30 days. Logging out revokes it. Changing the password
+  revokes every token and signs out other devices.
+- **Forgotten passwords:** there's no email, so the admin resets them from the console (below).
+
+### Encryption
+
+All traffic between the game and the server is encrypted with **DTLS** (TLS for UDP),
+including passwords, tokens and game moves. On first start the server creates a self-signed
+certificate (`server_tls.crt` + `server_tls.key` in its user data folder). **Keep the key
+private and back it up with the accounts.**
+
+Players' games trust the server's certificate like SSH trusts a host key:
+- **First connection:** the game fetches the certificate from UDP port 24703 and saves it.
+- **After that:** it only talks to a server presenting that exact certificate.
+- **If the certificate changes** (for example, you reinstalled the server without restoring
+  `server_tls.*`), players see a warning. They can accept the new certificate with **Settings →
+  Trust new server certificate**.
+
+**Strongest option:** copy `server_tls.crt` into the project root as `server_cert.crt` before
+exporting the game. Exported games then trust only that certificate from the very first
+connection, so there is no first-use step to intercept, and the certificate service isn't
+needed.
+
+Godot prints a few `mbedtls` / `TLS handshake` lines to the log when players disconnect or a
+connection is dropped mid-handshake. They are harmless.
+
+### Account commands
+
+| Command | What it does |
+| --- | --- |
+| `accounts` | Number of accounts and who is signed in right now. |
+| `accounts reset-password <user>` | Sets a new temporary password, prints it once in the console, and signs that player out everywhere. Give it to them; they change it in **Settings → Account**. |
+
+Back up the server's user data folder (`accounts/`, `ranked_armies.json`, `server_config.json`,
+`server_tls.*`) regularly. With Docker it's the `legion-data` volume:
+`docker run --rm -v server_legion-data:/d -v "$PWD":/b debian tar czf /b/legion-backup.tgz -C /d .`
+
 ## Ranked matchmaking
 
 When a player presses **Find Opponents** in the Battle tab, their game:
@@ -252,9 +331,10 @@ Empty slots, or all three if the server can't be reached, are filled with genera
 opponents. Saved armies are kept for 30 days in `ranked_armies.json`, in the server's Godot user
 data folder.
 
-Player profiles still live on players' own computers, so a modified game could upload an army it
-doesn't really own. The server clamps levels and tiers to legal values and strips locked units,
-but fully trusted ranked play would need accounts with server-side profiles.
+For signed-in players the server uses the army and rating from their account, simulates the
+battle itself and pays the rewards, so nothing can be faked. Guests still send their army from
+their own device. The server clamps levels and tiers to legal values and strips locked units,
+but a guest's ranked results only count on that guest's own device.
 
 ## Operating notes
 
@@ -266,7 +346,6 @@ but fully trusted ranked play would need accounts with server-side profiles.
   - `REQUESTS_PER_SECOND` = 30 per player (extra requests are dropped)
 - **Disconnects:** a player who drops out mid-match is replaced by a bot so the match finishes.
   Empty rooms close straight away; finished rooms close after 2 minutes.
-- **Not included yet:** accounts, persistent rankings, or a web dashboard. Profiles and rewards
-  are still saved on each player's computer.
-- **Security:** ENet traffic is not encrypted. That's fine for game moves, but don't send
-  anything private over it.
+- **Not included yet:** a leaderboard, email password recovery or a web dashboard.
+- **Security:** see [Accounts and security](#accounts-and-security). LAN games hosted from inside
+  the game (no server) are not encrypted and don't use accounts.

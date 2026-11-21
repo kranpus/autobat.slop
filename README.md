@@ -23,6 +23,11 @@ The first time it opens, the editor imports the assets, which takes a few second
 **Phones and tablets:** the game also runs on Android and iOS, with scaled-up text and buttons,
 touch controls and pinch-to-zoom. See **[MOBILE.md](MOBILE.md)** for how to build it.
 
+**Accounts:** at startup, sign in to (or create) an account on the server, which then keeps your
+progress, or press **Play offline (guest)** to keep a local profile on this device. You can
+switch later in **Settings → Account**. See [HOSTING.md](HOSTING.md#accounts-and-security) for how
+accounts, password hashing and encryption work.
+
 ## The gameplay loop
 
 1. **Find units: Expeditions tab.** Spend *Scouting Maps* to search a region. Your scouts come
@@ -189,20 +194,22 @@ obstacles (x/y as fractions of the map; anything left of centre is mirrored auto
   rely on this. Both players exchange army codes, the host picks a seed and map, each machine simulates
   the battle locally, and the two results are compared by checksum.
 
-## PvP: what's real and what's next
+## PvP: what's real
 
-What works now is **asynchronous PvP** (army codes) and **live 1v1** over ENet. Profiles are stored
-locally (`user://profile.json`). Army codes are validated and clamped to legal values, but a
-modified client could still claim units it doesn't own. A real ranked ladder needs a small server
-that:
-
-1. stores player profiles and expedition rolls (so progress can't be faked),
-2. stores each player's defence army so ranked opponents are real people's armies (the "ghost"
-   opponents are generated today), and
-3. re-runs the deterministic `BattleSim` to confirm reported results.
-
-`BattleSim` is a plain `RefCounted` with no scene dependencies, so it can run in a headless Godot
-server as-is.
+- **Signed-in players:**
+  - **Server-side progress.** The profile lives on the server. Every upgrade, expedition roll
+    and army change is applied by the server's copy of the rules (`ProfileLogic`), so progress
+    can't be faked.
+  - **Ranked opponents** are real players' saved armies near your rating, topped up with
+    generated ones.
+  - **Ranked battles** are simulated and rewarded by the server. Your game replays the same
+    seed, so you watch the identical fight.
+  - **Legion Draft** rewards are paid by the server.
+- **Guests (offline):**
+  - **Local progress.** They keep a local profile (`user://profile.json`).
+  - **Ranked against saved armies.** They can still fight ranked opponents from the server's
+    pool, but the results only count on their own device.
+- **Live 1v1 duels** over ENet work in both modes, but give no rewards while signed in.
 
 ## Project layout
 
@@ -212,11 +219,14 @@ scenes/main.tscn              Entry scene (UI is built in code)
 scripts/core/game_data.gd     All units, rarities, regions, damage tables  ← tweak balance here
 scripts/core/battle_maps.gd   The 20 battlefields and their obstacles
 scripts/core/army.gd          Squad sizes, power, army codes, opponent generator, Elo
-scripts/core/profile.gd       Save data, upgrades, expeditions, rewards (autoload "Profile")
+scripts/core/profile_logic.gd Profile rules: upgrades, expeditions, rewards (shared by game and server)
+scripts/core/profile.gd       The game's profile: local guest save or the server's copy (autoload "Profile")
 scripts/core/audio.gd         Music + pooled/throttled SFX (autoload "Audio")
 scripts/net/net.gd            ENet live duels (autoload "Net")
 scripts/net/party.gd          Legion Draft networking: server, LAN host, client (autoload "Party")
 scripts/net/match_room.gd     One authoritative Legion Draft match (used by server and LAN host)
+scripts/net/passwords.gd      PBKDF2-SHA256 password hashing, login tokens
+scripts/net/account_store.gd  Server-side accounts (one JSON file each, no passwords stored)
 server/                       Dockerfile, docker-compose and run script for the online server
 scripts/draft/draft_data.gd   Draft rules, unit abilities, trinkets
 scripts/draft/draft_run.gd    A player's draft run: shop, merging, abilities, bot AI
@@ -225,6 +235,7 @@ scripts/battle/battle_view.gd MultiMesh renderer + camera
 scripts/battle/battle_screen.gd  HUD, start and result screens
 scripts/ui/*.gd               Menu tabs
 tests/test_battle.gd          Headless tests
+tests/net_account_test.gd     End-to-end account test against a running server
 assets/                       CC0 sprites, sounds, music + licenses
 ```
 
@@ -247,7 +258,10 @@ battle, determinism (same seed gives the same checksum), and opponent generation
 selling, shop tiers, board sanitizing) and run a 15-round, 4-bot draft tournament through
 real battles. Finally, they play a full server-side match with a scripted player and
 three bots, and check that the server's replay of that player's actions always rebuilds
-exactly the board the player sees.
+exactly the board the player sees. The password and account tests check PBKDF2 against the
+RFC 7914 test vectors. They also check that account files never contain a password or login
+token, that tokens can be revoked, and that the server-side profile rules reject invalid
+actions.
 
 ### Network and visual checks
 
@@ -256,6 +270,13 @@ exactly the board the player sees.
 server/run_local.sh /path/to/godot
 godot --headless -s res://tests/net_smoke_client.gd -- --server=127.0.0.1 --name=A
 godot --headless -s res://tests/net_smoke_client.gd -- --server=127.0.0.1 --name=B
+
+# Same, signed in to an account (checks the server pays the draft reward into the account):
+godot --headless -s res://tests/net_smoke_client.gd -- --server=127.0.0.1 --name=C --login=tester:secret123
+
+# Accounts end to end: register, server-side progress, a server-run ranked battle, log in/out,
+# "remember me" tokens, password change and lockout (run on the same machine as the server):
+godot --headless -s res://tests/net_account_test.gd -- --server=127.0.0.1
 
 # LAN modes:  -- --lan-host   /   -- --lan-join=127.0.0.1   /   -- --lan-quick
 

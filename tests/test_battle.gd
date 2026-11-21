@@ -21,6 +21,9 @@ func _initialize() -> void:
 	test_server_gold_commands()
 	test_unit_locks()
 	test_ranked_pool()
+	test_passwords()
+	test_accounts()
+	test_profile_logic()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -513,3 +516,88 @@ func test_ranked_pool() -> void:
 	pool.entries["pid700"]["saved_at"] = 1000
 	pool.prune()
 	check(not pool.entries.has("pid700"), "armies older than 30 days are dropped")
+
+
+func test_passwords() -> void:
+	print("password hashing")
+	# RFC 7914 section 11 / Python hashlib test vectors for PBKDF2-HMAC-SHA256.
+	check(Passwords.pbkdf2_sha256("passwd", "salt".to_utf8_buffer(), 1).hex_encode().begins_with("55ac046e56e3089fec1691c22544b605"), "PBKDF2 matches RFC 7914 (c=1)")
+	check(Passwords.pbkdf2_sha256("password", "salt".to_utf8_buffer(), 4096).hex_encode() == "c5e478d59288c841aa530db6845c4c8d962893a001ce4e11a4963873aa98134a", "PBKDF2 matches the reference (c=4096)")
+	var rec := Passwords.make_record("hunter22", 1000)
+	check(rec.has("salt") and rec.has("hash") and int(rec["iterations"]) == 1000, "a record holds salt, hash and iteration count")
+	check(not JSON.stringify(rec).contains("hunter22"), "the record never contains the password")
+	check(Passwords.verify("hunter22", rec), "the right password verifies")
+	check(not Passwords.verify("hunter23", rec), "a wrong password is rejected")
+	var rec2 := Passwords.make_record("hunter22", 1000)
+	check(rec2["salt"] != rec["salt"] and rec2["hash"] != rec["hash"], "the same password gets a different salt and hash each time")
+	check(Passwords.ITERATIONS >= 600000, "default work factor is at least 600,000 iterations")
+	check(Passwords.check_new_password("abc") != "" and Passwords.check_new_password("longenough") == "", "short passwords are refused")
+	var t := Passwords.random_token()
+	check(t.length() == 64 and t != Passwords.random_token(), "tokens are 256 random bits")
+
+
+func test_accounts() -> void:
+	print("server accounts")
+	var dir := "user://test_accounts_%d" % Time.get_ticks_usec()
+	var store := AccountStore.new(dir)
+	check(AccountStore.check_username("ab") != "" and AccountStore.check_username("bad name!") != "" and AccountStore.check_username("Good_Name1") == "", "usernames are validated")
+	store.create("Tester", Passwords.make_record("secret-pass", 1000))
+	check(store.exists("tester") and store.exists("TESTER"), "usernames are case-insensitive")
+	var token := store.issue_token("Tester")
+	check(store.check_token("Tester", token), "an issued token works")
+	check(not store.check_token("Tester", Passwords.random_token()), "a random token doesn't")
+	var pl := store.logic("Tester")
+	pl.data["gold"] = 12345
+	store.save("Tester")
+	var text := FileAccess.get_file_as_string(dir + "/tester.json")
+	check(text != "" and not text.contains("secret-pass"), "the account file doesn't contain the password")
+	check(not text.contains(token), "the account file doesn't contain the login token (only its hash)")
+	var fresh := AccountStore.new(dir)
+	check(int(fresh.logic("Tester").gold()) == 12345, "profiles are saved on the server and reload")
+	check(Passwords.verify("secret-pass", fresh.get_record("Tester")["password"]), "the password still verifies after reloading")
+	fresh.revoke_token("Tester", token)
+	check(not fresh.check_token("Tester", token), "a revoked token stops working")
+	var t2 := fresh.issue_token("Tester")
+	fresh.set_password("Tester", Passwords.make_record("new-secret", 1000))
+	check(not fresh.check_token("Tester", t2), "changing the password signs out every device")
+	for i in 8:
+		fresh.issue_token("Tester")
+	check((fresh.get_record("Tester")["tokens"] as Dictionary).size() <= AccountStore.MAX_TOKENS, "only the newest few tokens are kept")
+	for f in DirAccess.get_files_at(dir):
+		DirAccess.remove_absolute(dir + "/" + f)
+	DirAccess.remove_absolute(dir)
+
+
+func test_profile_logic() -> void:
+	print("server-side profile rules")
+	var pl := ProfileLogic.new()
+	var owned: Array = pl.data["units"].keys()
+	check(owned.size() > 0, "a new profile starts with units")
+	pl.set_army([{"unit": owned[0], "row": "back"}, {"unit": owned[0], "row": "front"}, {"unit": "not_a_unit", "row": "front"}, {"unit": owned[0 if owned.size() < 2 else 1], "row": "sideways"}])
+	var army: Array = pl.data["army"]
+	var ids := {}
+	for e in army:
+		ids[e["unit"]] = true
+	check(not ids.has("not_a_unit") and ids.size() == army.size(), "set_army drops unowned and duplicate units")
+	check(army[0]["row"] == "back" and army.back()["row"] in GameData.ROWS, "set_army keeps valid rows and fixes bad ones")
+	pl.data["gold"] = 0
+	var id: String = owned[0]
+	var lvl := int(pl.unit(id)["level"])
+	pl.level_up(id)
+	check(int(pl.unit(id)["level"]) == lvl, "can't level up without gold")
+	pl.data["gold"] = 1000000
+	pl.level_up(id)
+	check(int(pl.unit(id)["level"]) == lvl + 1, "level up spends gold")
+	pl.data["maps"] = 0
+	var region := ""
+	for r in GameData.REGIONS:
+		if pl.region_unlocked(r) and not UnitLocks.is_region_locked(r):
+			region = r
+			break
+	check(pl.explore(region).is_empty(), "can't explore without a scouting map")
+	pl.data["maps"] = 1
+	var choice := pl.explore(region)
+	check(choice.has("options") and pl.has_pending_choice(), "exploring rolls a recruit choice")
+	var res := pl.choose_recruit(0)
+	check(res.has("unit") and not pl.has_pending_choice(), "choosing a recruit resolves it")
+	check(pl.choose_recruit(0).is_empty(), "a choice can't be taken twice")

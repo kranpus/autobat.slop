@@ -13,7 +13,12 @@ services:
     stdin_open: true
     tty: true
     ports:
-      - "24702:24702/udp"
+      - "24702:24702/udp"   # game connections (encrypted)
+      - "24703:24703/udp"   # certificate service (new players fetch it once)
+    # Accounts, ranked armies, settings and the server's TLS key live here,
+    # so they survive rebuilding or updating the container.
+    volumes:
+      - legion-data:/home/godot/.local/share/godot
     environment:
       - PORT=24702
     logging:
@@ -21,3 +26,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  legion-data:

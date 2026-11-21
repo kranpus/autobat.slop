@@ -144,6 +144,9 @@ func _find_opponents() -> void:
 	if Profile.battle_squads().is_empty():
 		_show_search_message("Build an army first (Army tab).")
 		return
+	if Profile.online and not Party.session_active():
+		_show_search_message("Reconnecting to the server... try again in a moment.")
+		return
 	_searching = true
 	_show_search_message("Searching for players near rating %d..." % Profile.rating())
 	# Saves your army on the server (with your current rating) and asks for
@@ -160,6 +163,10 @@ func _on_ranked_opponents(list: Array) -> void:
 	rng.randomize()
 	_opponents.clear()
 	for e in list:
+		if e.has("index"):
+			# Signed in: the server picked these opponents and will run the battle.
+			_opponents.append(e)
+			continue
 		var army := Army.decode(str(e.get("code", "")))
 		if army.is_empty():
 			continue  # e.g. every unit in it is locked
@@ -173,7 +180,7 @@ func _on_ranked_opponents(list: Array) -> void:
 	var my_power := maxf(500.0, Army.army_power(Profile.battle_squads()))
 	var tiers := [[0.8, -60, "Easy"], [1.0, 0, "Even"], [1.25, 70, "Hard"]]
 	# First cover any missing difficulty, then top up to three.
-	for pass_i in 2:
+	for pass_i in (0 if Profile.online else 2):
 		for t in tiers:
 			if _opponents.size() >= 3:
 				break
@@ -250,6 +257,14 @@ func _start(opp: Dictionary, mode: String) -> void:
 	var mine := Profile.battle_squads()
 	if mine.is_empty():
 		_status.text = "Build an army first (Army tab)."
+		return
+	if mode == "ranked" and opp.has("index"):
+		# The server simulates the battle and pays the rewards; the battle
+		# screen opens when it answers.
+		Party.request_ranked_battle(int(opp["index"]))
+		_opponents.clear()
+		UIKit.clear(_opponents_box)
+		_opponents_box.add_child(UIKit.label("Starting the battle on the server...", 14, UIKit.TEXT_DIM))
 		return
 	battle_requested.emit({
 		"mode": mode,
