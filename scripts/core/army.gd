@@ -44,14 +44,12 @@ static func unit_power(unit_id: String, level: int) -> float:
 	return sqrt(float(s["hp"]) * dps * reach_bonus) * rarity_mult
 
 
-## Units actually deployed per squad, respecting the global army unit cap.
+## Units deployed per squad. There is no army-wide cap: every squad fights at
+## full size, so the army limit is MAX_SQUADS squads.
 static func deploy_counts(squads: Array) -> Array:
 	var out: Array = []
-	var remaining := GameData.ARMY_UNIT_CAP
 	for sq in squads:
-		var n := mini(squad_size(sq["unit"], int(sq["tier"])), remaining)
-		out.append(n)
-		remaining -= n
+		out.append(squad_size(sq["unit"], int(sq["tier"])))
 	return out
 
 

@@ -11,6 +11,8 @@ var _status: Label
 var _ip_input: LineEdit
 var _port_input: SpinBox
 var _rematch_btn: Button
+var _map_picker: OptionButton
+var _map_desc: Label
 var _opponents: Array = []
 
 
@@ -44,6 +46,26 @@ func _ready() -> void:
 	add_child(right)
 
 	var fp := UIKit.panel(UIKit.PANEL_LIGHT)
+	var mp := UIKit.panel(UIKit.PANEL_LIGHT)
+	right.add_child(mp)
+	var mv := UIKit.vbox(6)
+	mp.add_child(mv)
+	var mrow := UIKit.hbox(8)
+	mrow.add_child(UIKit.label("Battlefield", 20, UIKit.ACCENT))
+	_map_picker = OptionButton.new()
+	_map_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_map_picker.add_item("Random (%d maps)" % BattleMaps.MAPS.size())
+	_map_picker.set_item_metadata(0, "")
+	for id in BattleMaps.map_ids():
+		_map_picker.add_item(BattleMaps.MAPS[id]["name"])
+		_map_picker.set_item_metadata(_map_picker.item_count - 1, id)
+	_map_picker.item_selected.connect(func(_i): _update_map_desc())
+	mrow.add_child(_map_picker)
+	mv.add_child(mrow)
+	_map_desc = UIKit.label("", 13, UIKit.TEXT_DIM)
+	_map_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	mv.add_child(_map_desc)
+	_update_map_desc()
 	right.add_child(fp)
 	var fv := UIKit.vbox(8)
 	fp.add_child(fv)
@@ -76,7 +98,7 @@ func _ready() -> void:
 	_port_input.max_value = 65535
 	_port_input.value = Net.DEFAULT_PORT
 	prow.add_child(_port_input)
-	prow.add_child(UIKit.button("Host", func(): Net.host(int(_port_input.value), Profile.army_code())))
+	prow.add_child(UIKit.button("Host", func(): Net.host(int(_port_input.value), Profile.army_code(), _chosen_map())))
 	nv.add_child(prow)
 	var jrow := UIKit.hbox(8)
 	_ip_input = LineEdit.new()
@@ -87,7 +109,7 @@ func _ready() -> void:
 	nv.add_child(jrow)
 	var crow := UIKit.hbox(8)
 	_rematch_btn = UIKit.button("Rematch", func():
-		if not Net.start_rematch(Profile.army_code()):
+		if not Net.start_rematch(Profile.army_code(), _chosen_map()):
 			_status.text = "No opponent connected (host only)."
 	)
 	crow.add_child(_rematch_btn)
@@ -121,6 +143,7 @@ func _find_opponents() -> void:
 	for t in tiers:
 		var opp := Army.generate_opponent(my_power * float(t[0]) * rng.randf_range(0.95, 1.05), maxi(0, rating + int(t[1]) + rng.randi_range(-15, 15)), rng.randi())
 		opp["difficulty"] = t[2]
+		opp["map"] = BattleMaps.random_map_id(rng)
 		_opponents.append(opp)
 	UIKit.clear(_opponents_box)
 	for opp in _opponents:
@@ -143,6 +166,7 @@ func _make_opponent_card(opp: Dictionary) -> Control:
 	var h2 := UIKit.hbox(10)
 	h2.add_child(UIKit.squad_strip(opp["squads"], 28))
 	h2.add_child(UIKit.spacer())
+	h2.add_child(UIKit.label("on %s" % BattleMaps.get_map(opp["map"])["name"], 13, UIKit.TEXT_DIM))
 	var win_delta := Army.elo_delta(Profile.rating(), int(opp["rating"]), 1.0)
 	h2.add_child(UIKit.button("Attack  (+%d)" % win_delta, func(): _start(opp, "ranked")))
 	v.add_child(h2)
@@ -163,7 +187,6 @@ func _start(opp: Dictionary, mode: String) -> void:
 	if mine.is_empty():
 		_status.text = "Build an army first (Army tab)."
 		return
-	var tiles := ["warrens", "crypt", "forest", "deep", "peaks", "arena"]
 	battle_requested.emit({
 		"mode": mode,
 		"seed": randi(),
@@ -174,8 +197,32 @@ func _start(opp: Dictionary, mode: String) -> void:
 		"rating_a": Profile.rating(),
 		"rating_b": int(opp["rating"]),
 		"local_team": 0,
-		"tile": tiles[randi() % tiles.size()],
+		"map": str(opp.get("map", _chosen_map_or_random())),
 	})
 	if mode == "ranked":
 		_opponents.clear()
 		UIKit.clear(_opponents_box)
+
+
+## "" when the player picked Random.
+func _chosen_map() -> String:
+	return str(_map_picker.get_item_metadata(_map_picker.selected))
+
+
+func _chosen_map_or_random() -> String:
+	var id := _chosen_map()
+	if id != "":
+		return id
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	return BattleMaps.random_map_id(rng)
+
+
+func _update_map_desc() -> void:
+	var id := _chosen_map()
+	if id == "":
+		_map_desc.text = "A random battlefield for friend challenges and live duels you host. Ranked opponents each come with their own map."
+	else:
+		var m := BattleMaps.get_map(id)
+		var sz: Array = m["size"]
+		_map_desc.text = "%s  (%dx%d, %d obstacles)" % [m["desc"], int(sz[0]), int(sz[1]), BattleMaps.obstacles(id).size()]

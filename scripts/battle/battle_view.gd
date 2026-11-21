@@ -31,9 +31,10 @@ var _big_units := PackedInt32Array()
 var _overlay: Node2D                 # draws FX and health bars above the sprites
 
 
-func setup(battle: BattleSim, tile: String) -> void:
+func setup(battle: BattleSim) -> void:
 	sim = battle
-	_build_background(tile)
+	_build_background(String(BattleMaps.get_map(sim.map_id)["tile"]))
+	_build_obstacle_layer()
 	_build_team_bases()
 	_build_unit_meshes()
 	_build_projectile_meshes()
@@ -43,7 +44,6 @@ func setup(battle: BattleSim, tile: String) -> void:
 	add_child(_overlay)
 	_camera = Camera2D.new()
 	add_child(_camera)
-	_camera.position = Vector2(BattleSim.MAP_W, BattleSim.MAP_H) * 0.5
 	fit_camera()
 	for i in sim.n:
 		if sim.max_hp[i] >= 500.0:
@@ -53,9 +53,9 @@ func setup(battle: BattleSim, tile: String) -> void:
 
 func fit_camera() -> void:
 	var vp := get_viewport_rect().size
-	var z := minf(vp.x / (BattleSim.MAP_W * 0.92), vp.y / (BattleSim.MAP_H * 0.92))
+	var z := minf(vp.x / (sim.map_w * 0.92), vp.y / (sim.map_h * 0.92))
 	_camera.zoom = Vector2(z, z)
-	_camera.position = Vector2(BattleSim.MAP_W, BattleSim.MAP_H) * 0.5
+	_camera.position = Vector2(sim.map_w, sim.map_h) * 0.5
 
 
 static func make_quad(size: float) -> ArrayMesh:
@@ -84,10 +84,55 @@ func _build_background(tile: String) -> void:
 	bg.texture = GameData.tile_texture(tile)
 	bg.centered = false
 	bg.region_enabled = true
-	bg.region_rect = Rect2(0, 0, BattleSim.MAP_W, BattleSim.MAP_H)
+	bg.region_rect = Rect2(0, 0, sim.map_w, sim.map_h)
 	bg.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	bg.modulate = Color(0.75, 0.75, 0.75)
 	add_child(bg)
+
+
+func _build_obstacle_layer() -> void:
+	var layer := Node2D.new()
+	layer.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	layer.draw.connect(_draw_obstacles.bind(layer))
+	add_child(layer)
+
+
+## Obstacles are static, so they are drawn once onto their own layer.
+func _draw_obstacles(layer: Node2D) -> void:
+	var tree_textures := [BattleMaps.terrain_texture("tree_green"), BattleMaps.terrain_texture("tree_yellow"), BattleMaps.terrain_texture("tree_red")]
+	for o in BattleMaps.obstacles(sim.map_id):
+		var kind: String = o[0]
+		var info: Dictionary = BattleMaps.OBSTACLE_KINDS[kind]
+		var c := Vector2(float(o[1]), float(o[2]))
+		var r: float = o[3]
+		var tex := BattleMaps.terrain_texture(info["texture"])
+		layer.draw_circle(c + Vector2(4, 7), r, Color(0, 0, 0, 0.35))
+		if info["style"] == "sprite":
+			layer.draw_circle(c, r, Color(0, 0, 0, 0.25))
+			var sz := r * 2.6
+			layer.draw_texture_rect(tex, Rect2(c - Vector2(sz * 0.5, sz * 0.7), Vector2(sz, sz)), false)
+			continue
+		var pts := PackedVector2Array()
+		var uvs := PackedVector2Array()
+		var segs := clampi(int(r / 4.0), 16, 64)
+		for k in segs:
+			var a := TAU * float(k) / float(segs)
+			var p := c + Vector2(cos(a), sin(a)) * r
+			pts.append(p)
+			uvs.append(p / 32.0)
+		layer.draw_colored_polygon(pts, Color.WHITE, uvs, tex)
+		layer.draw_arc(c, r, 0.0, TAU, segs, Color(0, 0, 0, 0.55), 4.0)
+		if info["style"] == "grove":
+			var trng := RandomNumberGenerator.new()
+			trng.seed = int(c.x) * 7919 + int(c.y) * 104729
+			var count := maxi(1, int(r * r / 1500.0))
+			for _t in count:
+				var ang := trng.randf() * TAU
+				var dist := sqrt(trng.randf()) * r * 0.78
+				var p := c + Vector2(cos(ang), sin(ang)) * dist
+				var tsz := trng.randf_range(40.0, 56.0)
+				var ttex: Texture2D = tree_textures[trng.randi_range(0, 2)]
+				layer.draw_texture_rect(ttex, Rect2(p - Vector2(tsz * 0.5, tsz * 0.8), Vector2(tsz, tsz)), false)
 
 
 func _build_team_bases() -> void:
@@ -287,8 +332,8 @@ func _update_fx(delta: float) -> void:
 
 func _draw_overlay() -> void:
 	# Arena border
-	_overlay.draw_rect(Rect2(0, 0, BattleSim.MAP_W, BattleSim.MAP_H), Color(0, 0, 0, 0.6), false, 6.0)
-	_overlay.draw_line(Vector2(BattleSim.MAP_W * 0.5, 0), Vector2(BattleSim.MAP_W * 0.5, BattleSim.MAP_H), Color(1, 1, 1, 0.06), 2.0)
+	_overlay.draw_rect(Rect2(0, 0, sim.map_w, sim.map_h), Color(0, 0, 0, 0.6), false, 6.0)
+	_overlay.draw_line(Vector2(sim.map_w * 0.5, 0), Vector2(sim.map_w * 0.5, sim.map_h), Color(1, 1, 1, 0.06), 2.0)
 	for f in _fx:
 		var k := float(f[4]) / float(f[5])
 		var pos := Vector2(float(f[1]), float(f[2]))

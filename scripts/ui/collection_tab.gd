@@ -103,7 +103,7 @@ func _build_detail() -> void:
 		_detail.add_child(UIKit.label("Where to find it:", 14, UIKit.ACCENT))
 		for rid in GameData.REGIONS:
 			if GameData.REGIONS[rid]["drops"].has(id):
-				_detail.add_child(UIKit.label("  • %s: %.1f%% per find" % [GameData.REGIONS[rid]["name"], Profile.drop_chance(rid, id) * 100.0], 14))
+				_detail.add_child(UIKit.label("  • %s: %.1f%% chance to be offered per expedition" % [GameData.REGIONS[rid]["name"], Profile.drop_chance(rid, id) * 100.0], 14))
 		_add_stats(id, 1)
 		return
 

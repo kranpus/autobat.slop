@@ -18,6 +18,7 @@ var remote_code := ""
 var _my_check := -1
 var _remote_check := -1
 var _in_match := false
+var map_choice := ""              # host's chosen battlefield, "" = random each match
 
 
 func _ready() -> void:
@@ -36,7 +37,7 @@ func is_active() -> bool:
 	return multiplayer.multiplayer_peer is ENetMultiplayerPeer
 
 
-func host(port: int, army_code: String) -> Error:
+func host(port: int, army_code: String, map_id: String = "") -> Error:
 	close()
 	var peer := ENetMultiplayerPeer.new()
 	var err := peer.create_server(port, 1)
@@ -46,6 +47,7 @@ func host(port: int, army_code: String) -> Error:
 	multiplayer.multiplayer_peer = peer
 	is_host = true
 	my_code = army_code
+	map_choice = map_id
 	status_changed.emit("Hosting on port %d. Waiting for a challenger..." % port)
 	return OK
 
@@ -94,11 +96,13 @@ func _send_army(code: String) -> void:
 	remote_code = code
 	if is_host and not _in_match:
 		var seed_value := randi()
-		_begin.rpc(seed_value, my_code, remote_code)
+		_begin.rpc(seed_value, my_code, remote_code, _pick_map())
 
 
 @rpc("authority", "call_local", "reliable")
-func _begin(seed_value: int, host_code: String, client_code: String) -> void:
+func _begin(seed_value: int, host_code: String, client_code: String, map_id: String) -> void:
+	if not BattleMaps.MAPS.has(map_id):
+		map_id = BattleMaps.DEFAULT_MAP
 	var a := Army.decode(host_code)
 	var b := Army.decode(client_code)
 	if a.is_empty() or b.is_empty():
@@ -118,7 +122,7 @@ func _begin(seed_value: int, host_code: String, client_code: String) -> void:
 		"rating_a": a["rating"],
 		"rating_b": b["rating"],
 		"local_team": 0 if is_host else 1,
-		"tile": "arena",
+		"map": map_id,
 	})
 
 
@@ -143,9 +147,18 @@ func _compare() -> void:
 
 
 ## Host only: start another battle against the connected opponent.
-func start_rematch(army_code: String) -> bool:
+func start_rematch(army_code: String, map_id: String = "") -> bool:
 	if not is_host or remote_code == "" or not is_active():
 		return false
 	my_code = army_code
-	_begin.rpc(randi(), my_code, remote_code)
+	map_choice = map_id
+	_begin.rpc(randi(), my_code, remote_code, _pick_map())
 	return true
+
+
+func _pick_map() -> String:
+	if BattleMaps.MAPS.has(map_choice):
+		return map_choice
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	return BattleMaps.random_map_id(rng)

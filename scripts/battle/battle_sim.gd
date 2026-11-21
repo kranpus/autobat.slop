@@ -1,6 +1,6 @@
 class_name BattleSim
 extends RefCounted
-## Deterministic, data-oriented battle simulation built for ~1000 units.
+## Deterministic, data-oriented battle simulation built for 1000+ units.
 ##
 ## All per-unit state lives in packed arrays (struct-of-arrays) and spatial
 ## queries go through a uniform grid, so the whole fight runs in plain
@@ -10,8 +10,8 @@ extends RefCounted
 
 const DT := 0.05                 # 20 simulation ticks per second
 const MAX_TIME := 150.0          # seconds before the fight is decided on remaining HP
-const MAP_W := 2400.0
-const MAP_H := 1400.0
+const OBSTACLE_MARGIN := 24.0     # max unit radius, used when bucketing obstacles into cells
+const STUCK_TICKS := 20           # flip detour direction after this many ticks without progress
 const CELL := 64.0
 const RETARGET_TICKS := 12
 const SEARCH_RINGS := 4
@@ -73,6 +73,18 @@ var pr_speed := PackedFloat32Array()
 var pr_ang := PackedFloat32Array()
 var pr_free: Array[int] = []
 
+# --- map & obstacles --------------------------------------------------------
+var map_id := BattleMaps.DEFAULT_MAP
+var map_w := 2400.0
+var map_h := 1400.0
+var ob_x := PackedFloat32Array()
+var ob_y := PackedFloat32Array()
+var ob_r := PackedFloat32Array()
+var cell_obs: Array = []          # cell -> PackedInt32Array of obstacles touching it
+var detour := PackedInt32Array()  # per unit: 0 none, +1 / -1 direction to walk around obstacles
+var detour_timer := PackedInt32Array()
+var stuck := PackedInt32Array()
+
 # --- spatial grid -----------------------------------------------------------
 var gw := 0
 var gh := 0
@@ -93,15 +105,43 @@ var rng := RandomNumberGenerator.new()
 
 
 ## squads_a / squads_b: arrays of squad dictionaries (see Army).
-func setup(squads_a: Array, squads_b: Array, seed_value: int) -> void:
+## map: an id from BattleMaps.MAPS.
+func setup(squads_a: Array, squads_b: Array, seed_value: int, map: String = BattleMaps.DEFAULT_MAP) -> void:
 	rng.seed = seed_value
-	gw = int(ceil(MAP_W / CELL))
-	gh = int(ceil(MAP_H / CELL))
+	map_id = map if BattleMaps.MAPS.has(map) else BattleMaps.DEFAULT_MAP
+	var size := BattleMaps.map_size(map_id)
+	map_w = size.x
+	map_h = size.y
+	gw = int(ceil(map_w / CELL))
+	gh = int(ceil(map_h / CELL))
 	cell_head.resize(gw * gh)
+	_build_obstacles()
 	_spawn_army(squads_a, 0)
 	_spawn_army(squads_b, 1)
 	cell_next.resize(n)
+	_resolve_obstacles()
 	_rebuild_team_lists()
+
+
+func _build_obstacles() -> void:
+	cell_obs.resize(gw * gh)
+	for c in gw * gh:
+		cell_obs[c] = PackedInt32Array()
+	for o in BattleMaps.obstacles(map_id):
+		var idx := ob_x.size()
+		ob_x.append(float(o[1]))
+		ob_y.append(float(o[2]))
+		ob_r.append(float(o[3]))
+		var reach_r := float(o[3]) + OBSTACLE_MARGIN
+		var x0 := clampi(int((float(o[1]) - reach_r) / CELL), 0, gw - 1)
+		var x1 := clampi(int((float(o[1]) + reach_r) / CELL), 0, gw - 1)
+		var y0 := clampi(int((float(o[2]) - reach_r) / CELL), 0, gh - 1)
+		var y1 := clampi(int((float(o[2]) + reach_r) / CELL), 0, gh - 1)
+		for gy in range(y0, y1 + 1):
+			for gx in range(x0, x1 + 1):
+				var list: PackedInt32Array = cell_obs[gy * gw + gx]
+				list.append(idx)
+				cell_obs[gy * gw + gx] = list
 
 
 func _kind_index(uid: String) -> int:
@@ -115,7 +155,8 @@ func _kind_index(uid: String) -> int:
 func _spawn_army(squads: Array, t: int) -> void:
 	var counts := Army.deploy_counts(squads)
 	# Group squads by row and lay them out as blocks.
-	var row_x := {"front": 360.0, "middle": 640.0, "back": 900.0}  # distance from centre line
+	# Distance of each row from the centre line scales with map width.
+	var row_x := {"front": map_w * 0.15, "middle": map_w * 0.27, "back": map_w * 0.38}
 	for row in GameData.ROWS:
 		var members: Array = []
 		for i in squads.size():
@@ -133,7 +174,7 @@ func _spawn_army(squads: Array, t: int) -> void:
 				var i: int = members[m]
 				var spacing := _spacing(squads[i]["unit"])
 				total_h += ceilf(float(counts[i]) / float(depth_cols[m])) * spacing + 24.0
-			if total_h <= MAP_H - 120.0:
+			if total_h <= map_h - 120.0:
 				break
 			for m in members.size():
 				depth_cols[m] = int(depth_cols[m]) + 1
@@ -144,22 +185,22 @@ func _spawn_army(squads: Array, t: int) -> void:
 			var h := ceilf(float(counts[i]) / float(depth_cols[m])) * _spacing(squads[i]["unit"])
 			heights.append(h)
 			sum_h += h + 24.0
-		var y_cursor := (MAP_H - sum_h) * 0.5 + 12.0
+		var y_cursor := (map_h - sum_h) * 0.5 + 12.0
 		for m in members.size():
 			var i: int = members[m]
 			var sq: Dictionary = squads[i]
 			var cols: int = depth_cols[m]
 			var spacing := _spacing(sq["unit"])
 			var stats := Army.unit_stats(sq["unit"], int(sq["level"]))
-			var front_x := MAP_W * 0.5 - float(row_x[row])
+			var front_x := map_w * 0.5 - float(row_x[row])
 			for u in int(counts[i]):
 				var c := u % cols
 				@warning_ignore("integer_division")
 				var rr := u / cols
-				var x := front_x - float(c) * spacing + rng.randf_range(-2.0, 2.0)
-				var y := y_cursor + float(rr) * spacing + spacing * 0.5 + rng.randf_range(-2.0, 2.0)
+				var x := maxf(12.0, front_x - float(c) * spacing + rng.randf_range(-2.0, 2.0))
+				var y := clampf(y_cursor + float(rr) * spacing + spacing * 0.5 + rng.randf_range(-2.0, 2.0), 8.0, map_h - 8.0)
 				if t == 1:
-					x = MAP_W - x
+					x = map_w - x
 				_add_unit(sq["unit"], stats, t, x, y)
 			y_cursor += float(heights[m]) + 24.0
 
@@ -184,6 +225,9 @@ func _add_unit(uid: String, s: Dictionary, t: int, x: float, y: float) -> void:
 	hit_tick.append(-100)
 	death_tick.append(-1)
 	attack_tick.append(-100)
+	detour.append(0)
+	detour_timer.append(0)
+	stuck.append(0)
 	px.append(x)
 	py.append(y)
 	prev_x.append(x)
@@ -228,6 +272,7 @@ func step() -> void:
 		else:
 			_combat_ai(i)
 	_separate()
+	_resolve_obstacles()
 	_update_projectiles()
 	_check_end()
 
@@ -284,9 +329,7 @@ func _approach_and_act(i: int, t: int, healing: bool) -> void:
 	var r := reach[i] + radius[i] + radius[t]
 	if d2 > r * r:
 		var d := sqrt(d2)
-		var mv := minf(speed[i] * DT, d - r + 0.5)
-		px[i] = clampf(px[i] + dx / d * mv, 0.0, MAP_W)
-		py[i] = clampf(py[i] + dy / d * mv, 0.0, MAP_H)
+		_move(i, dx / d, dy / d, minf(speed[i] * DT, d - r + 0.5))
 		return
 	if cd_t[i] > 0.0:
 		return
@@ -492,6 +535,125 @@ func _update_projectiles() -> void:
 			pr_ang[p] = atan2(dy, dx)
 
 
+# --- movement & obstacles ---------------------------------------------------
+
+## Move unit i along (nx, ny) by mv pixels. Ground units that would walk into
+## an obstacle slide around it instead, keeping a consistent direction
+## (detour) so they work their way along rivers and walls, and flip that
+## direction if they stop making progress (e.g. pinned against the map edge).
+func _move(i: int, nx: float, ny: float, mv: float) -> void:
+	var x := px[i] + nx * mv
+	var y := py[i] + ny * mv
+	var blocked := false
+	if flying[i] == 0 and not ob_x.is_empty():
+		var obs: PackedInt32Array = cell_obs[_cell_of(x, y)]
+		for o in obs:
+			var ox := x - ob_x[o]
+			var oy := y - ob_y[o]
+			var rr := ob_r[o] + radius[i]
+			if ox * ox + oy * oy >= rr * rr:
+				continue
+			blocked = true
+			# Outward normal from the obstacle at the unit's current position.
+			var ux := px[i] - ob_x[o]
+			var uy := py[i] - ob_y[o]
+			var ul := sqrt(ux * ux + uy * uy)
+			if ul < 0.001:
+				ux = 1.0
+				uy = 0.0
+				ul = 1.0
+			ux /= ul
+			uy /= ul
+			if detour[i] == 0:
+				# Pick the side of the obstacle that heads toward the goal.
+				var side := -uy * nx + ux * ny
+				if absf(side) < 0.05:
+					detour[i] = 1 if i % 2 == 0 else -1
+				else:
+					detour[i] = 1 if side > 0.0 else -1
+			var tx := -uy * float(detour[i])
+			var ty := ux * float(detour[i])
+			x = px[i] + tx * mv
+			y = py[i] + ty * mv
+			# Stay on the obstacle's edge.
+			var ex := x - ob_x[o]
+			var ey := y - ob_y[o]
+			var el := sqrt(ex * ex + ey * ey)
+			if el < rr and el > 0.001:
+				x = ob_x[o] + ex / el * rr
+				y = ob_y[o] + ey / el * rr
+			break
+	x = clampf(x, 0.0, map_w)
+	y = clampf(y, 0.0, map_h)
+	if blocked:
+		detour_timer[i] = 30
+		var moved := absf(x - px[i]) + absf(y - py[i])
+		if moved < mv * 0.3:
+			stuck[i] += 1
+			if stuck[i] > STUCK_TICKS:
+				detour[i] = -detour[i]
+				stuck[i] = 0
+		else:
+			stuck[i] = 0
+	elif detour_timer[i] > 0:
+		detour_timer[i] -= 1
+		if detour_timer[i] == 0:
+			detour[i] = 0
+			stuck[i] = 0
+	px[i] = x
+	py[i] = y
+
+
+## Push ground units that ended up inside an obstacle (spawn, crowd pushing)
+## back out to its edge.
+func _resolve_obstacles() -> void:
+	if ob_x.is_empty():
+		return
+	for i in n:
+		if alive[i] == 0 or flying[i] == 1:
+			continue
+		var obs: PackedInt32Array = cell_obs[_cell_of(px[i], py[i])]
+		# Two passes so units wedged where two obstacles overlap settle outside both.
+		for _pass in 2:
+			for o in obs:
+				var ox := px[i] - ob_x[o]
+				var oy := py[i] - ob_y[o]
+				var rr := ob_r[o] + radius[i]
+				var d2 := ox * ox + oy * oy
+				if d2 >= rr * rr:
+					continue
+				var d := sqrt(d2)
+				if d < 0.001:
+					ox = 1.0 if team[i] == 0 else -1.0
+					oy = 0.0
+					d = 1.0
+				px[i] = clampf(ob_x[o] + ox / d * rr, 0.0, map_w)
+				py[i] = clampf(ob_y[o] + oy / d * rr, 0.0, map_h)
+				# Still inside because the map edge clamped us? Push sideways instead.
+				var ey := py[i] - ob_y[o]
+				var ex := px[i] - ob_x[o]
+				if ex * ex + ey * ey < rr * rr:
+					var hx := sqrt(maxf(0.0, rr * rr - ey * ey))
+					px[i] = clampf(ob_x[o] + (hx if ex >= 0.0 else -hx), 0.0, map_w)
+
+
+func _cell_of(x: float, y: float) -> int:
+	return clampi(int(y / CELL), 0, gh - 1) * gw + clampi(int(x / CELL), 0, gw - 1)
+
+
+## True if the point is inside any obstacle (for tools/AI; flyers ignore this).
+func is_blocked(x: float, y: float, r: float = 0.0) -> bool:
+	if ob_x.is_empty():
+		return false
+	var obs: PackedInt32Array = cell_obs[_cell_of(x, y)]
+	for o in obs:
+		var dx := x - ob_x[o]
+		var dy := y - ob_y[o]
+		if dx * dx + dy * dy < (ob_r[o] + r) * (ob_r[o] + r):
+			return true
+	return false
+
+
 # --- spatial helpers --------------------------------------------------------
 
 func _rebuild_grid() -> void:
@@ -565,10 +727,10 @@ func _push_pair(i: int, j: int) -> void:
 	var wj := 1.0 - wi
 	var nx := dx / d
 	var ny := dy / d
-	px[i] = clampf(px[i] - nx * push * wi * 2.0, 0.0, MAP_W)
-	py[i] = clampf(py[i] - ny * push * wi * 2.0, 0.0, MAP_H)
-	px[j] = clampf(px[j] + nx * push * wj * 2.0, 0.0, MAP_W)
-	py[j] = clampf(py[j] + ny * push * wj * 2.0, 0.0, MAP_H)
+	px[i] = clampf(px[i] - nx * push * wi * 2.0, 0.0, map_w)
+	py[i] = clampf(py[i] - ny * push * wi * 2.0, 0.0, map_h)
+	px[j] = clampf(px[j] + nx * push * wj * 2.0, 0.0, map_w)
+	py[j] = clampf(py[j] + ny * push * wj * 2.0, 0.0, map_h)
 
 
 # --- end conditions ---------------------------------------------------------

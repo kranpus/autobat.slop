@@ -3,7 +3,6 @@ extends RefCounted
 ## Static game definitions: units, rarities, regions and damage tables.
 ## Everything here is plain data so it can be tweaked without touching logic.
 
-const ARMY_UNIT_CAP := 1000
 const MAX_SQUADS := 8
 const MAX_TIER := 10
 const BASE_MAX_LEVEL := 10
@@ -208,7 +207,8 @@ const REGIONS := {
 	},
 }
 
-const FINDS_PER_EXPEDITION := 3
+const FINDS_PER_EXPEDITION := 3   # units offered per expedition; the player keeps one
+const CHOICE_SHARD_MULT := 2      # shards per pick are doubled since only one of three is kept
 
 const ROWS := ["front", "middle", "back"]
 

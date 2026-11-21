@@ -8,7 +8,8 @@ var _failures := 0
 
 func _initialize() -> void:
 	test_army_code_roundtrip()
-	test_unit_cap()
+	test_no_unit_cap()
+	test_maps()
 	test_determinism_and_scale()
 	test_opponent_generation()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
@@ -44,10 +45,29 @@ func test_army_code_roundtrip() -> void:
 	check(int(c["squads"][0]["tier"]) == GameData.MAX_TIER and int(c["squads"][0]["level"]) == Army.max_level_for_tier(GameData.MAX_TIER), "out-of-range values clamped")
 
 
-func test_unit_cap() -> void:
-	print("unit cap")
+func test_no_unit_cap() -> void:
+	print("no unit cap")
 	var squads := big_army(["goblin", "kobold_slinger", "rat_swarm", "skeleton", "orc_warrior", "elf_archer", "dire_wolf", "dwarf_berserker"], 10, 1)
-	check(Army.total_units(squads) == GameData.ARMY_UNIT_CAP, "army truncated to %d (got %d)" % [GameData.ARMY_UNIT_CAP, Army.total_units(squads)])
+	check(Army.total_units(squads) == 4 * 180 + 4 * 95, "every squad deploys at full size (got %d)" % Army.total_units(squads))
+
+
+func test_maps() -> void:
+	print("maps")
+	check(BattleMaps.MAPS.size() == 20, "20 battlefields defined")
+	var a := big_army(["goblin", "elf_archer", "ogre", "griffon"], 4, 8)
+	var b := big_army(["skeleton", "kobold_slinger", "orc_warrior", "lich"], 4, 8)
+	for id in BattleMaps.map_ids():
+		var tex := load("res://assets/sprites/tiles/%s.png" % BattleMaps.MAPS[id]["tile"])
+		check(tex != null, "%s floor texture loads" % id)
+		var sim := BattleSim.new()
+		sim.setup(a, b, 99, id)
+		sim.run_to_end()
+		var inside := 0
+		for i in sim.n:
+			if sim.alive[i] == 1 and sim.flying[i] == 0 and sim.is_blocked(sim.px[i], sim.py[i], sim.radius[i] - 1.0):
+				inside += 1
+		check(sim.finished and sim.time < BattleSim.MAX_TIME, "%s: battle resolves in %.0fs" % [id, sim.time])
+		check(inside == 0, "%s: no ground units stuck inside obstacles" % id)
 
 
 func test_determinism_and_scale() -> void:
@@ -57,9 +77,9 @@ func test_determinism_and_scale() -> void:
 	var results: Array = []
 	for run in 2:
 		var sim := BattleSim.new()
-		sim.setup(a, b, 424242)
+		sim.setup(a, b, 424242, "twin_fords")
 		if run == 0:
-			check(sim.n == 2 * GameData.ARMY_UNIT_CAP, "full 1000 vs 1000 battle spawned (%d units)" % sim.n)
+			check(sim.n >= 2000, "1000+ vs 1000+ battle spawned (%d units)" % sim.n)
 		var t0 := Time.get_ticks_msec()
 		sim.run_to_end()
 		var ms := Time.get_ticks_msec() - t0
@@ -79,4 +99,4 @@ func test_opponent_generation() -> void:
 	var opp := Army.generate_opponent(target, 1200, 99)
 	var p := Army.army_power(opp["squads"])
 	check(p >= target * 0.9, "generated power %.0f near target %.0f" % [p, target])
-	check(Army.total_units(opp["squads"]) <= GameData.ARMY_UNIT_CAP, "opponent within unit cap")
+	check(opp["squads"].size() <= GameData.MAX_SQUADS, "opponent within squad limit")

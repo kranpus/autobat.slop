@@ -36,6 +36,13 @@ License texts that shipped with the packs are in [`assets/licenses/`](assets/lic
 | tiles/deep.png | dungeon/floor/grey_dirt_0_new.png |
 | tiles/peaks.png | dungeon/floor/volcanic_floor_0.png |
 | tiles/arena.png | dungeon/floor/sandstone_floor_0.png |
+| tiles/dirt, frozen, swamp, sand, moss, mud, ice, marble, crystal_floor, hive, tomb, rough_red, infernal, bog (.png) | dungeon/floor/ dirt_0_new, frozen_0, swamp_0_new, sand_1, moss_0, mud_0, ice_0_new, marble_floor_1, crystal_floor_0, hive_0, tomb_0_new, rough_red_0, infernal_1, bog_green_0_new |
+| terrain/water.png, terrain/swamp.png | dungeon/water/deep_water.png, deep_water_murky.png |
+| terrain/lava.png | dungeon/floor/lava_0.png |
+| terrain/rock.png, terrain/wall.png, terrain/crystal.png | dungeon/wall/lab-rock_0.png, brick_brown_0.png, crystal_wall_lightblue.png |
+| terrain/grove.png | dungeon/floor/floor_vines_0_new.png |
+| terrain/tree_green, tree_yellow, tree_red (.png) | dungeon/trees/mangrove_1.png, tree_1_yellow.png, tree_2_red.png |
+| terrain/column.png, terrain/statue.png | dungeon/statues/crumbled_column.png, granite_statue.png |
 | fx/arrow.png | effect/arrow_2.png |
 | fx/javelin.png | effect/javelin_2.png |
 | fx/magic_bolt.png | effect/magic_bolt_1.png |

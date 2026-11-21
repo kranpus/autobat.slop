@@ -23,10 +23,10 @@ var _auto_start_timer: Timer
 func _ready() -> void:
 	_local_team = int(config.get("local_team", 0))
 	sim = BattleSim.new()
-	sim.setup(config["squads_a"], config["squads_b"], int(config["seed"]))
+	sim.setup(config["squads_a"], config["squads_b"], int(config["seed"]), str(config.get("map", BattleMaps.DEFAULT_MAP)))
 	view = BattleView.new()
 	add_child(view)
-	view.setup(sim, str(config.get("tile", "arena")))
+	view.setup(sim)
 	view.battle_finished.connect(_on_finished)
 	_build_hud()
 	if config.get("mode", "") == "live":
@@ -133,6 +133,15 @@ func _build_hud() -> void:
 	var sub := UIKit.label("Power %s  vs  %s" % [pa, pb], 15, UIKit.TEXT_DIM)
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	sv.add_child(sub)
+	var map_def := BattleMaps.get_map(sim.map_id)
+	var map_l := UIKit.label("Battlefield: %s" % map_def["name"], 18, Color.WHITE)
+	map_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	sv.add_child(map_l)
+	var map_d := UIKit.label(String(map_def["desc"]) + ("" if map_def["obstacles"].is_empty() else "  Flying units ignore terrain."), 13, UIKit.TEXT_DIM)
+	map_d.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	map_d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	map_d.custom_minimum_size = Vector2(380, 0)
+	sv.add_child(map_d)
 	if config.get("mode", "") == "live":
 		sv.add_child(UIKit.label("Live duel starting...", 16))
 	else:

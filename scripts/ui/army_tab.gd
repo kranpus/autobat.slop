@@ -1,12 +1,11 @@
 extends VBoxContainer
 ## Army builder: choose up to 8 squads, set their battle row and order.
-## Squads deploy in order until the 1000-unit army cap is reached.
+## Every squad deploys at full size; there is no army-wide unit cap.
 
 const ROW_LABELS := {"front": "Front line", "middle": "Middle", "back": "Back line"}
 
 var _list: VBoxContainer
 var _summary: Label
-var _cap_bar: ProgressBar
 var _add_picker: OptionButton
 var _add_button: Button
 var _code_edit: LineEdit
@@ -16,11 +15,7 @@ func _ready() -> void:
 	add_theme_constant_override("separation", 10)
 	_summary = UIKit.label("", 18, UIKit.ACCENT)
 	add_child(_summary)
-	_cap_bar = ProgressBar.new()
-	_cap_bar.max_value = GameData.ARMY_UNIT_CAP
-	_cap_bar.custom_minimum_size = Vector2(0, 18)
-	add_child(_cap_bar)
-	var tip := UIKit.label("Squads deploy top to bottom until the %d-unit cap. Front line engages first; back line is protected. Ranged units and healers belong in the back." % GameData.ARMY_UNIT_CAP, 13, UIKit.TEXT_DIM)
+	var tip := UIKit.label("Every squad fights at full size, so upgrading squad tiers grows your army without limit. Front line engages first; back line is protected. Ranged units and healers belong in the back.", 13, UIKit.TEXT_DIM)
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(tip)
 
@@ -64,8 +59,7 @@ func refresh() -> void:
 	var squads := Profile.army_squads()
 	var counts := Army.deploy_counts(squads)
 	var total := Army.total_units(squads)
-	_summary.text = "Army: %d / %d units     Power: %s     Squads: %d / %d" % [total, GameData.ARMY_UNIT_CAP, Army.format_power(Army.army_power(squads)), squads.size(), GameData.MAX_SQUADS]
-	_cap_bar.value = total
+	_summary.text = "Army: %d units     Power: %s     Squads: %d / %d" % [total, Army.format_power(Army.army_power(squads)), squads.size(), GameData.MAX_SQUADS]
 	UIKit.clear(_list)
 	if squads.is_empty():
 		_list.add_child(UIKit.label("Your army is empty. Add squads below or from the Collection tab.", 15, UIKit.BAD))
@@ -92,11 +86,7 @@ func _make_row(index: int, sq: Dictionary, deployed: int) -> Control:
 	var v := UIKit.vbox(0)
 	v.custom_minimum_size = Vector2(220, 0)
 	v.add_child(UIKit.label(GameData.UNITS[id]["name"], 16, GameData.rarity_color(GameData.UNITS[id]["rarity"])))
-	var full := Army.squad_size(id, int(sq["tier"]))
-	var count_text := "x%d" % deployed
-	if deployed < full:
-		count_text += "  (cap: %d of %d deploy)" % [deployed, full]
-	v.add_child(UIKit.label("Lv %d   %s" % [int(sq["level"]), count_text], 13, UIKit.BAD if deployed < full else UIKit.TEXT_DIM))
+	v.add_child(UIKit.label("Lv %d   x%d" % [int(sq["level"]), deployed], 13, UIKit.TEXT_DIM))
 	h.add_child(v)
 	h.add_child(UIKit.label("Power %s" % Army.format_power(Army.unit_power(id, int(sq["level"])) * float(deployed)), 13, UIKit.ACCENT))
 	h.add_child(UIKit.spacer())
@@ -144,7 +134,7 @@ func _on_add() -> void:
 	Profile.set_army(army)
 
 
-## Greedy: pick the owned squads with the best power until slots/cap run out.
+## Greedy: pick the owned squads with the best power until the slots run out.
 func _auto_build() -> void:
 	var options: Array = []
 	for id in Profile.data["units"]:

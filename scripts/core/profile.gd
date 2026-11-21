@@ -82,6 +82,16 @@ func _sanitize() -> void:
 				row = "front"
 			army.append({"unit": str(sq["unit"]), "row": row})
 	data["army"] = army
+	var pc = data.get("pending_choice", {})
+	var clean_pc := {}
+	if typeof(pc) == TYPE_DICTIONARY and pc.has("options") and typeof(pc["options"]) == TYPE_ARRAY:
+		var opts: Array = []
+		for o in pc["options"]:
+			if typeof(o) == TYPE_DICTIONARY and GameData.UNITS.has(str(o.get("unit", ""))):
+				opts.append({"unit": str(o["unit"]), "shards": int(o.get("shards", 1))})
+		if not opts.is_empty():
+			clean_pc = {"region": str(pc.get("region", "")), "options": opts, "gold": int(pc.get("gold", 0))}
+	data["pending_choice"] = clean_pc
 
 
 func _regen_maps() -> void:
@@ -197,10 +207,20 @@ func region_unlocked(region_id: String) -> bool:
 
 
 func can_explore(region_id: String) -> bool:
-	return region_unlocked(region_id) and maps() >= int(GameData.REGIONS[region_id]["cost_maps"])
+	return not has_pending_choice() and region_unlocked(region_id) and maps() >= int(GameData.REGIONS[region_id]["cost_maps"])
 
 
-## Spend maps and roll finds. Returns {"finds": [{unit, shards, new}], "gold": int}.
+func has_pending_choice() -> bool:
+	return not data.get("pending_choice", {}).is_empty()
+
+
+## The open recruit choice: {"region": id, "options": [{unit, shards}], "gold": int}
+func pending_choice() -> Dictionary:
+	return data.get("pending_choice", {})
+
+
+## Spend maps, find gold, and roll 3 different units for the player to choose
+## from. The choice is saved, so closing the game doesn't reroll it.
 func explore(region_id: String) -> Dictionary:
 	if not can_explore(region_id):
 		return {}
@@ -210,39 +230,74 @@ func explore(region_id: String) -> Dictionary:
 	data["maps"] = int(data["maps"]) - int(region["cost_maps"])
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
-	var drops: Dictionary = region["drops"]
-	var total := 0
-	for id in drops:
-		total += int(drops[id])
-	var finds: Array = []
-	for _i in GameData.FINDS_PER_EXPEDITION:
-		var roll := rng.randi_range(1, total)
-		var picked := ""
-		for id in drops:
-			roll -= int(drops[id])
-			if roll <= 0:
-				picked = id
-				break
+	var pool: Dictionary = (region["drops"] as Dictionary).duplicate()
+	var options: Array = []
+	for _i in mini(GameData.FINDS_PER_EXPEDITION, pool.size()):
+		var picked := _weighted_pick(pool, rng)
+		pool.erase(picked)
 		var range_: Array = GameData.RARITIES[GameData.UNITS[picked]["rarity"]]["find_shards"]
-		var shards := rng.randi_range(int(range_[0]), int(range_[1])) * int(region["cost_maps"])
-		var is_new := not owns(picked)
-		if is_new:
-			data["units"][picked] = {"level": 1, "tier": 0, "shards": shards}
-		else:
-			data["units"][picked]["shards"] = int(data["units"][picked]["shards"]) + shards
-		finds.append({"unit": picked, "shards": shards, "new": is_new})
+		var shards := rng.randi_range(int(range_[0]), int(range_[1])) * int(region["cost_maps"]) * GameData.CHOICE_SHARD_MULT
+		options.append({"unit": picked, "shards": shards})
 	var gold_found := rng.randi_range(15, 45) * int(region["cost_maps"])
 	data["gold"] = gold() + gold_found
+	data["pending_choice"] = {"region": region_id, "options": options, "gold": gold_found}
 	save()
-	return {"finds": finds, "gold": gold_found}
+	return pending_choice()
 
 
+## Take option `index` from the pending choice. Returns {unit, shards, new}.
+func choose_recruit(index: int) -> Dictionary:
+	var pc := pending_choice()
+	if pc.is_empty() or index < 0 or index >= pc["options"].size():
+		return {}
+	var opt: Dictionary = pc["options"][index]
+	var id: String = opt["unit"]
+	var shards := int(opt["shards"])
+	var is_new := not owns(id)
+	if is_new:
+		data["units"][id] = {"level": 1, "tier": 0, "shards": shards}
+	else:
+		data["units"][id]["shards"] = int(data["units"][id]["shards"]) + shards
+	data["pending_choice"] = {}
+	save()
+	return {"unit": id, "shards": shards, "new": is_new}
+
+
+func _weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
+	var total := 0
+	for id in weights:
+		total += int(weights[id])
+	var roll := rng.randi_range(1, total)
+	for id in weights:
+		roll -= int(weights[id])
+		if roll <= 0:
+			return id
+	return weights.keys()[0]
+
+
+## Probability that a unit is among the offered choices in a region.
 func drop_chance(region_id: String, unit_id: String) -> float:
 	var drops: Dictionary = GameData.REGIONS[region_id]["drops"]
-	var total := 0
-	for id in drops:
-		total += int(drops[id])
-	return float(drops.get(unit_id, 0)) / float(total)
+	if not drops.has(unit_id):
+		return 0.0
+	return 1.0 - _miss_chance(drops, unit_id, mini(GameData.FINDS_PER_EXPEDITION, drops.size()))
+
+
+## Chance that `unit_id` is NOT drawn in `draws` weighted draws without replacement.
+func _miss_chance(weights: Dictionary, unit_id: String, draws: int) -> float:
+	if draws <= 0:
+		return 1.0
+	var total := 0.0
+	for id in weights:
+		total += float(weights[id])
+	var p := 0.0
+	for id in weights:
+		if id == unit_id:
+			continue
+		var rest := weights.duplicate()
+		rest.erase(id)
+		p += float(weights[id]) / total * _miss_chance(rest, unit_id, draws - 1)
+	return p
 
 
 # --- army -------------------------------------------------------------------
