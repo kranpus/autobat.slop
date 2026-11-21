@@ -67,6 +67,13 @@ func _queue_drag(from: Control, to: Control) -> void:
 	_drag_events.append(release)
 
 
+func _rows() -> Array:
+	var out: Array = []
+	for sq in root.get_node("Profile").data["army"]:
+		out.append("%s:%s" % [sq["unit"], sq["row"]])
+	return out
+
+
 func _process(_delta: float) -> bool:
 	if not _drag_events.is_empty():
 		Input.parse_input_event(_drag_events.pop_front())
@@ -148,6 +155,18 @@ func _process(_delta: float) -> bool:
 		35:
 			var run = root.get_node("Party").run
 			check_log.append("after drag 4 (sell): slot 6 = %s, gold = %d" % [run.board[5].get("unit", "empty"), run.gold])
+			root.get_node("Party").disconnect_all()
+			main.tabs.current_tab = 1
+		36:
+			# Army tab: drag the first Front line squad onto the Back line column.
+			var army_tab = main.tabs.get_child(1)
+			var front_list: VBoxContainer = army_tab._columns["front"]["list"]
+			var back_list: VBoxContainer = army_tab._columns["back"]["list"]
+			check_log.append("army before: %s" % [_rows()])
+			_queue_drag(front_list.get_child(0), back_list)
+		38:
+			check_log.append("army after drag to back column: %s" % [_rows()])
+			_shot("13_army_columns")
 			for l in check_log:
 				print("DRAG CHECK: ", l)
 			quit(0)

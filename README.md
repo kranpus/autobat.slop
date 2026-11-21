@@ -45,8 +45,11 @@ The first time it opens, the editor imports the assets, which takes a few second
    | Epic | 2 → 12 |
    | Legendary | 1 → 11 |
 4. **Build an army: Army tab.** Up to 8 squads. There is **no unit cap**: every squad fights at
-   full size, so a maxed army of commons and uncommons is about 1,100 units per side. Put each
-   squad in the front, middle or back row.
+   full size, so a maxed army of commons and uncommons is about 1,100 units per side.
+   - **Columns:** the tab has three columns, **Back line | Middle | Front line**, laid out like
+     the battlefield, with the front line on the right facing the enemy.
+   - **Moving squads:** drag a squad to another column (or use ◀ ▶); ▲ ▼ set the order within
+     a column.
 5. **Fight: Battle tab.**
    - **Ranked Arena:** choose one of three opponents (Easy / Even / Hard) matched to your army
      power, and win rating (Elo), gold and maps.
