@@ -23,6 +23,9 @@ var draft_screen: DraftScreenScript
 
 
 func _ready() -> void:
+	if "--server" in OS.get_cmdline_user_args():
+		_run_dedicated_server()
+		return
 	menu_layer = CanvasLayer.new()
 	add_child(menu_layer)
 	var root := Control.new()
@@ -93,6 +96,21 @@ func _ready() -> void:
 	add_child(tick)
 
 	Audio.play_music("menu")
+
+
+## Headless matchmaking server: `godot --headless -- --server [--port=24702]`
+func _run_dedicated_server() -> void:
+	Engine.max_fps = 30
+	OS.low_processor_usage_mode = true
+	var port := Party.SERVER_PORT
+	var env_port := OS.get_environment("PORT")
+	if env_port.is_valid_int():
+		port = int(env_port)
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--port="):
+			port = int(arg.get_slice("=", 1))
+	if Party.start_server(port) != OK:
+		get_tree().quit(1)
 
 
 func _build_top_bar() -> Control:

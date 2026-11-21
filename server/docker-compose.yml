@@ -1,0 +1,19 @@
+# Run from the repository root:
+#   docker compose -f server/docker-compose.yml up -d --build
+services:
+  legion-draft:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    image: autobat-legions-server
+    container_name: legion-draft-server
+    restart: unless-stopped
+    ports:
+      - "24702:24702/udp"
+    environment:
+      - PORT=24702
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

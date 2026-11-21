@@ -1,0 +1,5 @@
+.git
+.godot
+export
+server/*.md
+*.tmp

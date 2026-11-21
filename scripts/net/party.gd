@@ -1,18 +1,20 @@
 extends Node
-## Autoload "Party": multiplayer lobbies and matches for Legion Draft.
+## Autoload "Party": networking for Legion Draft.
 ##
-## One player hosts (ENet server); others find the lobby on the LAN (UDP
-## broadcast beacons) or join by IP. The host is authoritative: it collects
-## every player's board after each shop phase, pairs players, decides each
-## battle by running the deterministic BattleSim on worker threads, and
-## tracks lives/wins/placements. Each player watches a replay of their own
-## battle locally (same seed + boards = same fight).
+## Roles
+##   SERVER  dedicated matchmaking server (headless, many rooms, no local player)
+##   HOST    a player hosting one match on their LAN (runs one MatchRoom)
+##   CLIENT  a player connected to a LAN host or to the online server
 ##
-## This node uses its own SceneMultiplayer so it never interferes with the
-## 1v1 duel networking in Net.
+## All match logic lives in MatchRoom and is authoritative: clients send only
+## requests and shop actions; the room replays actions on its own DraftRun,
+## so boards can't be forged. Uses its own SceneMultiplayer so it never
+## interferes with the 1v1 duel networking in Net.
 
 signal lobby_changed
 signal lobbies_found(list: Array)
+signal rooms_listed(list: Array)
+signal online_changed
 signal status(text: String)
 signal match_started
 signal shop_started(round_num: int, seconds: int)
@@ -21,74 +23,73 @@ signal standings_changed
 signal match_over(placements: Array)
 signal left_match(reason: String)
 
-const PORT := 24700
+const GAME_VERSION := "legion-draft-2"   # client and server must match exactly
+const PORT := 24700                      # LAN hosting
+const SERVER_PORT := 24702               # dedicated online server
 const DISCOVERY_PORT := 24701
-const GAME_TAG := "autobat_draft_v1"
-const READY_TIMEOUT_MS := 200000     # max wait for players to finish watching battles
-const FORCE_GRACE_MS := 4000         # wait for late boards after the turn timer
-const BOT_NAMES := ["Grimtooth", "Lady Ash", "Old Borin", "Vex", "Captain Rook", "Mira", "Hexa", "Tusk", "Sable", "Kael", "Nyx", "Brother Fen"]
+const GAME_TAG := "autobat_draft_v2"
+## Put your server's address here so players don't have to type it
+## (players can still change it in the Legion Draft tab).
+const DEFAULT_SERVER := "localhost"
+const MAX_SERVER_PEERS := 1000
+const MAX_ROOMS := 400
+const REQUESTS_PER_SECOND := 30
+const CODE_CHARS := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
-enum Role { NONE, HOST, CLIENT }
+enum Role { NONE, SERVER, HOST, CLIENT }
 
 var role := Role.NONE
 var mp := SceneMultiplayer.new()
-var settings := {"wins": 10, "lives": 5, "max_players": 8, "turn_time": 75}
-var players := {}            # id -> {name, bot, ready, lives, wins, done, place}
-var my_id := 0
-var host_name := ""
+var online := false                      # CLIENT connected to the dedicated server
 
-# Local player state (host and clients).
-var phase := "idle"          # idle, connecting, lobby, shop, waiting, battle, results, over
+# Client-side view of the current room/match.
+var settings := {"wins": 10, "lives": 5, "max_players": 8, "turn_time": 75}
+var players := {}
+var owner_id := 0
+var room_code := ""
+var room_public := true
+var room_quick := false
+var auto_start_msec := 0
+var my_id := 0
+var player_name := ""
+var phase := "idle"          # idle, connecting, online, lobby, waiting, shop, battle, results, over
 var round_num := 0
 var run: DraftRun = null
 var turn_deadline_msec := 0
 var placements: Array = []
-var last_outcome := -1.0     # outcome of this player's latest battle per the host
-var _submitted := false
-var _pending_results := {}   # results for my last battle, applied when received
+var last_outcome := -1.0
+var _pending_online: Array = []
 
-# Host-only match state.
-var _host_phase := ""        # lobby, shop, sim, viewing, over
-var _boards := {}
-var _last_boards := {}
-var _bot_runs := {}
-var _shop_ready := {}
-var _deadline := 0
-var _forced := false
-var _grace := 0
-var _sims: Array = []        # [{task, sim, a, b, ghost}]
-var _next_bot := 100000
-var _next_top := 1
-var _next_bottom := 0
+# Authority side (SERVER or HOST).
+var _rooms := {}             # code -> MatchRoom
+var _player_room := {}       # peer id -> room code
+var _names := {}             # peer id -> pname (verified peers)
+var _req_count := {}
+var _req_window := 0
 var _rng := RandomNumberGenerator.new()
+
+# LAN discovery.
 var _beacon: PacketPeerUDP
 var _beacon_t := 0.0
-
-# Discovery.
 var _listener: PacketPeerUDP
 var _found := {}
 var _found_t := 0.0
 var _quick_deadline := 0
-var _quick_name := ""
+var _quick_settings := {}
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	_rng.randomize()
 	get_tree().set_multiplayer(mp, get_path())
 	mp.peer_connected.connect(_on_peer_connected)
 	mp.peer_disconnected.connect(_on_peer_disconnected)
 	mp.connected_to_server.connect(_on_connected)
-	mp.connection_failed.connect(func(): _leave_with("Could not connect to that match."))
-	mp.server_disconnected.connect(func(): _leave_with("The host closed the match."))
+	mp.connection_failed.connect(func(): _drop_connection("Could not connect."))
+	mp.server_disconnected.connect(func(): _drop_connection("Lost connection to the server."))
 
 
-func is_in_lobby() -> bool:
-	return role != Role.NONE and phase == "lobby"
-
-
-func is_in_match() -> bool:
-	return role != Role.NONE and phase not in ["idle", "connecting", "lobby"]
-
+# --- state helpers ----------------------------------------------------------
 
 func is_active() -> bool:
 	return role != Role.NONE
@@ -98,227 +99,665 @@ func is_host() -> bool:
 	return role == Role.HOST
 
 
+func is_owner() -> bool:
+	return my_id != 0 and owner_id == my_id
+
+
+func is_in_lobby() -> bool:
+	return phase == "lobby"
+
+
+func is_in_match() -> bool:
+	return phase in ["waiting", "shop", "battle", "results", "over"]
+
+
 func me() -> Dictionary:
 	return players.get(my_id, {})
 
 
-# --- hosting / joining ------------------------------------------------------
+func server_address() -> String:
+	var a := str(Profile.data.get("server_address", ""))
+	return a if a != "" else DEFAULT_SERVER
 
-func host_match(player_name: String, new_settings: Dictionary) -> Error:
-	leave(true)
-	settings = {
-		"wins": clampi(int(new_settings.get("wins", 10)), 1, 30),
-		"lives": clampi(int(new_settings.get("lives", 5)), 1, 20),
-		"max_players": clampi(int(new_settings.get("max_players", 8)), 2, 16),
-		"turn_time": clampi(int(new_settings.get("turn_time", 75)), 20, 300),
-	}
+
+func _sender() -> int:
+	var id := mp.get_remote_sender_id()
+	return id if id != 0 else my_id
+
+
+func _close_peer() -> void:
+	if mp.multiplayer_peer != null and not (mp.multiplayer_peer is OfflineMultiplayerPeer):
+		mp.multiplayer_peer.close()
+	mp.multiplayer_peer = OfflineMultiplayerPeer.new()
+
+
+func _reset_client_state() -> void:
+	players = {}
+	owner_id = 0
+	room_code = ""
+	run = null
+	round_num = 0
+	placements = []
+	last_outcome = -1.0
+
+
+# --- dedicated server -------------------------------------------------------
+
+func start_server(port: int = SERVER_PORT) -> Error:
+	disconnect_all(true)
 	var peer := ENetMultiplayerPeer.new()
-	var err := peer.create_server(PORT, int(settings["max_players"]) - 1)
+	var err := peer.create_server(port, MAX_SERVER_PEERS)
+	if err != OK:
+		print("ERROR: could not listen on UDP port %d (error %d)" % [port, err])
+		return err
+	mp.multiplayer_peer = peer
+	role = Role.SERVER
+	my_id = 1
+	_log("Legion Draft server %s listening on UDP port %d" % [GAME_VERSION, port])
+	return OK
+
+
+func _log(text: String) -> void:
+	if role == Role.SERVER:
+		print("[%s] %s" % [Time.get_datetime_string_from_system(), text])
+	else:
+		status.emit(text)
+
+
+# --- LAN hosting ------------------------------------------------------------
+
+func host_lan(pname: String, new_settings: Dictionary) -> Error:
+	disconnect_all(true)
+	var s := MatchRoom.clean_settings(new_settings)
+	var peer := ENetMultiplayerPeer.new()
+	var err := peer.create_server(PORT, int(s["max_players"]) - 1)
 	if err != OK:
 		status.emit("Could not host on port %d (is another match running?)." % PORT)
 		return err
 	mp.multiplayer_peer = peer
 	role = Role.HOST
 	my_id = 1
-	host_name = player_name
-	players = {1: _new_player(player_name, false)}
-	players[1]["ready"] = true
-	phase = "lobby"
-	_host_phase = "lobby"
+	player_name = pname
+	_reset_client_state()
+	_names[1] = pname
+	_create_room("LAN", s, true, false)
+	_join_room(1, "LAN", pname)
 	_beacon = PacketPeerUDP.new()
 	_beacon.set_broadcast_enabled(true)
 	_beacon.set_dest_address("255.255.255.255", DISCOVERY_PORT)
-	status.emit("Hosting a match on port %d. Players on your network can find it; others join with your IP." % PORT)
-	lobby_changed.emit()
+	status.emit("Hosting on your network (port %d). Others can find it or join with your IP." % PORT)
 	return OK
 
 
-func join_match(address: String, port: int, player_name: String) -> Error:
-	leave(true)
+func join_lan(address: String, port: int, pname: String) -> Error:
+	return _connect_to(address, port, pname, false, [])
+
+
+## Find a LAN match with space and join it; otherwise host one.
+func quick_lan(pname: String, new_settings: Dictionary) -> void:
+	player_name = pname
+	_quick_settings = new_settings.duplicate()
+	start_search()
+	_quick_deadline = Time.get_ticks_msec() + 2500
+	status.emit("Looking for an open match on your network...")
+
+
+# --- online (dedicated server) ----------------------------------------------
+
+func online_quick(pname: String, new_settings: Dictionary) -> void:
+	_online_request(pname, ["_rq_quick", new_settings])
+
+
+func online_create(pname: String, new_settings: Dictionary, is_public: bool) -> void:
+	_online_request(pname, ["_rq_create", new_settings, is_public])
+
+
+func online_join(pname: String, code: String) -> void:
+	_online_request(pname, ["_rq_join", code.strip_edges().to_upper()])
+
+
+func online_list(pname: String) -> void:
+	_online_request(pname, ["_rq_list"])
+
+
+func _online_request(pname: String, req: Array) -> void:
+	player_name = pname
+	if role == Role.CLIENT and online and phase != "connecting":
+		if phase == "lobby" and req[0] != "_rq_list":
+			_request("_rq_leave_room", [])
+			_reset_client_state()
+			phase = "online"
+		_send_request(req)
+		return
+	var addr := server_address().strip_edges()
+	var port := SERVER_PORT
+	if addr.count(":") == 1:
+		port = int(addr.get_slice(":", 1))
+		addr = addr.get_slice(":", 0)
+	_connect_to(addr, port, pname, true, req)
+
+
+func _send_request(req: Array) -> void:
+	_request(str(req[0]), req.slice(1))
+
+
+func _connect_to(address: String, port: int, pname: String, is_online: bool, pending: Array) -> Error:
+	disconnect_all(true)
 	var peer := ENetMultiplayerPeer.new()
 	var err := peer.create_client(address, port)
 	if err != OK:
-		status.emit("Could not connect (error %d)." % err)
+		status.emit("Could not connect to %s:%d (error %d)." % [address, port, err])
 		return err
 	mp.multiplayer_peer = peer
 	role = Role.CLIENT
-	host_name = player_name
+	online = is_online
+	player_name = pname
+	_pending_online = pending
 	phase = "connecting"
 	status.emit("Connecting to %s:%d..." % [address, port])
+	online_changed.emit()
+	lobby_changed.emit()
 	return OK
 
 
-## Look on the LAN for a lobby with space; join it, otherwise host one.
-func quick_match(player_name: String, new_settings: Dictionary) -> void:
-	_quick_name = player_name
-	settings = new_settings.duplicate()
-	start_search()
-	_quick_deadline = Time.get_ticks_msec() + 2500
-	status.emit("Looking for an open match...")
+func _on_connected() -> void:
+	my_id = mp.get_unique_id()
+	_request("_rq_hello", [player_name, GAME_VERSION])
 
 
-func leave(silent: bool = false) -> void:
+## Leave the current room/match. Online players stay connected to the server.
+func leave() -> void:
+	if role == Role.CLIENT and online:
+		_request("_rq_leave_room", [])
+		_reset_client_state()
+		phase = "online"
+		left_match.emit("You left the match.")
+		lobby_changed.emit()
+		return
+	disconnect_all()
+
+
+func disconnect_all(silent: bool = false) -> void:
 	stop_search()
 	_quick_deadline = 0
-	if mp.multiplayer_peer != null and not (mp.multiplayer_peer is OfflineMultiplayerPeer):
-		mp.multiplayer_peer.close()
-	mp.multiplayer_peer = OfflineMultiplayerPeer.new()
+	_close_peer()
 	if _beacon:
 		_beacon.close()
 		_beacon = null
-	var was_active := role != Role.NONE
-	role = Role.NONE
-	phase = "idle"
-	players = {}
-	run = null
-	_sims.clear()
-	_bot_runs.clear()
-	round_num = 0
-	if was_active and not silent:
-		left_match.emit("You left the match.")
-	lobby_changed.emit()
-
-
-func _leave_with(reason: String) -> void:
 	var was := role != Role.NONE
-	leave(true)
+	role = Role.NONE
+	online = false
+	phase = "idle"
+	_rooms.clear()
+	_player_room.clear()
+	_names.clear()
+	_reset_client_state()
+	if was and not silent:
+		left_match.emit("Disconnected.")
+	lobby_changed.emit()
+	online_changed.emit()
+
+
+func _drop_connection(reason: String) -> void:
+	var was := role != Role.NONE
+	disconnect_all(true)
 	status.emit(reason)
 	if was:
 		left_match.emit(reason)
 
 
-func _on_connected() -> void:
-	my_id = mp.get_unique_id()
-	_rq_hello.rpc_id(1, host_name)
+# --- requests (client -> authority) ----------------------------------------
+
+## Send a request to the authority. When we ARE the authority (LAN host),
+## the handler runs directly with our own id as the sender.
+func _request(method: String, args: Array) -> void:
+	if role == Role.HOST:
+		callv(method, args)
+	elif role == Role.CLIENT:
+		var call_args: Array = [1, method]
+		call_args.append_array(args)
+		callv("rpc_id", call_args)
 
 
-func _on_peer_connected(_id: int) -> void:
-	pass  # clients introduce themselves with _rq_hello
+func _authority() -> bool:
+	return role == Role.SERVER or role == Role.HOST
 
 
-func _on_peer_disconnected(id: int) -> void:
-	if role != Role.HOST or not players.has(id):
-		return
-	if _host_phase == "lobby":
-		players.erase(id)
-		_broadcast_lobby()
-		return
-	# Mid-match: a bot takes over their army so the match can continue.
-	var p: Dictionary = players[id]
-	p["bot"] = true
-	p["name"] = str(p["name"]) + " (bot)"
-	var r := DraftRun.new(_rng.randi())
-	r.board = DraftData.sanitize_board(_last_boards.get(id, []))
-	r.battles_played = maxi(0, round_num - 1)
-	r.lives = int(p["lives"])
-	r.wins = int(p["wins"])
-	_bot_runs[id] = r
-	_shop_ready[id] = true
-	if _host_phase == "shop" and not p["done"]:
-		r.begin_turn()
-		r.auto_play()
-		_boards[id] = r.end_turn()
-	_broadcast_standings()
-	status.emit("%s disconnected and was replaced by a bot." % p["name"])
+## Basic flood protection for the server.
+func _allow(id: int) -> bool:
+	if role != Role.SERVER:
+		return true
+	var now := Time.get_ticks_msec()
+	if now - _req_window >= 1000:
+		_req_window = now
+		_req_count.clear()
+	_req_count[id] = int(_req_count.get(id, 0)) + 1
+	return int(_req_count[id]) <= REQUESTS_PER_SECOND
 
 
-func _new_player(player_name: String, bot: bool) -> Dictionary:
-	return {"name": player_name.strip_edges().left(24), "bot": bot, "ready": bot, "lives": 0, "wins": 0, "done": false, "place": 0}
+func _room_of(id: int) -> MatchRoom:
+	return _rooms.get(_player_room.get(id, ""), null)
 
-
-# --- lobby (host) -----------------------------------------------------------
 
 @rpc("any_peer", "reliable")
-func _rq_hello(player_name: String) -> void:
-	if role != Role.HOST:
+func _rq_hello(pname: String, version: String) -> void:
+	if not _authority():
 		return
-	var id := mp.get_remote_sender_id()
-	if _host_phase != "lobby":
-		_rc_reject.rpc_id(id, "That match has already started.")
+	var id := _sender()
+	if version != GAME_VERSION:
+		_deliver(id, "error", ["Version mismatch: you have %s, the host runs %s. Please update the game." % [version.left(32), GAME_VERSION]])
 		return
-	if players.size() >= int(settings["max_players"]):
-		_rc_reject.rpc_id(id, "That match is full.")
+	var nm := pname.strip_edges().left(24)
+	_names[id] = nm if nm != "" else "Commander"
+	if role == Role.HOST:
+		var err := _join_room(id, "LAN", _names[id])
+		if err != "":
+			_deliver(id, "kicked", [err])
 		return
-	var nm := player_name.strip_edges().left(24)
-	if nm == "":
-		nm = "Commander"
-	players[id] = _new_player(nm, false)
-	status.emit("%s joined." % nm)
-	_broadcast_lobby()
+	_log("%s connected (%d online)" % [_names[id], _names.size()])
+	_deliver(id, "welcome", [{"rooms": _rooms.size(), "players": _names.size()}])
+
+
+@rpc("any_peer", "reliable")
+func _rq_list() -> void:
+	var id := _sender()
+	if role != Role.SERVER or not _names.has(id) or not _allow(id):
+		return
+	_deliver(id, "rooms", [_public_rooms()])
+
+
+func _public_rooms() -> Array:
+	var out: Array = []
+	for c in _rooms:
+		var r: MatchRoom = _rooms[c]
+		if r.public and r.phase == "lobby" and not r.is_full():
+			out.append(r.info())
+	return out
+
+
+@rpc("any_peer", "reliable")
+func _rq_quick(new_settings: Dictionary) -> void:
+	var id := _sender()
+	if role != Role.SERVER or not _names.has(id) or not _allow(id) or _player_room.has(id):
+		return
+	# Join the fullest open quick-match room, or open a new one.
+	var best: MatchRoom = null
+	for c in _rooms:
+		var r: MatchRoom = _rooms[c]
+		if r.quick and r.phase == "lobby" and not r.is_full():
+			if best == null or r.players.size() > best.players.size():
+				best = r
+	if best == null:
+		best = _create_room("", new_settings, true, true)
+		if best == null:
+			_deliver(id, "error", ["The server is busy. Try again in a moment."])
+			return
+	_join_room(id, best.code, _names[id])
+
+
+@rpc("any_peer", "reliable")
+func _rq_create(new_settings: Dictionary, is_public: bool) -> void:
+	var id := _sender()
+	if role != Role.SERVER or not _names.has(id) or not _allow(id) or _player_room.has(id):
+		return
+	var r := _create_room("", new_settings, is_public, false)
+	if r == null:
+		_deliver(id, "error", ["The server is busy. Try again in a moment."])
+		return
+	_join_room(id, r.code, _names[id])
+
+
+@rpc("any_peer", "reliable")
+func _rq_join(code: String) -> void:
+	var id := _sender()
+	if role != Role.SERVER or not _names.has(id) or not _allow(id) or _player_room.has(id):
+		return
+	code = code.left(8)
+	if not _rooms.has(code):
+		_deliver(id, "error", ["No match with code %s." % code])
+		return
+	var err := _join_room(id, code, _names[id])
+	if err != "":
+		_deliver(id, "error", [err])
+
+
+@rpc("any_peer", "reliable")
+func _rq_leave_room() -> void:
+	var id := _sender()
+	if not _authority() or not _allow(id):
+		return
+	var r := _room_of(id)
+	if r:
+		r.remove_player(id)
+	_player_room.erase(id)
 
 
 @rpc("any_peer", "reliable")
 func _rq_ready(is_ready: bool) -> void:
-	var id := mp.get_remote_sender_id()
-	if role == Role.HOST and players.has(id) and _host_phase == "lobby":
-		players[id]["ready"] = is_ready
-		_broadcast_lobby()
+	var id := _sender()
+	var r := _room_of(id) if _authority() and _allow(id) else null
+	if r:
+		r.set_ready(id, is_ready)
 
 
-func set_ready(is_ready: bool) -> void:
-	if role == Role.CLIENT:
-		_rq_ready.rpc_id(1, is_ready)
+@rpc("any_peer", "reliable")
+func _rq_add_bot() -> void:
+	var id := _sender()
+	var r := _room_of(id) if _authority() and _allow(id) else null
+	if r:
+		r.add_bot(id)
 
 
-func add_bot() -> void:
-	if role != Role.HOST or _host_phase != "lobby" or players.size() >= int(settings["max_players"]):
+@rpc("any_peer", "reliable")
+func _rq_kick(target: int) -> void:
+	var id := _sender()
+	var r := _room_of(id) if _authority() and _allow(id) else null
+	if r and r.players.has(target):
+		r.kick(id, target)
+		if not r.players.has(target):
+			_player_room.erase(target)
+
+
+@rpc("any_peer", "reliable")
+func _rq_start() -> void:
+	var id := _sender()
+	var r := _room_of(id) if _authority() and _allow(id) else null
+	if r:
+		r.start(id)
+
+
+@rpc("any_peer", "reliable")
+func _rq_action(r_num: int, act: Array) -> void:
+	var id := _sender()
+	var r := _room_of(id) if _authority() and _allow(id) else null
+	if r and act.size() <= 4:
+		r.action(id, r_num, act)
+
+
+@rpc("any_peer", "reliable")
+func _rq_submit(r_num: int) -> void:
+	var id := _sender()
+	var r := _room_of(id) if _authority() else null
+	if r:
+		r.submit(id, r_num)
+
+
+@rpc("any_peer", "reliable")
+func _rq_shop_ready(r_num: int) -> void:
+	var id := _sender()
+	var r := _room_of(id) if _authority() else null
+	if r:
+		r.shop_ready(id, r_num)
+
+
+# --- rooms (authority side) -------------------------------------------------
+
+func _create_room(code: String, new_settings: Dictionary, is_public: bool, quick: bool) -> MatchRoom:
+	if _rooms.size() >= MAX_ROOMS:
+		return null
+	if code == "":
+		for _attempt in 50:
+			code = ""
+			for _i in 5:
+				code += CODE_CHARS[_rng.randi_range(0, CODE_CHARS.length() - 1)]
+			if not _rooms.has(code):
+				break
+	var r := MatchRoom.new(code, new_settings, is_public, quick)
+	r.outbox.connect(_deliver)
+	r.room_log.connect(_log)
+	_rooms[code] = r
+	return r
+
+
+func _join_room(id: int, code: String, pname: String) -> String:
+	var r: MatchRoom = _rooms.get(code, null)
+	if r == null:
+		return "That match no longer exists."
+	_player_room[id] = code
+	var err := r.add_player(id, pname)
+	if err != "":
+		_player_room.erase(id)
+	return err
+
+
+## Deliver a room message to a player: locally for the LAN host's own
+## player, otherwise as an RPC.
+func _deliver(id: int, method: String, args: Array) -> void:
+	if id == my_id and role == Role.HOST:
+		callv("_rc_" + method, args)
 		return
-	var id := _next_bot
-	_next_bot += 1
-	players[id] = _new_player("%s (bot)" % BOT_NAMES[(id - 100000) % BOT_NAMES.size()], true)
-	_broadcast_lobby()
-
-
-func remove_player(id: int) -> void:
-	if role != Role.HOST or _host_phase != "lobby" or id == 1 or not players.has(id):
+	if not mp.get_peers().has(id):
 		return
-	if not players[id]["bot"]:
-		_rc_reject.rpc_id(id, "The host removed you from the lobby.")
-	players.erase(id)
-	_broadcast_lobby()
+	var call_args: Array = [id, "_rc_" + method]
+	call_args.append_array(args)
+	callv("rpc_id", call_args)
 
 
-func can_start() -> bool:
-	if role != Role.HOST or _host_phase != "lobby" or players.size() < 2:
-		return false
-	for id in players:
-		if not players[id]["ready"]:
-			return false
-	return true
+func _on_peer_connected(_id: int) -> void:
+	pass  # peers introduce themselves with _rq_hello
 
 
-func _lobby_state() -> Dictionary:
-	return {"settings": settings, "players": players, "host": players.get(1, {}).get("name", "")}
+func _on_peer_disconnected(id: int) -> void:
+	if not _authority():
+		return
+	var r := _room_of(id)
+	if r:
+		r.remove_player(id)
+	_player_room.erase(id)
+	if role == Role.SERVER and _names.has(id):
+		_log("%s disconnected" % _names[id])
+	_names.erase(id)
+	_req_count.erase(id)
 
 
-func _broadcast_lobby() -> void:
-	_rc_lobby.rpc(_lobby_state())
+func _cleanup_rooms() -> void:
+	if role != Role.SERVER:
+		return
+	var now := Time.get_ticks_msec()
+	for c in _rooms.keys():
+		var r: MatchRoom = _rooms[c]
+		var dead := r.is_empty_of_humans() and r.phase != "sim"
+		if r.phase == "over" and now - r.over_msec > 120000:
+			dead = true
+		if dead:
+			for id in r.players:
+				if _player_room.get(id, "") == c:
+					_player_room.erase(id)
+			_rooms.erase(c)
+			_log("Room %s closed (%d rooms open)" % [c, _rooms.size()])
+
+
+# --- client handlers (authority -> client) ----------------------------------
+
+@rpc("authority", "reliable")
+func _rc_welcome(info: Dictionary) -> void:
+	phase = "online"
+	status.emit("Connected to the server (%d players online, %d matches)." % [int(info.get("players", 0)), int(info.get("rooms", 0))])
+	online_changed.emit()
 	lobby_changed.emit()
+	if not _pending_online.is_empty():
+		var req := _pending_online
+		_pending_online = []
+		_send_request(req)
+
+
+@rpc("authority", "reliable")
+func _rc_error(text: String) -> void:
+	status.emit(text)
+	if phase == "connecting":
+		_drop_connection(text)
+
+
+@rpc("authority", "reliable")
+func _rc_rooms(list: Array) -> void:
+	rooms_listed.emit(list)
+
+
+@rpc("authority", "reliable")
+func _rc_kicked(reason: String) -> void:
+	if online:
+		_reset_client_state()
+		phase = "online"
+		status.emit(reason)
+		left_match.emit(reason)
+		lobby_changed.emit()
+	else:
+		_drop_connection(reason)
 
 
 @rpc("authority", "reliable")
 func _rc_lobby(state: Dictionary) -> void:
 	settings = state.get("settings", settings)
 	players = state.get("players", {})
-	if phase == "connecting":
+	owner_id = int(state.get("owner", 0))
+	room_code = str(state.get("code", ""))
+	room_public = bool(state.get("public", true))
+	room_quick = bool(state.get("quick", false))
+	var ms := int(state.get("auto_start_in", -1))
+	auto_start_msec = Time.get_ticks_msec() + ms if ms >= 0 else 0
+	if phase in ["connecting", "online", "idle"]:
+		status.emit(("Joined match %s." % room_code) if online else "Joined the match.")
+	if phase not in ["waiting", "shop", "battle", "results"]:
 		phase = "lobby"
-		status.emit("Joined %s's match." % state.get("host", "the"))
 	lobby_changed.emit()
 
 
 @rpc("authority", "reliable")
-func _rc_reject(reason: String) -> void:
-	_leave_with(reason)
+func _rc_match_start(new_settings: Dictionary, new_players: Dictionary) -> void:
+	stop_search()
+	settings = new_settings
+	players = new_players
+	run = DraftRun.new()
+	run.lives = int(settings["lives"])
+	placements = []
+	phase = "waiting"
+	match_started.emit()
 
 
-# --- discovery --------------------------------------------------------------
+@rpc("authority", "reliable")
+func _rc_shop(r: int, seconds: int, state: Dictionary) -> void:
+	round_num = r
+	turn_deadline_msec = Time.get_ticks_msec() + seconds * 1000
+	last_outcome = -1.0
+	if state.is_empty() or run == null:
+		phase = "waiting"
+		standings_changed.emit()
+		return
+	run.load_dict(state)
+	phase = "shop"
+	shop_started.emit(r, seconds)
+
+
+## Perform a shop action locally (instant feedback) and send it to the
+## authority, which replays it on the real run.
+func do_action(act: Array) -> bool:
+	if phase != "shop" or run == null:
+		return false
+	var ok := run.apply_action(act)
+	if ok:
+		_request("_rq_action", [round_num, act])
+	return ok
+
+
+func submit_turn() -> void:
+	if phase != "shop" or run == null:
+		return
+	run.end_turn()
+	phase = "waiting"
+	status.emit("Turn submitted. Waiting for other players...")
+	_request("_rq_submit", [round_num])
+	standings_changed.emit()
+
+
+@rpc("authority", "reliable")
+func _rc_force_end(r: int) -> void:
+	if phase == "shop" and r == round_num and run:
+		run.end_turn()
+		phase = "waiting"
+		standings_changed.emit()
+
+
+@rpc("authority", "reliable")
+func _rc_battle(cfg: Dictionary) -> void:
+	phase = "battle"
+	battle_ready.emit(cfg)
+
+
+@rpc("authority", "reliable")
+func _rc_results(res: Dictionary, new_players: Dictionary) -> void:
+	players = new_players
+	last_outcome = float(res["outcome"])
+	if run:
+		run.lives = int(res["lives"])
+		run.wins = int(res["wins"])
+	if phase == "waiting":
+		phase = "results"
+	standings_changed.emit()
+
+
+@rpc("authority", "reliable")
+func _rc_standings(new_players: Dictionary) -> void:
+	players = new_players
+	standings_changed.emit()
+
+
+@rpc("authority", "reliable")
+func _rc_over(list: Array) -> void:
+	placements = list
+	phase = "over"
+	var place := 0
+	for p in list:
+		if int(p["id"]) == my_id:
+			place = int(p["place"])
+	if place > 0:
+		Profile.apply_draft_result(place, list.size())
+	match_over.emit(list)
+
+
+# --- client actions -----------------------------------------------------------
+
+func set_ready(is_ready: bool) -> void:
+	_request("_rq_ready", [is_ready])
+
+
+func add_bot() -> void:
+	_request("_rq_add_bot", [])
+
+
+func kick(id: int) -> void:
+	_request("_rq_kick", [id])
+
+
+func start_match() -> void:
+	_request("_rq_start", [])
+
+
+func can_start() -> bool:
+	if not is_owner() or phase != "lobby":
+		return false
+	if players.size() < 2 and not room_quick:
+		return false
+	for id in players:
+		if id != owner_id and not players[id]["ready"]:
+			return false
+	return true
+
+
+## The local player finished watching their battle replay.
+func battle_viewed() -> void:
+	if phase == "battle":
+		phase = "results" if last_outcome >= 0.0 else "waiting"
+	_request("_rq_shop_ready", [round_num])
+	standings_changed.emit()
+
+
+# --- LAN discovery ------------------------------------------------------------
 
 func start_search() -> void:
 	stop_search()
 	_found.clear()
 	_listener = PacketPeerUDP.new()
-	var err := _listener.bind(DISCOVERY_PORT)
-	if err != OK:
+	if _listener.bind(DISCOVERY_PORT) != OK:
 		status.emit("Can't listen for local matches (port %d busy). You can still join by IP." % DISCOVERY_PORT)
 		_listener = null
 		return
@@ -360,383 +799,30 @@ func _poll_discovery(delta: float) -> void:
 
 
 func _send_beacon(delta: float) -> void:
-	if _beacon == null or _host_phase != "lobby":
+	var r: MatchRoom = _rooms.get("LAN", null)
+	if _beacon == null or r == null or r.phase != "lobby":
 		return
 	_beacon_t += delta
 	if _beacon_t < 1.0:
 		return
 	_beacon_t = 0.0
-	var info := {"tag": GAME_TAG, "name": host_name, "port": PORT, "players": players.size(),
-		"max": settings["max_players"], "wins": settings["wins"], "lives": settings["lives"]}
+	var info := {"tag": GAME_TAG, "name": player_name, "port": PORT, "players": r.players.size(),
+		"max": r.settings["max_players"], "wins": r.settings["wins"], "lives": r.settings["lives"]}
 	_beacon.put_packet(JSON.stringify(info).to_utf8_buffer())
 
 
-# --- match flow (host) ------------------------------------------------------
-
-func start_match() -> void:
-	if not can_start():
-		return
-	_rng.randomize()
-	_host_phase = "shop"
-	_next_top = 1
-	_next_bottom = players.size()
-	_last_boards.clear()
-	_bot_runs.clear()
-	for id in players:
-		var p: Dictionary = players[id]
-		p["lives"] = int(settings["lives"])
-		p["wins"] = 0
-		p["done"] = false
-		p["place"] = 0
-		if p["bot"]:
-			var r := DraftRun.new(_rng.randi())
-			r.lives = int(settings["lives"])
-			_bot_runs[id] = r
-	round_num = 0
-	_rc_match_start.rpc(settings, players)
-	_on_match_start(settings, players)
-	_begin_shop()
-
-
-@rpc("authority", "reliable")
-func _rc_match_start(new_settings: Dictionary, new_players: Dictionary) -> void:
-	_on_match_start(new_settings, new_players)
-
-
-func _on_match_start(new_settings: Dictionary, new_players: Dictionary) -> void:
-	stop_search()
-	settings = new_settings
-	players = new_players
-	run = DraftRun.new()
-	run.lives = int(settings["lives"])
-	placements = []
-	phase = "waiting"
-	match_started.emit()
-
-
-func _begin_shop() -> void:
-	round_num += 1
-	_boards.clear()
-	_shop_ready.clear()
-	_forced = false
-	for id in _bot_runs:
-		if players.has(id) and not players[id]["done"]:
-			var r: DraftRun = _bot_runs[id]
-			r.begin_turn()
-			r.auto_play()
-			_boards[id] = r.end_turn()
-	_deadline = Time.get_ticks_msec() + int(settings["turn_time"]) * 1000
-	_host_phase = "shop"
-	_rc_shop.rpc(round_num, int(settings["turn_time"]))
-	_on_shop(round_num, int(settings["turn_time"]))
-
-
-@rpc("authority", "reliable")
-func _rc_shop(r: int, seconds: int) -> void:
-	_on_shop(r, seconds)
-
-
-func _on_shop(r: int, seconds: int) -> void:
-	round_num = r
-	turn_deadline_msec = Time.get_ticks_msec() + seconds * 1000
-	_submitted = false
-	last_outcome = -1.0
-	if bool(me().get("done", false)):
-		phase = "waiting"
-		standings_changed.emit()
-		return
-	phase = "shop"
-	run.begin_turn()
-	shop_started.emit(r, seconds)
-
-
-## Local player ends their shop turn.
-func submit_turn() -> void:
-	if phase != "shop" or _submitted or run == null:
-		return
-	_submitted = true
-	var board := run.end_turn()
-	phase = "waiting"
-	status.emit("Turn submitted. Waiting for other players...")
-	if role == Role.HOST:
-		_receive_board(1, board)
-	else:
-		_rq_submit.rpc_id(1, round_num, board)
-	standings_changed.emit()
-
-
-@rpc("authority", "reliable")
-func _rc_force_end(r: int) -> void:
-	if r == round_num:
-		submit_turn()
-
-
-@rpc("any_peer", "reliable")
-func _rq_submit(r: int, board: Array) -> void:
-	if role != Role.HOST or r != round_num:
-		return
-	_receive_board(mp.get_remote_sender_id(), board)
-
-
-func _receive_board(id: int, board: Array) -> void:
-	if not players.has(id) or _host_phase != "shop":
-		return
-	_boards[id] = DraftData.sanitize_board(board)
-
-
-func _active_ids() -> Array:
-	var out: Array = []
-	for id in players:
-		if not players[id]["done"]:
-			out.append(id)
-	out.sort()
-	return out
-
-
-func _host_process() -> void:
-	var now := Time.get_ticks_msec()
-	match _host_phase:
-		"shop":
-			var waiting := false
-			for id in _active_ids():
-				if not _boards.has(id):
-					waiting = true
-					break
-			if not waiting:
-				_start_battles()
-			elif not _forced and now >= _deadline:
-				_forced = true
-				_grace = now + FORCE_GRACE_MS
-				_rc_force_end.rpc(round_num)
-				_rc_force_end(round_num)
-			elif _forced and now >= _grace:
-				_start_battles()
-		"sim":
-			for s in _sims:
-				if not WorkerThreadPool.is_task_completed(int(s["task"])):
-					return
-			for s in _sims:
-				WorkerThreadPool.wait_for_task_completion(int(s["task"]))
-			_finish_battles()
-		"viewing":
-			var all_ready := true
-			for id in _active_ids():
-				if not players[id]["bot"] and not _shop_ready.get(id, false):
-					all_ready = false
-					break
-			if all_ready or now >= _deadline:
-				_begin_shop()
-
-
-## Pair players, send each their battle, and simulate all battles on threads.
-func _start_battles() -> void:
-	var active := _active_ids()
-	for id in active:
-		if not _boards.has(id):
-			_boards[id] = DraftData.sanitize_board(_last_boards.get(id, []))
-		_last_boards[id] = _boards[id]
-	# Fisher-Yates shuffle with the match RNG.
-	for i in range(active.size() - 1, 0, -1):
-		var j := _rng.randi_range(0, i)
-		var tmp = active[i]
-		active[i] = active[j]
-		active[j] = tmp
-	_sims.clear()
-	var k := 0
-	while k < active.size():
-		var a: int = active[k]
-		if k + 1 < active.size():
-			_queue_battle(a, active[k + 1], _boards[a], _boards[active[k + 1]], false)
-		else:
-			# Odd player out fights a copy of another player's army.
-			var others: Array = []
-			for id in _last_boards:
-				if id != a and not DraftData.board_is_empty(_last_boards[id]):
-					others.append(id)
-			var ghost: int = others[_rng.randi_range(0, others.size() - 1)] if not others.is_empty() else a
-			_queue_battle(a, ghost, _boards[a], _last_boards.get(ghost, []), true)
-		k += 2
-	_host_phase = "sim"
-
-
-func _queue_battle(a: int, b: int, board_a: Array, board_b: Array, ghost: bool) -> void:
-	var sq_a := DraftData.board_to_squads(board_a)
-	var sq_b := DraftData.board_to_squads(DraftData.sanitize_board(board_b))
-	var seed_value := _rng.randi()
-	var map := BattleMaps.random_map_id(_rng)
-	var sim := BattleSim.new()
-	sim.setup(sq_a, sq_b, seed_value, map)
-	var task := WorkerThreadPool.add_task(sim.run_to_end.bind(200000), true, "draft battle")
-	_sims.append({"task": task, "sim": sim, "a": a, "b": b, "ghost": ghost})
-	var name_b: String = str(players[b]["name"]) + (" (copy)" if ghost else "")
-	var cfg := {
-		"mode": "draft", "round": round_num, "seed": seed_value, "map": map,
-		"squads_a": sq_a, "squads_b": sq_b,
-		"name_a": players[a]["name"], "name_b": name_b,
-	}
-	_send_battle(a, cfg, 0)
-	if not ghost:
-		_send_battle(b, cfg, 1)
-
-
-func _send_battle(id: int, cfg: Dictionary, team: int) -> void:
-	if players[id]["bot"]:
-		return
-	var c := cfg.duplicate()
-	c["local_team"] = team
-	if id == 1:
-		_on_battle(c)
-	else:
-		_rc_battle.rpc_id(id, c)
-
-
-@rpc("authority", "reliable")
-func _rc_battle(cfg: Dictionary) -> void:
-	_on_battle(cfg)
-
-
-func _on_battle(cfg: Dictionary) -> void:
-	phase = "battle"
-	_pending_results = {}
-	battle_ready.emit(cfg)
-
-
-func _finish_battles() -> void:
-	var outcome := {}
-	for s in _sims:
-		var sim: BattleSim = s["sim"]
-		var a: int = s["a"]
-		var b: int = s["b"]
-		var w := sim.winner
-		outcome[a] = 1.0 if w == 0 else (0.0 if w == 1 else 0.5)
-		if not s["ghost"]:
-			outcome[b] = 1.0 if w == 1 else (0.0 if w == 0 else 0.5)
-	_sims.clear()
-	var winners: Array = []
-	var losers: Array = []
-	for id in outcome:
-		var p: Dictionary = players[id]
-		if outcome[id] >= 1.0:
-			p["wins"] = int(p["wins"]) + 1
-		elif outcome[id] <= 0.0:
-			p["lives"] = int(p["lives"]) - 1
-		if int(p["wins"]) >= int(settings["wins"]):
-			winners.append(id)
-		elif int(p["lives"]) <= 0:
-			losers.append(id)
-	winners.sort_custom(func(x, y): return int(players[x]["lives"]) > int(players[y]["lives"]))
-	for id in winners:
-		players[id]["done"] = true
-		players[id]["place"] = _next_top
-		_next_top += 1
-	losers.sort_custom(func(x, y): return int(players[x]["wins"]) < int(players[y]["wins"]))
-	for id in losers:
-		players[id]["done"] = true
-		players[id]["place"] = _next_bottom
-		_next_bottom -= 1
-	var active := _active_ids()
-	if active.size() == 1:
-		players[active[0]]["done"] = true
-		players[active[0]]["place"] = _next_top
-		_next_top += 1
-	# Bots learn their results; humans get theirs over the network.
-	for id in outcome:
-		var p: Dictionary = players[id]
-		if p["bot"] and _bot_runs.has(id):
-			(_bot_runs[id] as DraftRun).apply_battle_result(outcome[id], int(p["lives"]), int(p["wins"]))
-		elif not p["bot"]:
-			var res := {"round": round_num, "outcome": outcome[id], "lives": p["lives"], "wins": p["wins"], "done": p["done"], "place": p["place"]}
-			if id == 1:
-				_on_results(res, players)
-			else:
-				_rc_results.rpc_id(id, res, players)
-	_broadcast_standings()
-	if _active_ids().is_empty():
-		_end_match()
-		return
-	_host_phase = "viewing"
-	_deadline = Time.get_ticks_msec() + READY_TIMEOUT_MS
-
-
-@rpc("authority", "reliable")
-func _rc_results(res: Dictionary, new_players: Dictionary) -> void:
-	_on_results(res, new_players)
-
-
-func _on_results(res: Dictionary, new_players: Dictionary) -> void:
-	players = new_players
-	last_outcome = float(res["outcome"])
-	if run:
-		run.apply_battle_result(float(res["outcome"]), int(res["lives"]), int(res["wins"]))
-	if phase == "waiting" or phase == "results":
-		phase = "results"
-	standings_changed.emit()
-
-
-func _broadcast_standings() -> void:
-	_rc_standings.rpc(players)
-	standings_changed.emit()
-
-
-@rpc("authority", "reliable")
-func _rc_standings(new_players: Dictionary) -> void:
-	players = new_players
-	standings_changed.emit()
-
-
-## Local player finished watching their battle.
-func battle_viewed() -> void:
-	if phase == "battle":
-		phase = "waiting"
-	if role == Role.HOST:
-		_shop_ready[1] = true
-	elif role == Role.CLIENT:
-		_rq_shop_ready.rpc_id(1, round_num)
-	standings_changed.emit()
-
-
-@rpc("any_peer", "reliable")
-func _rq_shop_ready(r: int) -> void:
-	if role == Role.HOST and r == round_num:
-		_shop_ready[mp.get_remote_sender_id()] = true
-
-
-func _end_match() -> void:
-	_host_phase = "over"
-	var list: Array = []
-	for id in players:
-		var p: Dictionary = players[id]
-		list.append({"id": id, "name": p["name"], "place": p["place"], "wins": p["wins"], "lives": p["lives"], "bot": p["bot"]})
-	list.sort_custom(func(x, y): return int(x["place"]) < int(y["place"]))
-	_rc_over.rpc(list)
-	_on_over(list)
-
-
-@rpc("authority", "reliable")
-func _rc_over(list: Array) -> void:
-	_on_over(list)
-
-
-func _on_over(list: Array) -> void:
-	placements = list
-	phase = "over"
-	var place := 0
-	for p in list:
-		if int(p["id"]) == my_id:
-			place = int(p["place"])
-	if place > 0:
-		Profile.apply_draft_result(place, list.size())
-	match_over.emit(list)
-
-
-# --- per-frame --------------------------------------------------------------
+# --- per frame ----------------------------------------------------------------
 
 func _process(delta: float) -> void:
 	mp.poll()
 	_poll_discovery(delta)
+	if _authority():
+		for c in _rooms.keys():
+			if _rooms.has(c):
+				(_rooms[c] as MatchRoom).process()
+		_cleanup_rooms()
 	if role == Role.HOST:
 		_send_beacon(delta)
-		_host_process()
 	if _quick_deadline > 0 and Time.get_ticks_msec() >= _quick_deadline:
 		_quick_deadline = 0
 		var best: Dictionary = {}
@@ -746,7 +832,7 @@ func _process(delta: float) -> void:
 				break
 		stop_search()
 		if best.is_empty():
-			host_match(_quick_name, settings)
-			status.emit("No open matches found, so you are now hosting one. Add bots or wait for players.")
+			host_lan(player_name, _quick_settings)
+			status.emit("No open matches on your network, so you're hosting one. Add bots or wait for players.")
 		else:
-			join_match(best["ip"], int(best["port"]), _quick_name)
+			join_lan(best["ip"], int(best["port"]), player_name)

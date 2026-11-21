@@ -14,6 +14,7 @@ func _initialize() -> void:
 	test_opponent_generation()
 	test_draft_rules()
 	test_draft_bot_tournament()
+	test_match_room()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -164,3 +165,73 @@ func test_draft_bot_tournament() -> void:
 	check(ok, "15 rounds of bot drafting and battles run cleanly")
 	check((bots[0] as DraftRun).tier() == 6, "bots reached shop tier 6")
 	print("    largest draft battle: %d units" % max_units)
+
+
+## Server-side room logic end to end: one scripted "human" (whose actions are
+## replayed by the room, exactly as over the network) plus three bots.
+func test_match_room() -> void:
+	print("match room (server logic)")
+	var room := MatchRoom.new("TEST1", {"wins": 3, "lives": 2, "max_players": 4, "turn_time": 60}, true, false)
+	var inbox: Array = []
+	room.outbox.connect(func(id: int, method: String, args: Array): inbox.append([id, method, args]))
+	check(room.add_player(42, "Tester") == "", "human joins the room")
+	for i in 3:
+		room.add_bot(42)
+	check(room.players.size() == 4 and room.can_start(), "owner fills the room with bots")
+	room.start(42)
+	var client := DraftRun.new()
+	var replay_ok := true
+	var rounds := 0
+	var started := Time.get_ticks_msec()
+	while room.phase != "over" and Time.get_ticks_msec() - started < 300000:
+		room.process()
+		var msgs := inbox.duplicate()
+		inbox.clear()
+		for m in msgs:
+			if int(m[0]) != 42:
+				continue
+			match str(m[1]):
+				"shop":
+					var state: Dictionary = m[2][2]
+					if state.is_empty():
+						continue
+					rounds += 1
+					client.load_dict(state)
+					var r: int = m[2][0]
+					for step in 8:
+						var act := _scripted_action(client, step)
+						if client.apply_action(act):
+							room.action(42, r, act)
+					client.end_turn()
+					room.submit(42, r)
+					var server_board: Array = room._submitted[42]
+					if JSON.stringify(server_board, "", true) != JSON.stringify(client.board, "", true):
+						replay_ok = false
+				"results":
+					room.shop_ready(42, room.round_num)
+	check(room.phase == "over", "match finished (%d rounds played by the human)" % rounds)
+	check(replay_ok, "server's replayed board always matches the client's board")
+	var places := {}
+	for id in room.players:
+		places[int(room.players[id]["place"])] = true
+	check(places.size() == 4 and places.has(1) and places.has(4), "placements 1-4 assigned")
+
+
+func _scripted_action(run: DraftRun, step: int) -> Array:
+	match step % 4:
+		0, 1:
+			if run.shop_units.is_empty():
+				return ["reroll"]
+			var uid: String = run.shop_units[0]["unit"]
+			var slot := run.slot_of_unit(uid)
+			if slot == -1:
+				slot = run.first_empty_slot()
+			if slot == -1:
+				return ["sell", 5]
+			return ["buy_unit", 0, slot]
+		2:
+			for s in DraftData.BOARD_SLOTS:
+				if not (run.board[s] as Dictionary).is_empty():
+					return ["buy_trinket", 0, s]
+			return ["reroll"]
+	return ["move", 0, 1] if step == 3 else ["reroll"]

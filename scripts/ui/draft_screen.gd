@@ -489,7 +489,7 @@ func _on_slot(slot: int) -> void:
 			var before := run.board[slot].duplicate() as Dictionary
 			if run.gold < DraftData.UNIT_COST:
 				_say("Not enough gold.")
-			elif run.buy_unit(_sel_index, slot):
+			elif Party.do_action(["buy_unit", _sel_index, slot]):
 				_clear_sel()
 				var after: Dictionary = run.board[slot]
 				if not before.is_empty() and DraftData.entry_level(after) > DraftData.entry_level(before):
@@ -502,7 +502,7 @@ func _on_slot(slot: int) -> void:
 		"trinket":
 			if run.gold < DraftData.TRINKET_COST:
 				_say("Not enough gold.")
-			elif run.buy_trinket(_sel_index, slot):
+			elif Party.do_action(["buy_trinket", _sel_index, slot]):
 				_clear_sel()
 				Audio.play_sfx("gem")
 			else:
@@ -510,7 +510,7 @@ func _on_slot(slot: int) -> void:
 		"board":
 			if slot == _sel_index:
 				_clear_sel()
-			elif run.move(_sel_index, slot):
+			elif Party.do_action(["move", _sel_index, slot]):
 				_clear_sel()
 				Audio.play_sfx("toggle")
 		_:
@@ -521,7 +521,7 @@ func _on_slot(slot: int) -> void:
 
 
 func _on_sell() -> void:
-	if _sel_kind == "board" and Party.run.sell(_sel_index):
+	if _sel_kind == "board" and Party.do_action(["sell", _sel_index]):
 		Audio.play_sfx("coins")
 		_clear_sel()
 		refresh()
@@ -529,14 +529,14 @@ func _on_sell() -> void:
 
 func _on_freeze() -> void:
 	if _sel_kind == "unit":
-		Party.run.toggle_freeze_unit(_sel_index)
+		Party.do_action(["freeze_unit", _sel_index])
 	elif _sel_kind == "trinket":
-		Party.run.toggle_freeze_trinket(_sel_index)
+		Party.do_action(["freeze_trinket", _sel_index])
 	refresh()
 
 
 func _on_reroll() -> void:
-	if Party.run.reroll():
+	if Party.do_action(["reroll"]):
 		_clear_sel()
 		Audio.play_sfx("scroll")
 	refresh()

@@ -70,21 +70,29 @@ collection: everyone drafts an army from scratch each match.
 - **Matches:** after each shop phase, players are paired against each other; an odd player out
   fights a copy of another player's army. Play until you hit the win target (default 10) or run
   out of lives (default 5). Final placings award gold and scouting maps in the main game.
-- **Matchmaking:**
-  - **Quick Match** joins an open match on your network, or hosts one if none is found.
-  - **Host Match** lets you set wins, lives, max players (2–16) and turn time, and add bots.
-  - **Find Matches** lists matches on your local network.
-  - **Join by IP** is for internet play: the host forwards UDP port 24700.
+- **Online play:** this uses the matchmaking server; see **[HOSTING.md](HOSTING.md)** for how
+  to run your own.
+  - **Quick Match** joins an open room. Rooms start on their own and fill empty seats with bots.
+  - **Create Match** makes a public room or a private one with a 5-letter code.
+  - **Browse** lists public rooms, and you can join any room by its code.
 
-  A player who disconnects mid-match is replaced by a bot.
-- **How it's networked:** the host is authoritative. It collects boards, pairs players, and
-  decides every battle by running the deterministic simulation on worker threads, while each
-  player watches a replay of their own fight. Shop actions run on each player's machine, so a
-  modified client could cheat its board. Boards are range-checked, but a fully cheat-proof ladder
-  would need the shop to run on the host or a server too.
+  Nobody needs to forward ports.
+- **Local network play** needs no server:
+  - **Quick Match (LAN)** joins a match on your network, or hosts one if none is found.
+  - **Host Match** lets you set wins, lives, max players (2–16) and turn time, and add bots.
+  - **Find Matches** lists matches on your network.
+  - **Join by IP**.
+- **Disconnects:** a player who drops mid-match is replaced by a bot.
+- **Cheat-proof:** whoever runs the match (the server, or the LAN host) keeps every player's
+  shop and board. Clients send only their actions (buy, sell, move…). The authority replays
+  them through the same rules code and random numbers, so a modified client can't fake its
+  army. The authority also decides every battle, on worker threads, and players watch a replay
+  of their own fight.
 
 Rules and content live in `scripts/draft/draft_data.gd`, the shop and ability logic (plus the bot
-player) in `scripts/draft/draft_run.gd`, and networking in `scripts/net/party.gd`.
+player) in `scripts/draft/draft_run.gd`, a match's authoritative logic in
+`scripts/net/match_room.gd`, and networking in `scripts/net/party.gd`. The dedicated server
+is this same project run headless: `godot --headless -- --server` (Docker setup in `server/`).
 
 ### Battlefields
 
@@ -153,7 +161,9 @@ scripts/core/army.gd          Squad sizes, power, army codes, opponent generator
 scripts/core/profile.gd       Save data, upgrades, expeditions, rewards (autoload "Profile")
 scripts/core/audio.gd         Music + pooled/throttled SFX (autoload "Audio")
 scripts/net/net.gd            ENet live duels (autoload "Net")
-scripts/net/party.gd          Legion Draft lobbies, LAN discovery, match host (autoload "Party")
+scripts/net/party.gd          Legion Draft networking: server, LAN host, client (autoload "Party")
+scripts/net/match_room.gd     One authoritative Legion Draft match (used by server and LAN host)
+server/                       Dockerfile, docker-compose and run script for the online server
 scripts/draft/draft_data.gd   Draft rules, unit abilities, trinkets
 scripts/draft/draft_run.gd    A player's draft run: shop, merging, abilities, bot AI
 scripts/battle/battle_sim.gd  Deterministic simulation
@@ -181,7 +191,9 @@ The tests check army-code round trips and cheat clamping, that squads deploy unc
 every one of the 20 maps resolves a battle with no units stuck in terrain, a 1000+ vs 1000+
 battle, determinism (same seed gives the same checksum), and opponent generation. They also check the Legion Draft rules (merging, levels, trinkets, abilities,
 selling, shop tiers, board sanitizing) and run a 15-round, 4-bot draft tournament through
-real battles.
+real battles. Finally, they play a full server-side match with a scripted player and
+three bots, and check that the server's replay of that player's actions always rebuilds
+exactly the board the player sees.
 
 ## Status
 

@@ -455,3 +455,66 @@ func _arrange_rows() -> void:
 	units.sort_custom(func(a, b): return int(order[GameData.UNITS[a["unit"]]["role"]]) < int(order[GameData.UNITS[b["unit"]]["role"]]))
 	for s in DraftData.BOARD_SLOTS:
 		board[s] = units[s] if s < units.size() else {}
+
+
+# --- networking: state sync and replayable actions --------------------------
+
+## Full state, including the RNG position, so a client can mirror the
+## server's run exactly and replay the same actions with the same results.
+func to_dict() -> Dictionary:
+	return {
+		"board": board.duplicate(true), "shop_units": shop_units.duplicate(true),
+		"shop_trinkets": shop_trinkets.duplicate(true), "gold": gold,
+		"battles_played": battles_played, "lives": lives, "wins": wins,
+		"seed": rng.seed, "state": rng.state, "log": log_lines.duplicate(),
+	}
+
+
+func load_dict(d: Dictionary) -> void:
+	board = DraftData.sanitize_board(d.get("board", []))
+	shop_units = []
+	for s in d.get("shop_units", []):
+		if typeof(s) == TYPE_DICTIONARY and GameData.UNITS.has(str(s.get("unit", ""))):
+			shop_units.append({"unit": str(s["unit"]), "frozen": bool(s.get("frozen", false))})
+	shop_trinkets = []
+	for s in d.get("shop_trinkets", []):
+		if typeof(s) == TYPE_DICTIONARY and DraftData.TRINKETS.has(str(s.get("trinket", ""))):
+			shop_trinkets.append({"trinket": str(s["trinket"]), "frozen": bool(s.get("frozen", false))})
+	gold = int(d.get("gold", 0))
+	battles_played = int(d.get("battles_played", 0))
+	lives = int(d.get("lives", lives))
+	wins = int(d.get("wins", 0))
+	rng.seed = int(d.get("seed", 0))
+	rng.state = int(d.get("state", 0))
+	log_lines = Array(d.get("log", []))
+
+
+## Apply a player action such as ["buy_unit", shop_index, slot]. The same
+## action list applied to the same state always gives the same result, which
+## is how the server verifies what clients do.
+func apply_action(action: Array) -> bool:
+	if action.is_empty():
+		return false
+	var a := func(i: int) -> int: return int(action[i]) if action.size() > i else -1
+	match str(action[0]):
+		"buy_unit":
+			return buy_unit(a.call(1), a.call(2))
+		"buy_trinket":
+			return buy_trinket(a.call(1), a.call(2))
+		"sell":
+			return sell(a.call(1))
+		"move":
+			return move(a.call(1), a.call(2))
+		"reroll":
+			return reroll()
+		"freeze_unit":
+			if a.call(1) < 0 or a.call(1) >= shop_units.size():
+				return false
+			toggle_freeze_unit(a.call(1))
+			return true
+		"freeze_trinket":
+			if a.call(1) < 0 or a.call(1) >= shop_trinkets.size():
+				return false
+			toggle_freeze_trinket(a.call(1))
+			return true
+	return false
