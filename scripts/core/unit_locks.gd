@@ -66,3 +66,50 @@ static func unlocked_ids() -> Array:
 		if not is_locked(id):
 			out.append(id)
 	return out
+
+
+# --- regions ----------------------------------------------------------------
+# Expedition regions can be locked the same way (hidden and unexplorable).
+
+static var _locked_regions := {}
+static var _regions_initialized := false
+
+
+static func default_regions() -> Array:
+	var out: Array = []
+	for id in GameData.REGIONS:
+		if bool(GameData.REGIONS[id].get("locked", false)):
+			out.append(id)
+	out.sort()
+	return out
+
+
+static func is_region_locked(id: String) -> bool:
+	if not _regions_initialized:
+		set_locked_regions(default_regions())
+	return _locked_regions.has(id)
+
+
+static func locked_regions() -> Array:
+	if not _regions_initialized:
+		set_locked_regions(default_regions())
+	var out: Array = _locked_regions.keys()
+	out.sort()
+	return out
+
+
+static func set_locked_regions(list: Array) -> void:
+	_locked_regions = {}
+	for id in list:
+		if GameData.REGIONS.has(str(id)):
+			_locked_regions[str(id)] = true
+	_regions_initialized = true
+
+
+static func set_region_locked(id: String, locked: bool) -> void:
+	if not _regions_initialized:
+		set_locked_regions(default_regions())
+	if locked:
+		_locked_regions[id] = true
+	else:
+		_locked_regions.erase(id)

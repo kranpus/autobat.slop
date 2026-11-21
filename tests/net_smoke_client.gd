@@ -110,6 +110,7 @@ func _on_over(list: Array) -> void:
 	print("[%s] server battle gold multiplier: x%s" % [player, root.get_node("Profile").battle_gold_mult()])
 	print("[%s] server unit locks: %d locked, storm_dragon %s, goblin %s" % [player, UnitLocks.locked_list().size(),
 		"locked" if UnitLocks.is_locked("storm_dragon") else "open", "locked" if UnitLocks.is_locked("goblin") else "open"])
+	print("[%s] server region locks: %s" % [player, UnitLocks.locked_regions()])
 	quit(0)
 
 

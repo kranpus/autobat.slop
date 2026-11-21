@@ -74,7 +74,16 @@ There are **60 units**. The original 20 are open. **40 more are locked** until y
 Locked units don't appear anywhere: not in expeditions, draft shops or ranked opponents, and not
 in army codes. Locked units you own sit out of battles.
 
-The Legion Draft server controls the locks (`units`, `lock`, `unlock`; see HOSTING.md). Any
+The new units come from **8 new expedition regions**, which are locked too:
+- **Opening regions (1 map, no rating needed):** Badlands Camp, Sunken Marsh, Hive Tunnels.
+- **Mid regions (2 maps, rating 1000–1100):** Elven Glade, Bone Fields, Giant's Steps.
+- **Top regions (3 maps, rating 1150–1200):** Dragon's Hoard, Celestial Spire.
+
+The original 5 regions keep their original 20 units. A locked region is hidden from the
+Expeditions tab, and a region can only be explored once some of its units are unlocked.
+
+The Legion Draft server controls the locks (`units`, `regions`, `lock`, `unlock`,
+`lock region`, `unlock region`, and `unlock new` to release everything new; see HOSTING.md). Any
 unit, old or new, can be locked as an emergency balance fix. Players' games pick up the server's
 locks when they connect. The defaults live in `scripts/core/game_data.gd` (`"locked": true`).
 

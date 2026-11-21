@@ -213,9 +213,11 @@ Ctrl+P then Ctrl+Q to detach again.
 | `units` | List all 60 units and whether each is locked or open. |
 | `lock Storm Dragon` / `lock goblin ogre` | Lock units by name or id. Locked units stop appearing in expeditions, draft shops and ranked opponents, are removed from army codes, and don't deploy in battles. Useful for emergency balance fixes. |
 | `unlock storm_dragon` | Unlock units again. |
-| `unlock new` / `lock new` | Release (or re-lock) the 40 not-yet-released units all at once. |
-| `unlock all` | Unlock every unit. |
-| `lock reset` | Back to the default locks (the 40 new units locked, everything else open). |
+| `regions` | List all 13 expedition regions and whether each is locked. |
+| `lock region Bone Fields` / `unlock region marsh` | Lock or unlock expedition regions by name or id. Locked regions are hidden and can't be explored. |
+| `unlock new` / `lock new` | Release (or re-lock) the unreleased content all at once: the 40 new units **and** the 8 new regions. |
+| `unlock all` | Unlock every unit and region. |
+| `lock reset` | Back to the defaults: the 40 new units and 8 new regions locked, everything else open. |
 
 Notes:
 - **Settings persist:** they're saved to `server_config.json` in the server's Godot user data

@@ -23,7 +23,7 @@ signal standings_changed
 signal match_over(placements: Array)
 signal left_match(reason: String)
 
-const GAME_VERSION := "legion-draft-4"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-5"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server
 const DISCOVERY_PORT := 24701
@@ -224,9 +224,14 @@ func run_command(line: String) -> String:
   gold draft-table <1st> <2nd> <3rd> <rest>   base draft gold by placement
   gold reset                      back to defaults
   units                           list every unit and whether it is locked
-  lock <unit> [unit...]           lock units (names or ids); 'lock new' = the unreleased set
-  unlock <unit> [unit...]         unlock units; 'unlock new' / 'unlock all'
-  lock reset                      back to the default locks (new units locked)
+  lock <unit> [unit...]           lock units (names or ids)
+  unlock <unit> [unit...]         unlock units
+  regions                         list expedition regions and whether they are locked
+  lock region <region> [...]      lock expedition regions (names or ids)
+  unlock region <region> [...]    unlock expedition regions
+  lock new / unlock new           the unreleased set: 40 new units + 8 new regions
+  unlock all                      every unit and region
+  lock reset                      back to the defaults (the new units and regions locked)
   say <message>                   show a message to every connected player"""
 		"status":
 			out = "%d players online, %d rooms. %s" % [_names.size(), _rooms.size(), _gold_text()]
@@ -268,8 +273,16 @@ func run_command(line: String) -> String:
 			for id in GameData.unit_ids_sorted():
 				lines.append("  %-22s %-10s %s" % [id, GameData.UNITS[id]["rarity"], "LOCKED" if UnitLocks.is_locked(id) else "open"])
 			out = "\n".join(PackedStringArray(lines)) + "\n%d of %d units locked." % [UnitLocks.locked_list().size(), GameData.UNITS.size()]
+		"regions":
+			var lines: Array = []
+			for rid in GameData.REGIONS:
+				lines.append("  %-16s %-20s %s" % [rid, GameData.REGIONS[rid]["name"], "LOCKED" if UnitLocks.is_region_locked(rid) else "open"])
+			out = "\n".join(PackedStringArray(lines)) + "\n%d of %d regions locked." % [UnitLocks.locked_regions().size(), GameData.REGIONS.size()]
 		"lock", "unlock":
-			out = _lock_command(a[0].to_lower() == "lock", a.slice(1))
+			if a.size() >= 2 and a[1].to_lower() in ["region", "regions"]:
+				out = _region_lock_command(a[0].to_lower() == "lock", a.slice(2))
+			else:
+				out = _lock_command(a[0].to_lower() == "lock", a.slice(1))
 		"say":
 			var msg := line.strip_edges().substr(4).strip_edges().left(200)
 			for id in _names:
@@ -291,12 +304,20 @@ func _lock_command(lock: bool, words: PackedStringArray) -> String:
 	var joined := " ".join(words).to_lower()
 	if joined == "reset" and lock:
 		UnitLocks.set_locked_list(UnitLocks.defaults())
+		UnitLocks.set_locked_regions(UnitLocks.default_regions())
 		_locks_changed()
-		return "Locks reset to defaults: %d units locked." % UnitLocks.locked_list().size()
+		return "Locks reset to defaults: %d units and %d regions locked." % [UnitLocks.locked_list().size(), UnitLocks.locked_regions().size()]
+	var region_note := ""
 	if joined == "all":
 		targets = GameData.UNITS.keys()
+		for rid in GameData.REGIONS:
+			UnitLocks.set_region_locked(rid, lock)
+		region_note = " All %d regions %s." % [GameData.REGIONS.size(), "locked" if lock else "unlocked"]
 	elif joined == "new":
 		targets = UnitLocks.defaults()
+		for rid in UnitLocks.default_regions():
+			UnitLocks.set_region_locked(rid, lock)
+		region_note = " The %d new regions are %s." % [UnitLocks.default_regions().size(), "locked" if lock else "unlocked"]
 	else:
 		var whole := joined.replace(" ", "_")
 		if GameData.UNITS.has(whole) or _unit_by_name(joined) != "":
@@ -314,9 +335,41 @@ func _lock_command(lock: bool, words: PackedStringArray) -> String:
 		UnitLocks.set_locked(id, lock)
 	if not targets.is_empty():
 		_locks_changed()
-	var out := "%s %d unit%s. %d of %d units are now locked." % ["Locked" if lock else "Unlocked", targets.size(), "" if targets.size() == 1 else "s", UnitLocks.locked_list().size(), GameData.UNITS.size()]
+	var out := "%s %d unit%s. %d of %d units are now locked.%s" % ["Locked" if lock else "Unlocked", targets.size(), "" if targets.size() == 1 else "s", UnitLocks.locked_list().size(), GameData.UNITS.size(), region_note]
 	if not unknown.is_empty():
 		out += " Unknown: %s (type 'units' for the list)." % ", ".join(PackedStringArray(unknown))
+	return out
+
+
+func _region_lock_command(lock: bool, words: PackedStringArray) -> String:
+	if words.is_empty():
+		return "Usage: lock region <region> [...] | unlock region <region> [...]  (type 'regions' for the list)"
+	var targets: Array = []
+	var joined := " ".join(words).to_lower()
+	var whole := joined.replace(" ", "_").replace("'", "")
+	for rid in GameData.REGIONS:
+		var nm := str(GameData.REGIONS[rid]["name"]).to_lower()
+		if rid == whole or nm == joined or nm.replace("'", "") == joined.replace("'", ""):
+			targets.append(rid)
+	var unknown: Array = []
+	if targets.is_empty():
+		for w in words:
+			var id := w.to_lower()
+			if GameData.REGIONS.has(id):
+				targets.append(id)
+			else:
+				unknown.append(w)
+	for rid in targets:
+		UnitLocks.set_region_locked(rid, lock)
+	if not targets.is_empty():
+		_locks_changed()
+	var out := "%s %d region%s. %d of %d regions are now locked." % ["Locked" if lock else "Unlocked", targets.size(), "" if targets.size() == 1 else "s", UnitLocks.locked_regions().size(), GameData.REGIONS.size()]
+	if not unknown.is_empty():
+		out += " Unknown: %s (type 'regions' for the list)." % ", ".join(PackedStringArray(unknown))
+	elif not lock:
+		for rid in targets:
+			if GameData.region_drops(rid).is_empty():
+				out += " Note: every unit in %s is still locked, so it can't be explored until some are unlocked." % GameData.REGIONS[rid]["name"]
 	return out
 
 
@@ -333,7 +386,7 @@ func _unit_by_name(text: String) -> String:
 func _locks_changed() -> void:
 	_save_config()
 	for id in _names:
-		_deliver(id, "locks", [UnitLocks.locked_list()])
+		_deliver(id, "locks", [UnitLocks.locked_list(), UnitLocks.locked_regions()])
 
 
 func _gold_text() -> String:
@@ -358,6 +411,8 @@ func _load_config() -> void:
 		return
 	if typeof(parsed.get("locked")) == TYPE_ARRAY:
 		UnitLocks.set_locked_list(parsed["locked"])
+	if typeof(parsed.get("locked_regions")) == TYPE_ARRAY:
+		UnitLocks.set_locked_regions(parsed["locked_regions"])
 	var r: Dictionary = parsed.get("rewards", {})
 	rewards["battle_mult"] = clampf(float(r.get("battle_mult", 1.0)), 0.0, 100.0)
 	rewards["draft_mult"] = clampf(float(r.get("draft_mult", 1.0)), 0.0, 100.0)
@@ -371,7 +426,7 @@ func _load_config() -> void:
 func _save_config() -> void:
 	var f := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list()}, "\t"))
+		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions()}, "\t"))
 
 
 func _log(text: String) -> void:
@@ -574,7 +629,7 @@ func _rq_hello(pname: String, version: String) -> void:
 			_deliver(id, "kicked", [err])
 		return
 	_log("%s connected (%d online)" % [_names[id], _names.size()])
-	_deliver(id, "welcome", [{"rooms": _rooms.size(), "players": _names.size(), "rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list()}])
+	_deliver(id, "welcome", [{"rooms": _rooms.size(), "players": _names.size(), "rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions()}])
 
 
 @rpc("any_peer", "reliable")
@@ -799,7 +854,7 @@ func _rc_welcome(info: Dictionary) -> void:
 	phase = "online"
 	_rc_rewards(info.get("rewards", {}))
 	if typeof(info.get("locked")) == TYPE_ARRAY:
-		_rc_locks(info["locked"])
+		_rc_locks(info["locked"], info.get("locked_regions", UnitLocks.locked_regions()))
 	status.emit("Connected to the server (%d players online, %d matches)." % [int(info.get("players", 0)), int(info.get("rooms", 0))])
 	online_changed.emit()
 	lobby_changed.emit()
@@ -821,9 +876,11 @@ func _rc_rewards(r: Dictionary) -> void:
 ## The server's unit locks. Remembered in the profile so they also apply to
 ## expeditions, ranked battles and army codes while offline.
 @rpc("authority", "reliable")
-func _rc_locks(list: Array) -> void:
+func _rc_locks(list: Array, regions: Array) -> void:
 	UnitLocks.set_locked_list(list)
+	UnitLocks.set_locked_regions(regions)
 	Profile.data["unit_locks"] = UnitLocks.locked_list()
+	Profile.data["region_locks"] = UnitLocks.locked_regions()
 	Profile.save()
 
 

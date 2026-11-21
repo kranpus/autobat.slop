@@ -71,6 +71,8 @@ func refresh() -> void:
 	_pity_label.text = "[b]Guaranteed pulls:[/b]  " + "   ·   ".join(PackedStringArray(parts)) + "  [color=#9aa0b0](Legendary only counts in regions that have them)[/color]"
 	UIKit.clear(_list)
 	for rid in GameData.REGIONS:
+		if UnitLocks.is_region_locked(rid):
+			continue  # locked by the server: hidden until released
 		_list.add_child(_make_region(rid))
 
 

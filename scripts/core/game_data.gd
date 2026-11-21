@@ -464,27 +464,68 @@ const REGIONS := {
 	"warrens": {
 		"name": "Goblin Warrens", "tile": "warrens", "cost_maps": 1, "min_rating": 0,
 		"desc": "Damp tunnels crawling with greenskins.",
-		"drops": {"goblin": 34, "kobold_slinger": 28, "rat_swarm": 18, "orc_warrior": 12, "ogre": 6, "hill_giant": 2, "jackal": 14, "hobgoblin": 16, "gnoll_raider": 8, "kobold_brute": 12, "goblin_archer": 14, "orc_knight": 8, "war_hound": 8, "troll": 4, "cyclops": 3, "ettin": 4, "orc_warlord": 3},
+		"drops": {"goblin": 34, "kobold_slinger": 28, "rat_swarm": 18, "orc_warrior": 12, "ogre": 6, "hill_giant": 2},
 	},
 	"crypt": {
 		"name": "Haunted Crypt", "tile": "crypt", "cost_maps": 1, "min_rating": 0,
 		"desc": "The dead do not rest here.",
-		"drops": {"skeleton": 38, "rat_swarm": 22, "gnoll_shaman": 18, "orc_sorcerer": 12, "lich": 4, "giant_frog": 10, "gnoll_raider": 12, "cave_bat": 14, "wight": 12, "naga_warrior": 4, "minotaur": 5, "vampire_knight": 5, "death_knight": 4, "sphinx": 2, "hydra": 2, "bone_dragon": 2, "shadow_dragon": 1},
+		"drops": {"skeleton": 38, "rat_swarm": 22, "gnoll_shaman": 18, "orc_sorcerer": 12, "lich": 4},
 	},
 	"forest": {
 		"name": "Whispering Forest", "tile": "forest", "cost_maps": 1, "min_rating": 1000,
 		"desc": "Elves, wolves and older things beneath the canopy.",
-		"drops": {"elf_archer": 30, "dire_wolf": 30, "centaur": 14, "treant": 12, "griffon": 5, "phoenix": 1, "jackal": 10, "giant_frog": 8, "soldier_ant": 12, "elf_knight": 8, "hippogriff": 7, "war_hound": 8, "black_bear": 8, "elf_mage": 6, "seraph": 1},
+		"drops": {"elf_archer": 30, "dire_wolf": 30, "centaur": 14, "treant": 12, "griffon": 5, "phoenix": 1},
 	},
 	"deep": {
 		"name": "Dwarven Deeps", "tile": "deep", "cost_maps": 2, "min_rating": 1050,
 		"desc": "Forgotten halls under the mountain.",
-		"drops": {"dwarf_berserker": 30, "kobold_slinger": 22, "naga_sharpshooter": 14, "ogre": 12, "hill_giant": 4, "titan": 1, "kobold_brute": 10, "cave_bat": 12, "soldier_ant": 8, "elf_mage": 6, "naga_warrior": 8, "merfolk_impaler": 7, "troll": 6, "troll_berserker": 5, "minotaur": 4, "ettin": 4, "stone_giant": 3, "fire_giant": 2, "hydra": 2, "juggernaut": 2, "grand_avatar": 1},
+		"drops": {"dwarf_berserker": 30, "kobold_slinger": 22, "naga_sharpshooter": 14, "ogre": 12, "hill_giant": 4, "titan": 1},
 	},
 	"peaks": {
 		"name": "Dragon Peaks", "tile": "peaks", "cost_maps": 3, "min_rating": 1150,
 		"desc": "Only the bold climb where dragons nest.",
-		"drops": {"orc_sorcerer": 24, "centaur": 20, "griffon": 16, "hill_giant": 12, "lich": 10, "golden_dragon": 3, "phoenix": 2, "titan": 2, "hippogriff": 8, "tengu_warrior": 8, "cyclops": 6, "manticore": 6, "salamander_firebrand": 7, "stone_giant": 3, "frost_giant": 3, "fire_giant": 3, "sphinx": 2, "ice_dragon": 2, "shadow_dragon": 1, "storm_dragon": 2},
+		"drops": {"orc_sorcerer": 24, "centaur": 20, "griffon": 16, "hill_giant": 12, "lich": 10, "golden_dragon": 3, "phoenix": 2, "titan": 2},
+	},
+	# --- Locked by default (enable with the server's `unlock region` command) ---
+	"badlands": {
+		"name": "Badlands Camp", "tile": "badlands", "cost_maps": 1, "min_rating": 0, "locked": true,
+		"desc": "A warband's camp in the scrublands: hounds, raiders and their bosses.",
+		"drops": {"jackal": 30, "hobgoblin": 30, "gnoll_raider": 26, "goblin_archer": 26, "war_hound": 16, "orc_knight": 14, "orc_warlord": 7, "cyclops": 5},
+	},
+	"marsh": {
+		"name": "Sunken Marsh", "tile": "marsh", "cost_maps": 1, "min_rating": 0, "locked": true,
+		"desc": "Reeds, black water and things with too many teeth.",
+		"drops": {"giant_frog": 34, "cave_bat": 22, "naga_warrior": 16, "merfolk_impaler": 16, "troll": 8, "hydra": 3},
+	},
+	"hive_tunnels": {
+		"name": "Hive Tunnels", "tile": "hive_tunnels", "cost_maps": 1, "min_rating": 0, "locked": true,
+		"desc": "Burrows dug by giant ants, now home to worse.",
+		"drops": {"soldier_ant": 36, "kobold_brute": 30, "cave_bat": 18, "black_bear": 14, "troll_berserker": 7, "ettin": 6},
+	},
+	"elven_glade": {
+		"name": "Elven Glade", "tile": "elven_glade", "cost_maps": 2, "min_rating": 1000, "locked": true,
+		"desc": "A hidden grove guarded by the elven host.",
+		"drops": {"elf_knight": 26, "elf_mage": 24, "hippogriff": 18, "tengu_warrior": 16, "sphinx": 4, "seraph": 1},
+	},
+	"bone_fields": {
+		"name": "Bone Fields", "tile": "bone_fields", "cost_maps": 2, "min_rating": 1000, "locked": true,
+		"desc": "An old battlefield where the fallen still march.",
+		"drops": {"wight": 34, "minotaur": 12, "vampire_knight": 12, "death_knight": 10, "bone_dragon": 4},
+	},
+	"giants_steps": {
+		"name": "Giant's Steps", "tile": "giants_steps", "cost_maps": 2, "min_rating": 1100, "locked": true,
+		"desc": "Mountain terraces carved by giants.",
+		"drops": {"cyclops": 22, "ettin": 22, "stone_giant": 10, "frost_giant": 9, "fire_giant": 9, "juggernaut": 6},
+	},
+	"dragons_hoard": {
+		"name": "Dragon's Hoard", "tile": "dragons_hoard", "cost_maps": 3, "min_rating": 1150, "locked": true,
+		"desc": "Treasure caves where the great wyrms sleep.",
+		"drops": {"salamander_firebrand": 30, "manticore": 28, "ice_dragon": 8, "shadow_dragon": 3, "storm_dragon": 3},
+	},
+	"celestial_spire": {
+		"name": "Celestial Spire", "tile": "celestial_spire", "cost_maps": 3, "min_rating": 1200, "locked": true,
+		"desc": "A tower above the clouds, home to winged hosts.",
+		"drops": {"tengu_warrior": 30, "hippogriff": 28, "sphinx": 10, "seraph": 3, "grand_avatar": 2},
 	},
 }
 

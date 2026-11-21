@@ -19,6 +19,8 @@ func _init() -> void:
 	# Unit locks last received from the server (or the built-in defaults).
 	if typeof(data.get("unit_locks")) == TYPE_ARRAY:
 		UnitLocks.set_locked_list(data["unit_locks"])
+	if typeof(data.get("region_locks")) == TYPE_ARRAY:
+		UnitLocks.set_locked_regions(data["region_locks"])
 
 
 func default_profile() -> Dictionary:
@@ -208,7 +210,7 @@ func tier_up(id: String) -> bool:
 # --- expeditions (finding units) ------------------------------------------
 
 func region_unlocked(region_id: String) -> bool:
-	return rating() >= int(GameData.REGIONS[region_id]["min_rating"])
+	return rating() >= int(GameData.REGIONS[region_id]["min_rating"]) and not UnitLocks.is_region_locked(region_id)
 
 
 func can_explore(region_id: String) -> bool:

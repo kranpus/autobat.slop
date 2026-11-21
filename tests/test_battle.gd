@@ -248,6 +248,8 @@ func test_expedition_pity() -> void:
 	var backup: Dictionary = profile.data.duplicate(true)
 	var worst := {}
 	for region in GameData.REGIONS:
+		if UnitLocks.is_region_locked(region):
+			continue
 		profile.data["pity"] = {}
 		var since := {}
 		for rule in GameData.PITY:
@@ -372,7 +374,11 @@ func test_unit_locks() -> void:
 		profile.data["maps"] = 99
 		profile.data["pending_choice"] = {}
 		profile.data["rating"] = 5000
-		var region: String = GameData.REGIONS.keys()[i % GameData.REGIONS.size()]
+		var open_regions: Array = []
+		for rid in GameData.REGIONS:
+			if not UnitLocks.is_region_locked(rid):
+				open_regions.append(rid)
+		var region: String = open_regions[i % open_regions.size()]
 		for o in profile.explore(region)["options"]:
 			if UnitLocks.is_locked(o["unit"]):
 				leaked = true
@@ -405,7 +411,7 @@ func test_unit_locks() -> void:
 	check(profile.army_squads().size() == 2 and profile.battle_squads().size() == 1, "an owned locked unit stays in the army but doesn't deploy")
 	# Server commands.
 	party.run_command("unlock Storm Dragon")
-	check(not UnitLocks.is_locked("storm_dragon") and GameData.region_drops("peaks").has("storm_dragon"), "'unlock Storm Dragon' makes it available")
+	check(not UnitLocks.is_locked("storm_dragon") and GameData.region_drops("dragons_hoard").has("storm_dragon"), "'unlock Storm Dragon' makes it available (in the Dragon's Hoard drop table)")
 	check(profile.battle_squads().size() == 2, "unlocked unit deploys again")
 	party.run_command("lock goblin")
 	check(UnitLocks.is_locked("goblin") and not DraftData.units_for_tier(1, UnitLocks.as_dict()).has("goblin"), "'lock goblin' removes an original unit from shops")
@@ -414,6 +420,39 @@ func test_unit_locks() -> void:
 	check(UnitLocks.locked_list() == ["goblin"], "'unlock new' releases all 40 new units")
 	party.run_command("lock reset")
 	check(UnitLocks.locked_list().size() == 40 and not UnitLocks.is_locked("goblin"), "'lock reset' restores the defaults")
+	# Expedition regions.
+	check(GameData.REGIONS.size() == 13 and UnitLocks.locked_regions().size() == 8, "13 regions, the 8 new ones locked by default")
+	var new_only := true
+	for rid in UnitLocks.default_regions():
+		for id in GameData.REGIONS[rid]["drops"]:
+			if not bool(GameData.UNITS[id].get("locked", false)):
+				new_only = false
+	for rid in ["warrens", "crypt", "forest", "deep", "peaks"]:
+		for id in GameData.REGIONS[rid]["drops"]:
+			if bool(GameData.UNITS[id].get("locked", false)):
+				new_only = false
+	check(new_only, "new regions hold only new units; the original 5 hold none")
+	profile.data["maps"] = 99
+	profile.data["rating"] = 5000
+	profile.data["pending_choice"] = {}
+	check(not profile.can_explore("dragons_hoard") and profile.explore("dragons_hoard").is_empty(), "a locked region can't be explored")
+	party.run_command("unlock region Dragon's Hoard")
+	check(not UnitLocks.is_region_locked("dragons_hoard") and not profile.can_explore("dragons_hoard"), "an unlocked region whose units are all locked still can't be explored")
+	party.run_command("unlock new")
+	check(UnitLocks.locked_list().is_empty() and UnitLocks.locked_regions().is_empty(), "'unlock new' opens the new units and regions")
+	var saw_new := false
+	for i in 20:
+		profile.data["pending_choice"] = {}
+		profile.data["maps"] = 99
+		for o in profile.explore("dragons_hoard")["options"]:
+			if bool(GameData.UNITS[o["unit"]].get("locked", false)):
+				saw_new = true
+	check(saw_new, "new units are found in the new regions once unlocked")
+	party.run_command("lock region bone_fields")
+	check(UnitLocks.is_region_locked("bone_fields") and not profile.can_explore("bone_fields"), "'lock region bone_fields' closes a region")
+	party.run_command("lock reset")
+	check(UnitLocks.locked_regions().size() == 8 and UnitLocks.locked_list().size() == 40, "'lock reset' re-locks the new units and regions")
+	profile.data["pending_choice"] = {}
 	# A server-run match syncs the lock list into every run state.
 	var room := MatchRoom.new("LOCKS", {"max_players": 2}, true, false)
 	var states: Array = []
