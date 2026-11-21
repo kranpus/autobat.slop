@@ -3,7 +3,8 @@ extends RefCounted
 ## One player's Legion Draft run: gold, shop, board, abilities and trinkets.
 ## Used for the local player and for bots (see auto_play). Pure logic, no UI.
 
-var board: Array = []            # BOARD_SLOTS entries; {} = empty slot
+var slots := DraftData.BOARD_SLOTS   # board size: 4, 6 or 8
+var board: Array = []            # one entry per slot; {} = empty slot
 var shop_units: Array = []       # [{"unit": id, "frozen": bool}]
 var shop_trinkets: Array = []    # [{"trinket": id, "frozen": bool}]
 var gold := 0
@@ -14,13 +15,14 @@ var log_lines: Array = []        # recent ability messages for the UI
 var rng := RandomNumberGenerator.new()
 
 
-func _init(seed_value: int = 0) -> void:
+func _init(seed_value: int = 0, board_slots: int = DraftData.BOARD_SLOTS) -> void:
+	slots = DraftData.valid_slots(board_slots)
 	if seed_value == 0:
 		rng.randomize()
 	else:
 		rng.seed = seed_value
-	board.resize(DraftData.BOARD_SLOTS)
-	for i in DraftData.BOARD_SLOTS:
+	board.resize(slots)
+	for i in slots:
 		board[i] = {}
 
 
@@ -110,7 +112,7 @@ func toggle_freeze_trinket(i: int) -> void:
 
 
 func can_place_unit(unit_id: String, slot: int) -> bool:
-	if slot < 0 or slot >= DraftData.BOARD_SLOTS:
+	if slot < 0 or slot >= slots:
 		return false
 	var e: Dictionary = board[slot]
 	return e.is_empty() or (e["unit"] == unit_id and int(e["xp"]) < DraftData.MAX_XP)
@@ -141,7 +143,7 @@ func buy_unit(i: int, slot: int) -> bool:
 func buy_trinket(i: int, slot: int) -> bool:
 	if i < 0 or i >= shop_trinkets.size() or gold < DraftData.TRINKET_COST:
 		return false
-	if slot < 0 or slot >= DraftData.BOARD_SLOTS or (board[slot] as Dictionary).is_empty():
+	if slot < 0 or slot >= slots or (board[slot] as Dictionary).is_empty():
 		return false
 	var tid: String = shop_trinkets[i]["trinket"]
 	gold -= DraftData.TRINKET_COST
@@ -167,7 +169,7 @@ func _apply_trinket(slot: int, tid: String) -> void:
 
 
 func sell(slot: int) -> bool:
-	if slot < 0 or slot >= DraftData.BOARD_SLOTS:
+	if slot < 0 or slot >= slots:
 		return false
 	var e: Dictionary = board[slot]
 	if e.is_empty():
@@ -177,7 +179,7 @@ func sell(slot: int) -> bool:
 	gold += lvl
 	_log("Sold %s for %d gold." % [_uname(e["unit"]), lvl])
 	board[slot] = {}
-	for s in DraftData.BOARD_SLOTS:
+	for s in slots:
 		if not (board[s] as Dictionary).is_empty():
 			_trigger(s, "ally_sold")
 	return true
@@ -185,7 +187,7 @@ func sell(slot: int) -> bool:
 
 ## Move a board unit: into an empty slot, merge onto the same unit, or swap.
 func move(from: int, to: int) -> bool:
-	if from == to or from < 0 or to < 0 or from >= DraftData.BOARD_SLOTS or to >= DraftData.BOARD_SLOTS:
+	if from == to or from < 0 or to < 0 or from >= slots or to >= slots:
 		return false
 	var a: Dictionary = board[from]
 	var b: Dictionary = board[to]
@@ -219,7 +221,7 @@ func _add_xp(slot: int, amount: int) -> void:
 # --- abilities --------------------------------------------------------------
 
 func _trigger_all(trigger: String) -> void:
-	for s in DraftData.BOARD_SLOTS:
+	for s in slots:
 		if not (board[s] as Dictionary).is_empty():
 			_trigger(s, trigger)
 
@@ -268,7 +270,7 @@ func _ability_trinket(slot: int, ab: Dictionary) -> void:
 	var receiver := slot
 	if str(board[slot]["trinket"]) != "":
 		receiver = -1
-		for s in DraftData.BOARD_SLOTS:
+		for s in slots:
 			if not (board[s] as Dictionary).is_empty() and str(board[s]["trinket"]) == "":
 				receiver = s
 				break
@@ -287,7 +289,7 @@ func _buff(slot: int, hp_pct: int, dmg_pct: int) -> void:
 
 func _targets(slot: int, target: String) -> Array:
 	var others: Array = []
-	for s in DraftData.BOARD_SLOTS:
+	for s in slots:
 		if s != slot and not (board[s] as Dictionary).is_empty():
 			others.append(s)
 	match target:
@@ -305,7 +307,7 @@ func _targets(slot: int, target: String) -> Array:
 		"front", "back":
 			var out: Array = []
 			for s in others:
-				if DraftData.SLOT_ROWS[s] == target:
+				if DraftData.slot_row(slots, s) == target:
 					out.append(s)
 			return out
 		"adjacent":
@@ -348,14 +350,14 @@ func unit_count() -> int:
 
 
 func first_empty_slot() -> int:
-	for s in DraftData.BOARD_SLOTS:
+	for s in slots:
 		if (board[s] as Dictionary).is_empty():
 			return s
 	return -1
 
 
 func slot_of_unit(uid: String) -> int:
-	for s in DraftData.BOARD_SLOTS:
+	for s in slots:
 		var e: Dictionary = board[s]
 		if not e.is_empty() and e["unit"] == uid and int(e["xp"]) < DraftData.MAX_XP:
 			return s
@@ -401,7 +403,7 @@ func auto_play() -> void:
 		if gold >= DraftData.TRINKET_COST and not shop_trinkets.is_empty() and unit_count() > 0:
 			var tid: String = shop_trinkets[0]["trinket"]
 			var target := -1
-			for s in DraftData.BOARD_SLOTS:
+			for s in slots:
 				var e: Dictionary = board[s]
 				if e.is_empty():
 					continue
@@ -434,7 +436,7 @@ func _best_shop_unit() -> int:
 func _weakest_slot() -> int:
 	var weakest := 0
 	var low := INF
-	for s in DraftData.BOARD_SLOTS:
+	for s in slots:
 		var e: Dictionary = board[s]
 		if e.is_empty():
 			continue
@@ -453,7 +455,7 @@ func _arrange_rows() -> void:
 			units.append(e)
 	var order := {"tank": 0, "melee": 1, "ranged": 2, "caster": 3, "healer": 4}
 	units.sort_custom(func(a, b): return int(order[GameData.UNITS[a["unit"]]["role"]]) < int(order[GameData.UNITS[b["unit"]]["role"]]))
-	for s in DraftData.BOARD_SLOTS:
+	for s in slots:
 		board[s] = units[s] if s < units.size() else {}
 
 
@@ -466,12 +468,13 @@ func to_dict() -> Dictionary:
 		"board": board.duplicate(true), "shop_units": shop_units.duplicate(true),
 		"shop_trinkets": shop_trinkets.duplicate(true), "gold": gold,
 		"battles_played": battles_played, "lives": lives, "wins": wins,
-		"seed": rng.seed, "state": rng.state, "log": log_lines.duplicate(),
+		"seed": rng.seed, "state": rng.state, "log": log_lines.duplicate(), "slots": slots,
 	}
 
 
 func load_dict(d: Dictionary) -> void:
-	board = DraftData.sanitize_board(d.get("board", []))
+	slots = DraftData.valid_slots(int(d.get("slots", slots)))
+	board = DraftData.sanitize_board(d.get("board", []), slots)
 	shop_units = []
 	for s in d.get("shop_units", []):
 		if typeof(s) == TYPE_DICTIONARY and GameData.UNITS.has(str(s.get("unit", ""))):

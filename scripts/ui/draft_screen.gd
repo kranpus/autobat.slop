@@ -1,13 +1,12 @@
 extends Control
 ## Legion Draft in-match screen: shop, board, trinkets, timer and standings.
 ##
-## Click a shop unit/trinket, then click a board slot to buy it there.
-## Click a board unit, then another slot to move, swap or merge duplicates.
-## Sell / Freeze act on the current selection. Right-click clears it.
+## Drag a shop unit/trinket onto a board slot to buy it there, drag a board
+## unit onto another slot to move, swap or merge duplicates, or onto Sell.
+## Clicking works too: click an item, then click a slot. Right-click clears.
 
 signal leave_requested
 
-const SLOT_DISPLAY_ORDER := [5, 4, 3, 2, 1, 0]   # back row on the left, front row facing the enemy
 
 var _sel_kind := ""        # "", "unit", "trinket", "board"
 var _sel_index := -1
@@ -25,6 +24,7 @@ var _reroll_btn: Button
 var _end_btn: Button
 var _overlay: PanelContainer
 var _overlay_box: VBoxContainer
+var _slot_buttons := {}    # slot -> Button, for live drop highlights
 
 
 func _ready() -> void:
@@ -57,6 +57,8 @@ func _ready() -> void:
 	_freeze_btn = UIKit.button("Freeze", _on_freeze)
 	th.add_child(_freeze_btn)
 	_sell_btn = UIKit.button("Sell", _on_sell)
+	_sell_btn.tooltip_text = "Sell the selected unit, or drag a unit here."
+	_sell_btn.set_drag_forwarding(Callable(), _can_drop_sell, _drop_sell)
 	th.add_child(_sell_btn)
 	_end_btn = UIKit.button("End Turn ▶", func(): Party.submit_turn())
 	_end_btn.add_theme_font_size_override("font_size", 18)
@@ -76,7 +78,7 @@ func _ready() -> void:
 	main_col.add_child(UIKit.label("Shop", 16, UIKit.ACCENT))
 	_shop_row = UIKit.hbox(8)
 	main_col.add_child(_shop_row)
-	_msg = UIKit.label("Click a shop item, then a board slot. Click a unit then another slot to move or merge duplicates. Right-click to cancel.", 13, UIKit.TEXT_DIM)
+	_msg = UIKit.label("Drag shop items onto your board. Drag units between slots to move or merge duplicates, or onto Sell. (Clicking an item and then a slot works too.)", 13, UIKit.TEXT_DIM)
 	_msg.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	main_col.add_child(_msg)
 	_log = RichTextLabel.new()
@@ -125,7 +127,10 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if not visible:
 		return
-	if Party.phase == "shop":
+	if Party.phase == "shop" and Party.turn_deadline_msec == 0:
+		_timer_label.text = "No timer"
+		_timer_label.add_theme_color_override("font_color", UIKit.TEXT_DIM)
+	elif Party.phase == "shop":
 		var left := maxi(0, (Party.turn_deadline_msec - Time.get_ticks_msec()) / 1000)
 		@warning_ignore("integer_division")
 		_timer_label.text = "%d:%02d" % [left / 60, left % 60]
@@ -137,6 +142,13 @@ func _process(_delta: float) -> void:
 func _on_shop_started(_r: int, _s: int) -> void:
 	_clear_sel()
 	refresh()
+
+
+func _notification(what: int) -> void:
+	# A drag that ended anywhere other than a valid slot: drop the highlight.
+	if what == NOTIFICATION_DRAG_END and is_inside_tree():
+		_clear_sel()
+		refresh.call_deferred()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -167,9 +179,14 @@ func refresh() -> void:
 		var tier := run.tier()
 		var next := run.battles_to_next_tier()
 		var me := Party.me()
-		_top_label.text = "Round %d   ·   Shop tier %d%s   ·   Gold %d   ·   Lives %d/%d   ·   Wins %d/%d" % [
-			Party.round_num, tier, ("" if next < 0 else " (next in %d)" % next), run.gold,
-			int(me.get("lives", run.lives)), int(Party.settings["lives"]), int(me.get("wins", run.wins)), int(Party.settings["wins"])]
+		var s := Party.settings
+		var round_text := "Round %d" % Party.round_num
+		if not s.get("use_lives", true):
+			round_text += "/%d" % int(s.get("max_rounds", 15))
+		var lives_text := "Lives %d/%d" % [int(me.get("lives", run.lives)), int(s["lives"])] if s.get("use_lives", true) else "Losses %d" % int(me.get("losses", 0))
+		var wins_text := "Wins %d/%d" % [int(me.get("wins", run.wins)), int(s["wins"])] if s.get("use_wins", true) else "Wins %d" % int(me.get("wins", run.wins))
+		_top_label.text = "%s   ·   Shop tier %d%s   ·   Gold %d   ·   %s   ·   %s" % [
+			round_text, tier, ("" if next < 0 else " (next in %d)" % next), run.gold, lives_text, wins_text]
 	_reroll_btn.disabled = not shopping or run.gold < DraftData.REROLL_COST
 	_end_btn.disabled = not shopping
 	_sell_btn.disabled = not shopping or _sel_kind != "board"
@@ -229,20 +246,17 @@ func _build_board(shopping: bool) -> void:
 	var run := Party.run
 	if run == null:
 		return
-	for slot in SLOT_DISPLAY_ORDER:
+	_slot_buttons.clear()
+	var card_w := 132.0 if run.slots <= 6 else 104.0
+	# Back row on the left, front row on the right (facing the enemy).
+	for slot in range(run.slots - 1, -1, -1):
 		var e: Dictionary = run.board[slot]
-		var border := Color("4a5068")
-		var width := 2
-		if _sel_kind == "board" and _sel_index == slot:
-			border = UIKit.ACCENT
-			width = 4
-		elif shopping and _slot_is_target(slot):
-			border = UIKit.GOOD
-			width = 3
 		var s: int = slot
-		var b := _card(Vector2(132, 178), border, width, func(): _on_slot(s))
+		var b := _card(Vector2(card_w, 178), Color("4a5068"), 2, func(): _on_slot(s))
+		b.set_drag_forwarding(_drag_from_slot.bind(s), _can_drop_on_slot.bind(s), _drop_on_slot.bind(s))
+		_slot_buttons[slot] = b
 		var v := _card_content(b)
-		v.add_child(_centered(UIKit.label("%s · slot %d" % [String(DraftData.SLOT_ROWS[slot]).capitalize(), slot + 1], 11, UIKit.TEXT_DIM)))
+		v.add_child(_centered(UIKit.label("%s · %d" % [DraftData.slot_row(run.slots, slot).capitalize(), slot + 1], 11, UIKit.TEXT_DIM)))
 		if e.is_empty():
 			v.add_child(_centered(UIKit.label("(empty)", 13, UIKit.TEXT_DIM)))
 		else:
@@ -260,6 +274,28 @@ func _build_board(shopping: bool) -> void:
 				v.add_child(_centered(UIKit.label("◆ " + str(DraftData.TRINKETS[t]["name"]), 11, Color("9fd3ff"))))
 			b.tooltip_text = _unit_tooltip(uid, lvl)
 		_board_row.add_child(b)
+	_apply_slot_styles(shopping)
+
+
+## Border colours: selected slot gold, valid drop/placement targets green.
+func _apply_slot_styles(shopping: bool) -> void:
+	for slot in _slot_buttons:
+		var b: Button = _slot_buttons[slot]
+		if not is_instance_valid(b):
+			continue
+		var border := Color("4a5068")
+		var width := 2
+		if _sel_kind == "board" and _sel_index == slot:
+			border = UIKit.ACCENT
+			width = 4
+		elif shopping and _sel_kind != "" and _slot_is_target(slot):
+			border = UIKit.GOOD
+			width = 3
+		for st in ["normal", "hover", "pressed", "disabled"]:
+			var sb := _card_style(border, width)
+			if st == "hover":
+				sb.bg_color = Color("3d4357")
+			b.add_theme_stylebox_override(st, sb)
 
 
 func _slot_is_target(slot: int) -> bool:
@@ -294,6 +330,7 @@ func _build_shop(shopping: bool) -> void:
 			width = 4
 		var idx: int = i
 		var b := _card(Vector2(118, 150), border, width, func(): _select("unit", idx))
+		b.set_drag_forwarding(_drag_from_shop.bind("unit", idx), Callable(), Callable())
 		var v := _card_content(b)
 		var ic := UIKit.unit_icon(uid, 48)
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -317,6 +354,7 @@ func _build_shop(shopping: bool) -> void:
 			width = 4
 		var idx: int = i
 		var b := _card(Vector2(118, 150), border, width, func(): _select("trinket", idx))
+		b.set_drag_forwarding(_drag_from_shop.bind("trinket", idx), Callable(), Callable())
 		var v := _card_content(b)
 		var ic := UIKit.icon(DraftData.trinket_texture(tid), 44)
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -416,14 +454,20 @@ func _build_standings() -> void:
 		var pb: Dictionary = Party.players[b]
 		if int(pa["wins"]) != int(pb["wins"]):
 			return int(pa["wins"]) > int(pb["wins"])
-		return int(pa["lives"]) > int(pb["lives"]))
+		return int(pa.get("losses", 0)) < int(pb.get("losses", 0)))
+	var use_lives: bool = Party.settings.get("use_lives", true)
 	for id in ids:
 		var p: Dictionary = Party.players[id]
 		var status := ""
 		if bool(p["done"]):
-			status = "#%d %s" % [int(p["place"]), "★" if int(p["wins"]) >= int(Party.settings["wins"]) else "out"]
-		var txt := "%s%s   ♥%d  W%d  %s" % [p["name"], "  (you)" if int(id) == Party.my_id else "", int(p["lives"]), int(p["wins"]), status]
+			status = "#%d %s" % [int(p["place"]), "★" if _finished_on_wins(p) else ("out" if use_lives and int(p["lives"]) <= 0 else "")]
+		var record := ("♥%d  W%d" % [int(p["lives"]), int(p["wins"])]) if use_lives else ("W%d  L%d" % [int(p["wins"]), int(p.get("losses", 0))])
+		var txt := "%s%s   %s  %s" % [p["name"], "  (you)" if int(id) == Party.my_id else "", record, status]
 		_standings.add_child(UIKit.label(txt, 13, UIKit.TEXT_DIM if bool(p["done"]) else Color.WHITE))
+
+
+func _finished_on_wins(p: Dictionary) -> bool:
+	return Party.settings.get("use_wins", true) and int(p["wins"]) >= int(Party.settings["wins"])
 
 
 func _build_log() -> void:
@@ -446,28 +490,100 @@ func _build_overlay() -> void:
 		_overlay_box.add_child(UIKit.label("Match Over", 28, UIKit.ACCENT))
 		for p in Party.placements:
 			var mine := int(p["id"]) == Party.my_id
-			_overlay_box.add_child(UIKit.label("#%d  %s   (%d wins, %d lives)%s" % [int(p["place"]), p["name"], int(p["wins"]), int(p["lives"]), "  ← you" if mine else ""], 16, UIKit.GOOD if mine else Color.WHITE))
-		var my_place := 0
+			_overlay_box.add_child(UIKit.label("#%d  %s   (%d wins, %d losses)%s" % [int(p["place"]), p["name"], int(p["wins"]), int(p.get("losses", 0)), "  ← you" if mine else ""], 16, UIKit.GOOD if mine else Color.WHITE))
 		for p in Party.placements:
 			if int(p["id"]) == Party.my_id:
-				my_place = int(p["place"])
-		if my_place > 0:
-			_overlay_box.add_child(UIKit.label("Rewards added to your collection: gold%s." % (" and a scouting map" if my_place <= maxi(1, ceili(float(Party.placements.size()) / 2.0)) else ""), 13, UIKit.TEXT_DIM))
+				_overlay_box.add_child(UIKit.label("Added to your collection: +%d gold%s" % [int(p.get("gold", 0)), "  +%d scouting map" % int(p["maps"]) if int(p.get("maps", 0)) > 0 else ""], 15, Color("ffd76a")))
 		_overlay_box.add_child(UIKit.button("Back to menu", func(): leave_requested.emit()))
 		return
 	var me := Party.me()
 	if bool(me.get("done", false)):
-		var won := int(me.get("wins", 0)) >= int(Party.settings["wins"])
-		_overlay_box.add_child(UIKit.label("You finished #%d!" % int(me["place"]) if won else "Out of lives. You placed #%d." % int(me["place"]), 22, UIKit.GOOD if won else UIKit.BAD))
+		var out: bool = Party.settings.get("use_lives", true) and int(me.get("lives", 1)) <= 0
+		_overlay_box.add_child(UIKit.label("Out of lives. You placed #%d." % int(me["place"]) if out else "You finished #%d!" % int(me["place"]), 22, UIKit.BAD if out else UIKit.GOOD))
 		_overlay_box.add_child(UIKit.label("Waiting for the remaining players to finish...", 14, UIKit.TEXT_DIM))
 		_overlay_box.add_child(UIKit.button("Leave match", func(): leave_requested.emit()))
 		return
 	if Party.last_outcome >= 0.0:
 		var o := Party.last_outcome
-		var title := "Victory! +1 win" if o >= 1.0 else ("Defeat. -1 life" if o <= 0.0 else "Draw")
+		var loss_text := "Defeat. -1 life" if Party.settings.get("use_lives", true) else "Defeat"
+		var title := "Victory! +1 win" if o >= 1.0 else (loss_text if o <= 0.0 else "Draw")
 		_overlay_box.add_child(UIKit.label(title, 24, UIKit.GOOD if o >= 1.0 else (UIKit.BAD if o <= 0.0 else UIKit.ACCENT)))
 	_overlay_box.add_child(UIKit.label("Waiting for other players...", 18))
 	_overlay_box.add_child(UIKit.label("The next shop opens when everyone has finished their turn or watched their battle.", 13, UIKit.TEXT_DIM))
+
+
+# --- drag and drop ------------------------------------------------------------
+
+func _drag_preview(tex: Texture2D) -> Control:
+	var r := UIKit.icon(tex, 56)
+	r.modulate = Color(1, 1, 1, 0.85)
+	r.position = Vector2(-28, -28)
+	var holder := Control.new()
+	holder.add_child(r)
+	return holder
+
+
+func _drag_from_shop(_at: Vector2, kind: String, index: int) -> Variant:
+	var run := Party.run
+	if run == null or Party.phase != "shop":
+		return null
+	var tex: Texture2D
+	if kind == "unit":
+		if index >= run.shop_units.size():
+			return null
+		tex = GameData.unit_texture(run.shop_units[index]["unit"])
+	else:
+		if index >= run.shop_trinkets.size():
+			return null
+		tex = DraftData.trinket_texture(run.shop_trinkets[index]["trinket"])
+	set_drag_preview(_drag_preview(tex))
+	_sel_kind = kind
+	_sel_index = index
+	_apply_slot_styles(true)
+	return {"src": kind, "index": index}
+
+
+func _drag_from_slot(_at: Vector2, slot: int) -> Variant:
+	var run := Party.run
+	if run == null or Party.phase != "shop" or (run.board[slot] as Dictionary).is_empty():
+		return null
+	set_drag_preview(_drag_preview(GameData.unit_texture(run.board[slot]["unit"])))
+	_sel_kind = "board"
+	_sel_index = slot
+	_apply_slot_styles(true)
+	return {"src": "board", "index": slot}
+
+
+func _can_drop_on_slot(_at: Vector2, data: Variant, slot: int) -> bool:
+	var run := Party.run
+	if run == null or Party.phase != "shop" or typeof(data) != TYPE_DICTIONARY or not data.has("src"):
+		return false
+	var i := int(data["index"])
+	match str(data["src"]):
+		"unit":
+			return i < run.shop_units.size() and run.gold >= DraftData.UNIT_COST and run.can_place_unit(run.shop_units[i]["unit"], slot)
+		"trinket":
+			return i < run.shop_trinkets.size() and run.gold >= DraftData.TRINKET_COST and not (run.board[slot] as Dictionary).is_empty()
+		"board":
+			return i != slot
+	return false
+
+
+func _drop_on_slot(_at: Vector2, data: Variant, slot: int) -> void:
+	# Same path as click-to-select then click-a-slot.
+	_sel_kind = str(data["src"])
+	_sel_index = int(data["index"])
+	_on_slot(slot)
+
+
+func _can_drop_sell(_at: Vector2, data: Variant) -> bool:
+	return Party.phase == "shop" and typeof(data) == TYPE_DICTIONARY and data.get("src", "") == "board"
+
+
+func _drop_sell(_at: Vector2, data: Variant) -> void:
+	_sel_kind = "board"
+	_sel_index = int(data["index"])
+	_on_sell()
 
 
 # --- actions ----------------------------------------------------------------

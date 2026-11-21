@@ -6,6 +6,11 @@ var _wins: SpinBox
 var _lives: SpinBox
 var _max_players: SpinBox
 var _turn_time: SpinBox
+var _use_wins: CheckBox
+var _use_lives: CheckBox
+var _use_timer: CheckBox
+var _slots: OptionButton
+var _max_rounds: SpinBox
 var _server: LineEdit
 var _code: LineEdit
 var _private: CheckBox
@@ -36,19 +41,37 @@ func _ready() -> void:
 	rules.fit_content = true
 	rules.text = """A drafting mode for a group of players. Your collection isn't used: everyone starts from scratch.
 • Each round: [b]%d gold[/b]. Units and trinkets cost [b]%d[/b], reroll [b]%d[/b], freeze items to keep them.
-• Up to [b]%d squads[/b]: slots 1-2 front line, 3-4 middle, 5-6 back. Put a [b]duplicate[/b] on a unit to level it (Lv2 at 3 copies, Lv3 at 6).
+• A board of [b]4, 6 or 8 slots[/b] (match setting): the first slots are the front line, the last the back row. Put a [b]duplicate[/b] on a unit to level it (Lv2 at 3 copies, Lv3 at 6).
 • Every unit has a unique [b]out-of-battle ability[/b]; [b]trinkets[/b] (6 tiers) change how squads fight.
-• The [b]shop tier rises every %d battles[/b]. Battle other players each round: reach the win target, or run out of lives.""" % [DraftData.TURN_GOLD, DraftData.UNIT_COST, DraftData.REROLL_COST, DraftData.BOARD_SLOTS, DraftData.BATTLES_PER_TIER]
+• The [b]shop tier rises every %d battles[/b]. Battle other players each round: reach the win target, or run out of lives.""" % [DraftData.TURN_GOLD, DraftData.UNIT_COST, DraftData.REROLL_COST, DraftData.BATTLES_PER_TIER]
 	lv.add_child(rules)
 
 	lv.add_child(UIKit.label("Match settings (for matches you create)", 16, UIKit.ACCENT))
 	var g := GridContainer.new()
 	g.columns = 4
 	g.add_theme_constant_override("h_separation", 12)
-	_wins = _spin(g, "Wins to win", 1, 30, 10)
-	_lives = _spin(g, "Lives", 1, 20, 5)
+	_use_wins = _check(g, "Win target")
+	_wins = _spin_only(g, 1, 30, 10)
+	_use_lives = _check(g, "Lives")
+	_lives = _spin_only(g, 1, 20, 5)
+	_use_timer = _check(g, "Turn timer (s)")
+	_turn_time = _spin_only(g, 20, 300, 75)
 	_max_players = _spin(g, "Max players", 2, 16, 8)
-	_turn_time = _spin(g, "Turn time (s)", 20, 300, 75)
+	g.add_child(UIKit.label("Board slots", 14))
+	_slots = OptionButton.new()
+	for n in DraftData.BOARD_SIZES:
+		_slots.add_item("%d slots" % n)
+		_slots.set_item_metadata(_slots.item_count - 1, n)
+	_slots.selected = DraftData.BOARD_SIZES.find(DraftData.BOARD_SLOTS)
+	g.add_child(_slots)
+	_max_rounds = _spin(g, "Round limit", 1, 100, 15)
+	_use_wins.toggled.connect(func(on: bool): _wins.editable = on)
+	_use_lives.toggled.connect(func(on: bool):
+		_lives.editable = on
+		_max_rounds.editable = not on)
+	_use_timer.toggled.connect(func(on: bool): _turn_time.editable = on)
+	_max_rounds.editable = false
+	_max_rounds.tooltip_text = "Used when Lives is off: the match ends after this many rounds, ranked by wins."
 	lv.add_child(g)
 
 	# --- Online ---------------------------------------------------------------
@@ -152,8 +175,44 @@ func _spin(grid: GridContainer, text: String, lo: int, hi: int, value: int) -> S
 	return s
 
 
+func _check(grid: GridContainer, text: String) -> CheckBox:
+	var c := CheckBox.new()
+	c.text = text
+	c.button_pressed = true
+	c.tooltip_text = "Untick to turn this rule off."
+	grid.add_child(c)
+	return c
+
+
+func _spin_only(grid: GridContainer, lo: int, hi: int, value: int) -> SpinBox:
+	var s := SpinBox.new()
+	s.min_value = lo
+	s.max_value = hi
+	s.value = value
+	grid.add_child(s)
+	return s
+
+
 func _settings() -> Dictionary:
-	return {"wins": int(_wins.value), "lives": int(_lives.value), "max_players": int(_max_players.value), "turn_time": int(_turn_time.value)}
+	return {
+		"wins": int(_wins.value), "lives": int(_lives.value), "max_players": int(_max_players.value),
+		"turn_time": int(_turn_time.value), "slots": int(_slots.get_item_metadata(_slots.selected)),
+		"use_wins": _use_wins.button_pressed, "use_lives": _use_lives.button_pressed,
+		"use_timer": _use_timer.button_pressed, "max_rounds": int(_max_rounds.value),
+	}
+
+
+## Short description of a match's rules, e.g. "First to 10 wins · 5 lives · 75s turns · 6 slots".
+static func rules_text(s: Dictionary) -> String:
+	var parts: Array = []
+	parts.append("First to %d wins" % int(s.get("wins", 10)) if s.get("use_wins", true) else "No win target")
+	if s.get("use_lives", true):
+		parts.append("%d lives" % int(s.get("lives", 5)))
+	else:
+		parts.append("No lives (ends after %d rounds)" % int(s.get("max_rounds", 15)))
+	parts.append("%ds turns" % int(s.get("turn_time", 75)) if s.get("use_timer", true) else "No turn timer")
+	parts.append("%d slots" % int(s.get("slots", DraftData.BOARD_SLOTS)))
+	return " · ".join(PackedStringArray(parts))
 
 
 func _refresh_conn() -> void:
@@ -176,7 +235,7 @@ func _show_rooms(list: Array) -> void:
 	for r in list:
 		var h := UIKit.hbox(10)
 		h.add_child(UIKit.label("%s's match" % r["name"] if not r["quick"] else "Quick match", 15))
-		h.add_child(UIKit.label("%d/%d players · %d wins · %d lives · %ds turns" % [int(r["players"]), int(r["max"]), int(r["wins"]), int(r["lives"]), int(r["turn_time"])], 12, UIKit.TEXT_DIM))
+		h.add_child(UIKit.label("%d/%d players · %s" % [int(r["players"]), int(r["max"]), rules_text(r.get("settings", {}))], 12, UIKit.TEXT_DIM))
 		h.add_child(UIKit.spacer())
 		var code: String = r["code"]
 		h.add_child(UIKit.button("Join", func(): Party.online_join(Profile.player_name(), code)))
@@ -218,7 +277,7 @@ func _refresh_lobby() -> void:
 		code_row.add_child(UIKit.button("Copy", func(): DisplayServer.clipboard_set(Party.room_code)))
 		_lobby_box.add_child(code_row)
 		_lobby_box.add_child(UIKit.label("Public: anyone can join from Browse" if Party.room_public else "Private: share the code with friends", 12, UIKit.TEXT_DIM))
-	_lobby_box.add_child(UIKit.label("First to %d wins · %d lives · up to %d players · %ds turns" % [int(s["wins"]), int(s["lives"]), int(s["max_players"]), int(s["turn_time"])], 13, UIKit.TEXT_DIM))
+	_lobby_box.add_child(_wrapped("%s · up to %d players" % [rules_text(s), int(s["max_players"])], 13, UIKit.TEXT_DIM))
 	if Party.room_quick and Party.auto_start_msec > 0:
 		@warning_ignore("integer_division")
 		var secs := maxi(0, (Party.auto_start_msec - Time.get_ticks_msec()) / 1000)

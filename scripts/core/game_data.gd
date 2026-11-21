@@ -210,6 +210,15 @@ const REGIONS := {
 const FINDS_PER_EXPEDITION := 3   # units offered per expedition; the player keeps one
 const CHOICE_SHARD_MULT := 2      # shards per pick are doubled since only one of three is kept
 
+## Pity: an expedition is guaranteed to offer a unit of at least this rarity
+## once this many expeditions in a row have gone without one.
+## Legendary pity only fires in regions that have legendary units.
+const PITY := [
+	{"rarity": "rare", "every": 5},
+	{"rarity": "epic", "every": 15},
+	{"rarity": "legendary", "every": 40},
+]
+
 const ROWS := ["front", "middle", "back"]
 
 const STARTER_UNITS := ["goblin", "kobold_slinger", "rat_swarm"]

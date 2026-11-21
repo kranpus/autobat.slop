@@ -246,7 +246,8 @@ func _on_finished(winner: int) -> void:
 	v.add_child(UIKit.label("Enemies defeated: %d / %d" % [killed, sim.start_count[enemy]], 15))
 	v.add_child(UIKit.label("Battle time: %d s" % int(sim.time), 15, UIKit.TEXT_DIM))
 	if mode == "draft":
-		var note := "Win: +1 win toward the goal." if score >= 1.0 else ("Loss: -1 life." if score <= 0.0 else "Draw: no change.")
+		var loss_note := "Loss: -1 life." if config.get("use_lives", true) else "Loss."
+		var note := "Win: +1 win." if score >= 1.0 else (loss_note if score <= 0.0 else "Draw: no change.")
 		v.add_child(UIKit.label(note, 16, title_color))
 	else:
 		v.add_child(UIKit.label("+%d gold" % int(summary["gold"]), 16, Color("ffd76a")))

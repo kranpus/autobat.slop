@@ -8,6 +8,10 @@ services:
     image: autobat-legions-server
     container_name: legion-draft-server
     restart: unless-stopped
+    # Lets you type admin commands: `docker attach legion-draft-server`
+    # (detach again with Ctrl+P then Ctrl+Q; Ctrl+C would stop the server).
+    stdin_open: true
+    tty: true
     ports:
       - "24702:24702/udp"
     environment:

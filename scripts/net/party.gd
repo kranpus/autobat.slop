@@ -23,7 +23,7 @@ signal standings_changed
 signal match_over(placements: Array)
 signal left_match(reason: String)
 
-const GAME_VERSION := "legion-draft-2"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-3"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server
 const DISCOVERY_PORT := 24701
@@ -35,6 +35,8 @@ const MAX_SERVER_PEERS := 1000
 const MAX_ROOMS := 400
 const REQUESTS_PER_SECOND := 30
 const CODE_CHARS := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+const CONFIG_PATH := "user://server_config.json"
+const DEFAULT_REWARDS := {"battle_mult": 1.0, "draft_mult": 1.0, "draft_table": [400, 250, 150, 60]}
 
 enum Role { NONE, SERVER, HOST, CLIENT }
 
@@ -67,6 +69,12 @@ var _names := {}             # peer id -> pname (verified peers)
 var _req_count := {}
 var _req_window := 0
 var _rng := RandomNumberGenerator.new()
+## Gold economy set by the server admin (see console commands). Rooms share
+## this dictionary, so changes apply to matches already in progress.
+var rewards := DEFAULT_REWARDS.duplicate(true)
+var _stdin_thread: Thread
+var _stdin_mutex := Mutex.new()
+var _stdin_lines: Array = []
 var _local_calls := 0        # >0 while the LAN host runs its own request locally
 
 # LAN discovery.
@@ -161,8 +169,141 @@ func start_server(port: int = SERVER_PORT) -> Error:
 	mp.multiplayer_peer = peer
 	role = Role.SERVER
 	my_id = 1
+	_load_config()
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--battle-gold="):
+			rewards["battle_mult"] = maxf(0.0, float(arg.get_slice("=", 1)))
+		elif arg.begins_with("--draft-gold="):
+			rewards["draft_mult"] = maxf(0.0, float(arg.get_slice("=", 1)))
 	_log("Legion Draft server %s listening on UDP port %d" % [GAME_VERSION, port])
+	_log("Gold: battles x%s, draft x%s, draft payouts %s. Type 'help' for commands." % [rewards["battle_mult"], rewards["draft_mult"], rewards["draft_table"]])
+	_stdin_thread = Thread.new()
+	_stdin_thread.start(_read_stdin)
 	return OK
+
+
+# --- server console -----------------------------------------------------------
+
+## Runs on its own thread: reads admin commands typed into the server window.
+func _read_stdin() -> void:
+	while true:
+		var line := OS.read_string_from_stdin().strip_edges()
+		if line == "":
+			OS.delay_msec(200)  # stdin closed or empty line
+			continue
+		_stdin_mutex.lock()
+		_stdin_lines.append(line)
+		_stdin_mutex.unlock()
+
+
+func _poll_console() -> void:
+	if role != Role.SERVER:
+		return
+	_stdin_mutex.lock()
+	var lines := _stdin_lines.duplicate()
+	_stdin_lines.clear()
+	_stdin_mutex.unlock()
+	for line in lines:
+		run_command(line)
+
+
+## Execute one admin command and print the result. Also usable from code/tests.
+func run_command(line: String) -> String:
+	var a := line.strip_edges().split(" ", false)
+	var out := ""
+	if a.is_empty():
+		return out
+	match a[0].to_lower():
+		"help":
+			out = """Commands:
+  status                          players online, open rooms, gold settings
+  rooms                           list rooms
+  gold                            show gold settings
+  gold battle <multiplier>        gold from every battle, e.g. 'gold battle 1.5'
+  gold draft <multiplier>         Legion Draft finishing gold, e.g. 'gold draft 2'
+  gold draft-table <1st> <2nd> <3rd> <rest>   base draft gold by placement
+  gold reset                      back to defaults
+  say <message>                   show a message to every connected player"""
+		"status":
+			out = "%d players online, %d rooms. %s" % [_names.size(), _rooms.size(), _gold_text()]
+		"rooms":
+			var lines: Array = []
+			for c in _rooms:
+				var r: MatchRoom = _rooms[c]
+				lines.append("  %s  %s  %d/%d players  round %d%s" % [c, r.phase, r.players.size(), int(r.settings["max_players"]), r.round_num, "  (quick)" if r.quick else ""])
+			out = "No rooms." if lines.is_empty() else "\n".join(PackedStringArray(lines))
+		"gold":
+			if a.size() == 1:
+				out = _gold_text()
+			elif a[1] == "reset":
+				_set_rewards(DEFAULT_REWARDS.duplicate(true))
+				out = "Gold reset. " + _gold_text()
+			elif a[1] == "battle" and a.size() >= 3 and a[2].is_valid_float():
+				rewards["battle_mult"] = clampf(float(a[2]), 0.0, 100.0)
+				_set_rewards(rewards)
+				out = "Battle gold is now x%s. " % rewards["battle_mult"]
+			elif a[1] == "draft" and a.size() >= 3 and a[2].is_valid_float():
+				rewards["draft_mult"] = clampf(float(a[2]), 0.0, 100.0)
+				_set_rewards(rewards)
+				out = "Draft gold is now x%s. " % rewards["draft_mult"]
+			elif a[1] == "draft-table" and a.size() >= 3:
+				var table: Array = []
+				for i in range(2, a.size()):
+					if a[i].is_valid_int():
+						table.append(clampi(int(a[i]), 0, 1000000))
+				if table.is_empty():
+					out = "Usage: gold draft-table <1st> <2nd> <3rd> <rest>"
+				else:
+					rewards["draft_table"] = table
+					_set_rewards(rewards)
+					out = "Draft payouts are now %s (last value applies to every lower place). " % [table]
+			else:
+				out = "Usage: gold | gold battle <x> | gold draft <x> | gold draft-table <1st> <2nd> ... | gold reset"
+		"say":
+			var msg := line.strip_edges().substr(4).strip_edges().left(200)
+			for id in _names:
+				_deliver(id, "notice", ["[Server] " + msg])
+			out = "Sent: " + msg
+		_:
+			out = "Unknown command '%s'. Type 'help'." % a[0]
+	_log(out)
+	return out
+
+
+func _gold_text() -> String:
+	return "Gold: battles x%s, draft x%s, draft payouts %s." % [rewards["battle_mult"], rewards["draft_mult"], rewards["draft_table"]]
+
+
+## Apply new reward settings: save them and tell every connected player.
+func _set_rewards(new_rewards: Dictionary) -> void:
+	for k in new_rewards:
+		rewards[k] = new_rewards[k]
+	_save_config()
+	for id in _names:
+		_deliver(id, "rewards", [{"battle_mult": rewards["battle_mult"]}])
+
+
+func _load_config() -> void:
+	if not FileAccess.file_exists(CONFIG_PATH):
+		return
+	var f := FileAccess.open(CONFIG_PATH, FileAccess.READ)
+	var parsed = JSON.parse_string(f.get_as_text()) if f else null
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var r: Dictionary = parsed.get("rewards", {})
+	rewards["battle_mult"] = clampf(float(r.get("battle_mult", 1.0)), 0.0, 100.0)
+	rewards["draft_mult"] = clampf(float(r.get("draft_mult", 1.0)), 0.0, 100.0)
+	var table: Array = []
+	for v in r.get("draft_table", DEFAULT_REWARDS["draft_table"]):
+		table.append(clampi(int(v), 0, 1000000))
+	if not table.is_empty():
+		rewards["draft_table"] = table
+
+
+func _save_config() -> void:
+	var f := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
+	if f:
+		f.store_string(JSON.stringify({"rewards": rewards}, "\t"))
 
 
 func _log(text: String) -> void:
@@ -365,7 +506,7 @@ func _rq_hello(pname: String, version: String) -> void:
 			_deliver(id, "kicked", [err])
 		return
 	_log("%s connected (%d online)" % [_names[id], _names.size()])
-	_deliver(id, "welcome", [{"rooms": _rooms.size(), "players": _names.size()}])
+	_deliver(id, "welcome", [{"rooms": _rooms.size(), "players": _names.size(), "rewards": {"battle_mult": rewards["battle_mult"]}}])
 
 
 @rpc("any_peer", "reliable")
@@ -513,6 +654,7 @@ func _create_room(code: String, new_settings: Dictionary, is_public: bool, quick
 			if not _rooms.has(code):
 				break
 	var r := MatchRoom.new(code, new_settings, is_public, quick)
+	r.rewards = rewards
 	r.outbox.connect(_deliver)
 	r.room_log.connect(_log)
 	_rooms[code] = r
@@ -587,6 +729,7 @@ func _cleanup_rooms() -> void:
 @rpc("authority", "reliable")
 func _rc_welcome(info: Dictionary) -> void:
 	phase = "online"
+	_rc_rewards(info.get("rewards", {}))
 	status.emit("Connected to the server (%d players online, %d matches)." % [int(info.get("players", 0)), int(info.get("rooms", 0))])
 	online_changed.emit()
 	lobby_changed.emit()
@@ -594,6 +737,20 @@ func _rc_welcome(info: Dictionary) -> void:
 		var req := _pending_online
 		_pending_online = []
 		_send_request(req)
+
+
+## The server's gold settings for battles; kept in the profile so the
+## economy the server admin chose applies to all your battles.
+@rpc("authority", "reliable")
+func _rc_rewards(r: Dictionary) -> void:
+	if r.has("battle_mult"):
+		Profile.data["server_rewards"] = {"battle_mult": clampf(float(r["battle_mult"]), 0.0, 100.0)}
+		Profile.save()
+
+
+@rpc("authority", "reliable")
+func _rc_notice(text: String) -> void:
+	status.emit(text.left(220))
 
 
 @rpc("authority", "reliable")
@@ -642,8 +799,8 @@ func _rc_match_start(new_settings: Dictionary, new_players: Dictionary) -> void:
 	stop_search()
 	settings = new_settings
 	players = new_players
-	run = DraftRun.new()
-	run.lives = int(settings["lives"])
+	run = DraftRun.new(0, int(settings.get("slots", DraftData.BOARD_SLOTS)))
+	run.lives = int(settings["lives"]) if settings.get("use_lives", true) else 0
 	placements = []
 	phase = "waiting"
 	match_started.emit()
@@ -652,7 +809,7 @@ func _rc_match_start(new_settings: Dictionary, new_players: Dictionary) -> void:
 @rpc("authority", "reliable")
 func _rc_shop(r: int, seconds: int, state: Dictionary) -> void:
 	round_num = r
-	turn_deadline_msec = Time.get_ticks_msec() + seconds * 1000
+	turn_deadline_msec = Time.get_ticks_msec() + seconds * 1000 if seconds > 0 else 0
 	last_outcome = -1.0
 	if state.is_empty() or run == null:
 		phase = "waiting"
@@ -720,12 +877,9 @@ func _rc_standings(new_players: Dictionary) -> void:
 func _rc_over(list: Array) -> void:
 	placements = list
 	phase = "over"
-	var place := 0
 	for p in list:
-		if int(p["id"]) == my_id:
-			place = int(p["place"])
-	if place > 0:
-		Profile.apply_draft_result(place, list.size())
+		if int(p["id"]) == my_id and int(p["place"]) > 0:
+			Profile.add_draft_reward(int(p.get("gold", 0)), int(p.get("maps", 0)), int(p["place"]))
 	match_over.emit(list)
 
 
@@ -830,6 +984,7 @@ func _send_beacon(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	mp.poll()
+	_poll_console()
 	_poll_discovery(delta)
 	if _authority():
 		for c in _rooms.keys():

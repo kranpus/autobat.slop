@@ -5,6 +5,7 @@ extends VBoxContainer
 ## unit means choosing where to look.
 
 var _list: VBoxContainer
+var _pity_label: RichTextLabel
 var _banner: PanelContainer
 var _choice_popup: PopupPanel
 var _choice_box: VBoxContainer
@@ -17,6 +18,11 @@ func _ready() -> void:
 	var intro := UIKit.label("Send scouts into a region. They return with %d different units from that region. Read their descriptions and recruit ONE: a new unit joins your collection, a unit you already own gives shards for squad upgrades. Maps refill over time and from ranked wins." % GameData.FINDS_PER_EXPEDITION, 14, UIKit.TEXT_DIM)
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(intro)
+	_pity_label = RichTextLabel.new()
+	_pity_label.bbcode_enabled = true
+	_pity_label.fit_content = true
+	_pity_label.scroll_active = false
+	add_child(_pity_label)
 
 	# Shown while a recruit choice is waiting (e.g. the window was closed).
 	_banner = UIKit.panel(Color("4a3a14"))
@@ -56,6 +62,13 @@ func refresh() -> void:
 	if not is_inside_tree():
 		return
 	_banner.visible = Profile.has_pending_choice()
+	var parts: Array = []
+	for rule in GameData.PITY:
+		var r: String = rule["rarity"]
+		var left := Profile.pity_remaining(r)
+		var when := "on your NEXT expedition" if left <= 1 else "within %d expeditions" % left
+		parts.append("[color=#%s]%s%s[/color] %s" % [GameData.RARITIES[r]["color"], GameData.RARITIES[r]["name"], "" if r == "legendary" else "+", when])
+	_pity_label.text = "[b]Guaranteed pulls:[/b]  " + "   ·   ".join(PackedStringArray(parts)) + "  [color=#9aa0b0](Legendary only counts in regions that have them)[/color]"
 	UIKit.clear(_list)
 	for rid in GameData.REGIONS:
 		_list.add_child(_make_region(rid))
@@ -129,14 +142,14 @@ func _show_choice() -> void:
 	var best_rarity := 0
 	for i in pc["options"].size():
 		var opt: Dictionary = pc["options"][i]
-		row.add_child(_make_choice_card(i, opt["unit"], int(opt["shards"])))
+		row.add_child(_make_choice_card(i, opt["unit"], int(opt["shards"]), bool(opt.get("guaranteed", false))))
 		best_rarity = maxi(best_rarity, int(GameData.RARITIES[GameData.UNITS[opt["unit"]]["rarity"]]["order"]))
 	if best_rarity >= 3:
 		Audio.play_sfx("roar")
 	_choice_popup.popup_centered(Vector2i(980, 520))
 
 
-func _make_choice_card(index: int, id: String, shards: int) -> Control:
+func _make_choice_card(index: int, id: String, shards: int, guaranteed: bool = false) -> Control:
 	var def: Dictionary = GameData.UNITS[id]
 	var color := GameData.rarity_color(def["rarity"])
 	var owned := Profile.owns(id)
@@ -151,6 +164,8 @@ func _make_choice_card(index: int, id: String, shards: int) -> Control:
 	var hv := UIKit.vbox(2)
 	hv.add_child(UIKit.label(def["name"], 18, color))
 	hv.add_child(UIKit.label("%s %s" % [GameData.RARITIES[def["rarity"]]["name"], String(def["role"]).capitalize()], 13, UIKit.TEXT_DIM))
+	if guaranteed:
+		v.add_child(UIKit.label("★ GUARANTEED PULL", 13, UIKit.ACCENT))
 	if owned:
 		var u := Profile.unit(id)
 		hv.add_child(UIKit.label("Owned: Lv %d, squad x%d" % [int(u["level"]), Profile.squad_size(id)], 13, UIKit.TEXT_DIM))

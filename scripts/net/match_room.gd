@@ -19,7 +19,9 @@ const BOT_NAMES := ["Grimtooth", "Lady Ash", "Old Borin", "Vex", "Captain Rook",
 var code := ""
 var public := true
 var quick := false                    # created by Quick Match: auto-starts, fills with bots
-var settings := {"wins": 10, "lives": 5, "max_players": 8, "turn_time": 75}
+var settings := {}
+## Gold paid out at the end of the match; shared with (and editable from) the server.
+var rewards := {"draft_mult": 1.0, "draft_table": [400, 250, 150, 60]}
 var players := {}                     # id -> {name, bot, ready, lives, wins, done, place}
 var owner_id := 0
 var phase := "lobby"                  # lobby, shop, sim, viewing, over
@@ -49,12 +51,19 @@ func _init(room_code: String, room_settings: Dictionary, is_public: bool, is_qui
 	_rng.randomize()
 
 
+## use_lives / use_wins / use_timer can switch those rules off. Without
+## lives the match ends after max_rounds (ranked by wins, then fewest losses).
 static func clean_settings(s: Dictionary) -> Dictionary:
 	return {
 		"wins": clampi(int(s.get("wins", 10)), 1, 30),
 		"lives": clampi(int(s.get("lives", 5)), 1, 20),
 		"max_players": clampi(int(s.get("max_players", 8)), 2, 16),
 		"turn_time": clampi(int(s.get("turn_time", 75)), 20, 300),
+		"slots": DraftData.valid_slots(int(s.get("slots", DraftData.BOARD_SLOTS))),
+		"use_lives": bool(s.get("use_lives", true)),
+		"use_wins": bool(s.get("use_wins", true)),
+		"use_timer": bool(s.get("use_timer", true)),
+		"max_rounds": clampi(int(s.get("max_rounds", 15)), 1, 100),
 	}
 
 
@@ -90,7 +99,7 @@ func info() -> Dictionary:
 	if players.has(owner_id):
 		host_name = str(players[owner_id]["name"])
 	return {"code": code, "name": host_name, "players": players.size(), "max": settings["max_players"],
-		"wins": settings["wins"], "lives": settings["lives"], "turn_time": settings["turn_time"], "quick": quick}
+		"settings": settings, "quick": quick}
 
 
 func lobby_state() -> Dictionary:
@@ -150,7 +159,7 @@ func remove_player(id: int) -> void:
 
 
 func _new_player(player_name: String, bot: bool) -> Dictionary:
-	return {"name": player_name, "bot": bot, "ready": bot, "lives": 0, "wins": 0, "done": false, "place": 0}
+	return {"name": player_name, "bot": bot, "ready": bot, "lives": 0, "wins": 0, "losses": 0, "done": false, "place": 0}
 
 
 func set_ready(id: int, is_ready: bool) -> void:
@@ -223,12 +232,13 @@ func start(by_id: int) -> void:
 	_runs.clear()
 	for id in players:
 		var p: Dictionary = players[id]
-		p["lives"] = int(settings["lives"])
+		p["lives"] = int(settings["lives"]) if settings["use_lives"] else 0
 		p["wins"] = 0
+		p["losses"] = 0
 		p["done"] = false
 		p["place"] = 0
-		var r := DraftRun.new(_rng.randi() | 1)
-		r.lives = int(settings["lives"])
+		var r := DraftRun.new(_rng.randi() | 1, int(settings["slots"]))
+		r.lives = int(p["lives"])
 		_runs[id] = r
 	room_log.emit("Room %s started with %d players" % [code, players.size()])
 	_send_all("match_start", [settings, players])
@@ -248,7 +258,7 @@ func _begin_shop() -> void:
 	round_num += 1
 	_submitted.clear()
 	_shop_ready.clear()
-	_deadline = Time.get_ticks_msec() + int(settings["turn_time"]) * 1000
+	_deadline = Time.get_ticks_msec() + int(settings["turn_time"]) * 1000 if settings["use_timer"] else 0
 	phase = "shop"
 	for id in _active_ids():
 		var r: DraftRun = _runs[id]
@@ -261,7 +271,7 @@ func _begin_shop() -> void:
 		if p["bot"]:
 			continue
 		var state: Dictionary = (_runs[id] as DraftRun).to_dict() if not p["done"] else {}
-		_send(id, "shop", [round_num, int(settings["turn_time"]), state])
+		_send(id, "shop", [round_num, int(settings["turn_time"]) if settings["use_timer"] else 0, state])
 
 
 ## A player's shop action, replayed on the authoritative run.
@@ -301,7 +311,7 @@ func process() -> void:
 					break
 			if not waiting:
 				_start_battles()
-			elif now >= _deadline:
+			elif _deadline > 0 and now >= _deadline:
 				for id in _active_ids():
 					if not _submitted.has(id):
 						_end_turn_for(id)
@@ -360,7 +370,7 @@ func _queue_battle(a: int, b: int, ghost: bool) -> void:
 	var task := WorkerThreadPool.add_task(sim.run_to_end.bind(200000), false, "draft battle")
 	_sims.append({"task": task, "sim": sim, "a": a, "b": b, "ghost": ghost})
 	var cfg := {
-		"mode": "draft", "round": round_num, "seed": seed_value, "map": map,
+		"mode": "draft", "round": round_num, "seed": seed_value, "map": map, "use_lives": settings["use_lives"],
 		"squads_a": sq_a, "squads_b": sq_b,
 		"name_a": players[a]["name"], "name_b": str(players[b]["name"]) + (" (copy)" if ghost else ""),
 	}
@@ -389,11 +399,13 @@ func _finish_battles() -> void:
 		if outcome[id] >= 1.0:
 			p["wins"] = int(p["wins"]) + 1
 		elif outcome[id] <= 0.0:
-			p["lives"] = int(p["lives"]) - 1
+			p["losses"] = int(p["losses"]) + 1
+			if settings["use_lives"]:
+				p["lives"] = int(p["lives"]) - 1
 		(_runs[id] as DraftRun).apply_battle_result(outcome[id], int(p["lives"]), int(p["wins"]))
-		if int(p["wins"]) >= int(settings["wins"]):
+		if settings["use_wins"] and int(p["wins"]) >= int(settings["wins"]):
 			winners.append(id)
-		elif int(p["lives"]) <= 0:
+		elif settings["use_lives"] and int(p["lives"]) <= 0:
 			losers.append(id)
 	winners.sort_custom(func(x, y): return int(players[x]["lives"]) > int(players[y]["lives"]))
 	for id in winners:
@@ -406,13 +418,23 @@ func _finish_battles() -> void:
 		players[id]["place"] = _next_bottom
 		_next_bottom -= 1
 	var active := _active_ids()
-	if active.size() == 1:
+	if not settings["use_lives"] and round_num >= int(settings["max_rounds"]):
+		# Round limit reached: rank everyone still playing by wins, then fewest losses.
+		active.sort_custom(func(x, y):
+			if int(players[x]["wins"]) != int(players[y]["wins"]):
+				return int(players[x]["wins"]) > int(players[y]["wins"])
+			return int(players[x]["losses"]) < int(players[y]["losses"]))
+		for id in active:
+			players[id]["done"] = true
+			players[id]["place"] = _next_top
+			_next_top += 1
+	elif active.size() == 1:
 		players[active[0]]["done"] = true
 		players[active[0]]["place"] = _next_top
 		_next_top += 1
 	for id in outcome:
 		var p: Dictionary = players[id]
-		_send(id, "results", [{"round": round_num, "outcome": outcome[id], "lives": p["lives"], "wins": p["wins"], "done": p["done"], "place": p["place"]}, players])
+		_send(id, "results", [{"round": round_num, "outcome": outcome[id], "lives": p["lives"], "wins": p["wins"], "losses": p["losses"], "done": p["done"], "place": p["place"]}, players])
 	_send_all("standings", [players])
 	if _active_ids().is_empty():
 		_end_match()
@@ -425,9 +447,14 @@ func _end_match() -> void:
 	phase = "over"
 	over_msec = Time.get_ticks_msec()
 	var list: Array = []
+	var table: Array = rewards.get("draft_table", [400, 250, 150, 60])
+	var top_half := maxi(1, ceili(float(players.size()) / 2.0))
 	for id in players:
 		var p: Dictionary = players[id]
-		list.append({"id": id, "name": p["name"], "place": p["place"], "wins": p["wins"], "lives": p["lives"], "bot": p["bot"]})
+		var place := int(p["place"])
+		var base := int(table[clampi(place - 1, 0, table.size() - 1)]) if not table.is_empty() else 0
+		list.append({"id": id, "name": p["name"], "place": place, "wins": p["wins"], "lives": p["lives"], "losses": p["losses"], "bot": p["bot"],
+			"gold": maxi(0, roundi(float(base) * float(rewards.get("draft_mult", 1.0)))), "maps": 1 if place <= top_half else 0})
 	list.sort_custom(func(x, y): return int(x["place"]) < int(y["place"]))
 	room_log.emit("Room %s finished; winner %s" % [code, list[0]["name"] if not list.is_empty() else "-"])
 	_send_all("over", [list])

@@ -193,6 +193,33 @@ journalctl -u legion-draft -f
 
 ---
 
+## Admin commands (gold rewards)
+
+Type these into the server window (the console that `start_server_windows.bat` or
+`run_local.sh` opens). For Docker, run `docker attach legion-draft-server` to type them; press
+Ctrl+P then Ctrl+Q to detach again.
+
+| Command | What it does |
+|---|---|
+| `help` | List all commands. |
+| `status` | Players online, open rooms, current gold settings. |
+| `rooms` | List rooms with their phase and player count. |
+| `gold` | Show the gold settings. |
+| `gold battle 1.5` | Multiply the gold players earn at the end of every battle (1 = normal, 2 = double). |
+| `gold draft 2` | Multiply the gold paid when a Legion Draft match ends. |
+| `gold draft-table 500 300 200 100` | Base Legion Draft payout for 1st, 2nd, 3rd…; the last number applies to every lower place. |
+| `gold reset` | Back to the defaults (x1, x1, 400/250/150/60). |
+| `say Server restarting in 5 minutes` | Show a message to every connected player. |
+
+Notes:
+- **Settings persist:** they're saved to `server_config.json` in the server's Godot user data
+  folder and survive restarts.
+- **Draft payouts** are calculated by the server and apply to matches still in progress.
+- **The battle multiplier** is sent to players when they connect and whenever you change it.
+  Their game remembers it, so it applies to all their battles.
+- **Startup flags:** you can also set values when starting the server, e.g.
+  `-- --server --battle-gold=1.5 --draft-gold=2`. These override the saved file for that run.
+
 ## Operating notes
 
 - **Logs:** each join, room start, room finish and disconnect is printed with a timestamp.

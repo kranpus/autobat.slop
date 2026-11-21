@@ -106,7 +106,8 @@ func _on_shop(r: int, _s: int) -> void:
 func _on_over(list: Array) -> void:
 	done = true
 	for p in list:
-		print("[%s] final #%d %s (%d wins, %d lives)" % [player, int(p["place"]), p["name"], int(p["wins"]), int(p["lives"])])
+		print("[%s] final #%d %s (%d wins, %d losses) +%d gold" % [player, int(p["place"]), p["name"], int(p["wins"]), int(p.get("losses", 0)), int(p.get("gold", 0))])
+	print("[%s] server battle gold multiplier: x%s" % [player, root.get_node("Profile").battle_gold_mult()])
 	quit(0)
 
 

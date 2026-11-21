@@ -12,7 +12,9 @@ const MAX_MAPS := 10
 var data: Dictionary = {}
 
 
-func _ready() -> void:
+## Load as soon as the autoload is created, so the profile is usable even
+## before the scene tree is ready (e.g. from tool or test scripts).
+func _init() -> void:
 	load_profile()
 
 
@@ -88,7 +90,7 @@ func _sanitize() -> void:
 		var opts: Array = []
 		for o in pc["options"]:
 			if typeof(o) == TYPE_DICTIONARY and GameData.UNITS.has(str(o.get("unit", ""))):
-				opts.append({"unit": str(o["unit"]), "shards": int(o.get("shards", 1))})
+				opts.append({"unit": str(o["unit"]), "shards": int(o.get("shards", 1)), "guaranteed": bool(o.get("guaranteed", false))})
 		if not opts.is_empty():
 			clean_pc = {"region": str(pc.get("region", "")), "options": opts, "gold": int(pc.get("gold", 0))}
 	data["pending_choice"] = clean_pc
@@ -231,18 +233,88 @@ func explore(region_id: String) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var pool: Dictionary = (region["drops"] as Dictionary).duplicate()
-	var options: Array = []
+	var picks: Array = []
 	for _i in mini(GameData.FINDS_PER_EXPEDITION, pool.size()):
 		var picked := _weighted_pick(pool, rng)
 		pool.erase(picked)
+		picks.append(picked)
+	var guaranteed := _apply_pity(region_id, picks, rng)
+	var options: Array = []
+	for picked in picks:
 		var range_: Array = GameData.RARITIES[GameData.UNITS[picked]["rarity"]]["find_shards"]
 		var shards := rng.randi_range(int(range_[0]), int(range_[1])) * int(region["cost_maps"]) * GameData.CHOICE_SHARD_MULT
-		options.append({"unit": picked, "shards": shards})
+		options.append({"unit": picked, "shards": shards, "guaranteed": picked == guaranteed})
 	var gold_found := rng.randi_range(15, 45) * int(region["cost_maps"])
 	data["gold"] = gold() + gold_found
 	data["pending_choice"] = {"region": region_id, "options": options, "gold": gold_found}
 	save()
 	return pending_choice()
+
+
+func _rarity_order(unit_id: String) -> int:
+	return int(GameData.RARITIES[GameData.UNITS[unit_id]["rarity"]]["order"])
+
+
+## Expeditions since an offer last contained `rarity` or better.
+func pity_count(rarity: String) -> int:
+	return int(data.get("pity", {}).get(rarity, 0))
+
+
+## How many more expeditions until `rarity`+ is guaranteed (1 = the next one).
+func pity_remaining(rarity: String) -> int:
+	for p in GameData.PITY:
+		if p["rarity"] == rarity:
+			return maxi(1, int(p["every"]) - pity_count(rarity))
+	return -1
+
+
+## Force rarer units into the offer when a pity counter is due, then update
+## the counters. Returns the unit that was guaranteed ("" if none).
+func _apply_pity(region_id: String, picks: Array, rng: RandomNumberGenerator) -> String:
+	var drops: Dictionary = GameData.REGIONS[region_id]["drops"]
+	var pity: Dictionary = data.get("pity", {})
+	var guaranteed := ""
+	# Highest tier first, so one forced legendary also satisfies rare/epic.
+	for k in range(GameData.PITY.size() - 1, -1, -1):
+		var rule: Dictionary = GameData.PITY[k]
+		var need := int(GameData.RARITIES[rule["rarity"]]["order"])
+		if int(pity.get(rule["rarity"], 0)) + 1 < int(rule["every"]):
+			continue
+		var has := false
+		for u in picks:
+			if _rarity_order(u) >= need:
+				has = true
+		if has:
+			continue
+		var candidates := {}
+		for u in drops:
+			if _rarity_order(u) >= need and u not in picks:
+				candidates[u] = drops[u]
+		if candidates.is_empty():
+			continue  # this region has nothing that rare; keep the counter
+		# Replace the most common unit in the offer.
+		var worst := 0
+		for i in picks.size():
+			if _rarity_order(picks[i]) < _rarity_order(picks[worst]):
+				worst = i
+		picks[worst] = _weighted_pick(candidates, rng)
+		if guaranteed == "":
+			guaranteed = picks[worst]
+	var best := 0
+	for u in picks:
+		best = maxi(best, _rarity_order(u))
+	for rule in GameData.PITY:
+		var r: String = rule["rarity"]
+		var region_has := false
+		for u in drops:
+			if _rarity_order(u) >= int(GameData.RARITIES[r]["order"]):
+				region_has = true
+		if best >= int(GameData.RARITIES[r]["order"]):
+			pity[r] = 0
+		elif region_has:
+			pity[r] = int(pity.get(r, 0)) + 1
+	data["pity"] = pity
+	return guaranteed
 
 
 ## Take option `index` from the pending choice. Returns {unit, shards, new}.
@@ -342,6 +414,7 @@ func apply_battle_result(mode: String, score: float, opp_rating: int, enemy_kill
 			g += 30
 		else:
 			g += 60
+	g = roundi(float(g) * battle_gold_mult())
 	data["gold"] = gold() + g
 	data["maps"] = int(data["maps"]) + int(summary["maps"])
 	summary["gold"] = g
@@ -349,17 +422,16 @@ func apply_battle_result(mode: String, score: float, opp_rating: int, enemy_kill
 	return summary
 
 
-## Rewards for finishing a Legion Draft match. Returns {"gold", "maps"}.
-func apply_draft_result(place: int, player_count: int) -> Dictionary:
-	var gold_reward := 60
-	match place:
-		1:
-			gold_reward = 400
-		2:
-			gold_reward = 250
-		3:
-			gold_reward = 150
-	var maps_reward := 1 if place <= maxi(1, ceili(float(player_count) / 2.0)) else 0
+## Gold multiplier for battles, set by the Legion Draft server admin.
+func battle_gold_mult() -> float:
+	return float(data.get("server_rewards", {}).get("battle_mult", 1.0))
+
+
+## Rewards for finishing a Legion Draft match. The amounts come from the
+## match host / server (so the server admin controls them).
+func add_draft_reward(gold_reward: int, maps_reward: int, place: int) -> Dictionary:
+	gold_reward = maxi(0, gold_reward)
+	maps_reward = clampi(maps_reward, 0, 5)
 	data["gold"] = gold() + gold_reward
 	data["maps"] = int(data["maps"]) + maps_reward
 	data["draft_played"] = int(data.get("draft_played", 0)) + 1

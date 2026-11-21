@@ -29,6 +29,10 @@ The first time it opens, the editor imports the assets, which takes a few second
    specific unit you pick where to look (e.g. Golden Dragons only appear in Dragon Peaks); the
    region card shows each unit's chance to be offered. The choice is saved, so closing the game
    doesn't reroll it. Maps refill (1 per 10 minutes, max 10) and ranked wins award more.
+   **Guaranteed pulls:** if 4 expeditions in a row offered nothing Rare or better, the 5th
+   is guaranteed to include one. Epic or better is guaranteed every 15 expeditions, and
+   Legendary every 40 (counting only regions that have legendaries). The tab shows the
+   countdowns, and the guaranteed unit is marked on its card.
 2. **Level up: Collection tab.** Spend gold to raise a unit's level (+8% HP and damage per level).
 3. **Increase quantity: Collection tab.** Spend shards and gold to raise the squad tier, which
    adds units to the squad. Each tier also raises the level cap by 4.
@@ -58,9 +62,14 @@ A separate mode for a group of players, picked from the **Legion Draft** tab. It
 collection: everyone drafts an army from scratch each match.
 
 - **Shop rounds:** each round you get 10 gold. Units and trinkets cost 3, rerolling costs 1, and
-  frozen items stay in the shop for the next round. Click a shop item, then click a board slot.
-- **Board:** 6 slots. Slots 1–2 are the front line, 3–4 the middle and 5–6 the back. Click a
-  unit, then another slot, to move or swap it.
+  frozen items stay in the shop for the next round.
+- **Drag and drop:** drag shop units and trinkets onto your board. Drag a unit to another slot
+  to move or swap it, onto a matching unit to merge, or onto **Sell**. Valid slots light up
+  green while you drag. Clicking an item and then a slot also works.
+- **Board:** 4, 6 or 8 slots, chosen when the match is created.
+  - 4 slots: 2 front line, 2 back row.
+  - 6 slots: 2 front, 2 middle, 2 back.
+  - 8 slots: 3 front, 2 middle, 3 back.
 - **Duplicates level up:** drop a copy onto the same unit, or merge two board units. Lv2 needs 3
   copies and Lv3 needs 6. Each level makes the squad bigger (common: 16 → 32 → 48 units) and
   stronger (+40% per level).
@@ -75,7 +84,13 @@ collection: everyone drafts an army from scratch each match.
   and 5 legendary, and each tier adds stronger trinkets and more shop slots.
 - **Matches:** after each shop phase, players are paired against each other; an odd player out
   fights a copy of another player's army. Play until you hit the win target (default 10) or run
-  out of lives (default 5). Final placings award gold and scouting maps in the main game.
+  out of lives (default 5). Final placings award gold and scouting maps in the main game; the
+  amounts are set by the server (see the admin commands in HOSTING.md).
+- **Rule toggles:** when creating a match you can switch off the **win target**, the **lives**
+  and the **turn timer**.
+  - Without lives, nobody is knocked out and the match ends after a **round limit**, ranked by
+    wins, then fewest losses.
+  - Without a timer, each shop phase waits until everyone presses End Turn.
 - **Online play:** this uses the matchmaking server; see **[HOSTING.md](HOSTING.md)** for how
   to run your own. On a home Windows PC, run `server\start_server_windows.bat`.
   - **Quick Match** joins an open room. Rooms start on their own and fill empty seats with bots.

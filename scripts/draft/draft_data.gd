@@ -3,7 +3,8 @@ extends RefCounted
 ## Rules and content for the Legion Draft game mode: shop economy, unit
 ## abilities (out-of-battle effects) and trinkets.
 
-const BOARD_SLOTS := 6
+const BOARD_SLOTS := 6                           # default board size
+const BOARD_SIZES := [4, 6, 8]                   # selectable per match
 const TURN_GOLD := 10
 const UNIT_COST := 3
 const TRINKET_COST := 3
@@ -23,8 +24,21 @@ const LEVEL_COUNT_MULT := [1.0, 2.0, 3.0]
 ## Battle stat level used for draft levels 1/2/3 (+0%, +40%, +88%).
 const LEVEL_SIM_LEVEL := [1, 6, 12]
 
-## Board slot -> battle row. Slots 0-1 are the front line.
-const SLOT_ROWS := ["front", "front", "middle", "middle", "back", "back"]
+## Board slot -> battle row for each board size. Slot 0 is always front line.
+const ROW_LAYOUTS := {
+	4: ["front", "front", "back", "back"],
+	6: ["front", "front", "middle", "middle", "back", "back"],
+	8: ["front", "front", "front", "middle", "middle", "back", "back", "back"],
+}
+
+
+static func valid_slots(n: int) -> int:
+	return n if n in BOARD_SIZES else BOARD_SLOTS
+
+
+static func slot_row(slots: int, i: int) -> String:
+	var layout: Array = ROW_LAYOUTS[valid_slots(slots)]
+	return layout[clampi(i, 0, layout.size() - 1)]
 
 # --- Unit abilities ---------------------------------------------------------
 # trigger: buy, sell, level_up, turn_start, turn_end, trinket, ally_sold,
@@ -171,7 +185,7 @@ static func board_to_squads(board: Array) -> Array:
 			"unit": e["unit"],
 			"level": LEVEL_SIM_LEVEL[entry_level(e) - 1],
 			"tier": 0,
-			"row": SLOT_ROWS[mini(i, SLOT_ROWS.size() - 1)],
+			"row": slot_row(board.size(), i),
 			"count": entry_count(e),
 			"mods": entry_mods(e),
 		})
@@ -179,13 +193,14 @@ static func board_to_squads(board: Array) -> Array:
 
 
 ## Validate a board received over the network.
-static func sanitize_board(raw) -> Array:
+static func sanitize_board(raw, slots: int = BOARD_SLOTS) -> Array:
+	slots = valid_slots(slots)
 	var out: Array = []
-	for i in BOARD_SLOTS:
+	for i in slots:
 		out.append({})
 	if typeof(raw) != TYPE_ARRAY:
 		return out
-	for i in mini(BOARD_SLOTS, raw.size()):
+	for i in mini(slots, raw.size()):
 		var e = raw[i]
 		if typeof(e) != TYPE_DICTIONARY or not GameData.UNITS.has(str(e.get("unit", ""))):
 			continue
