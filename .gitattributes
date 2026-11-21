@@ -3,3 +3,4 @@
 *.ogg binary
 *.wav binary
 *.mp3 binary
+*.bat text eol=crlf

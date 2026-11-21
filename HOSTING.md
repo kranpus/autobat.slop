@@ -33,6 +33,37 @@ which starts 30 seconds after the second player joins.
 
 ---
 
+## Run it on your home Windows PC (players in the same house)
+
+1. **Get the game files** onto the PC: on GitHub open the repository, switch to the branch with
+   this code, then **Code → Download ZIP** and unzip it (or use `git clone`).
+2. **Get Godot 4.3:** from <https://godotengine.org/download/archive/4.3-stable/> download
+   *Windows 64-bit* and unzip it. Copy `Godot_v4.3-stable_win64_console.exe` into the game's
+   `server` folder.
+3. **Allow it through the firewall (once):** right-click `server\allow_firewall_windows.bat` and
+   choose **Run as administrator**. Make sure your home network is set to **Private**
+   (Settings → Network & internet → your Wi-Fi/Ethernet → Network profile type). If Windows
+   later asks whether Godot may use the network, tick **Private networks** and allow it.
+4. **Start the server:** double-click `server\start_server_windows.bat`. The first time, it
+   imports the project (about a minute). It then shows this PC's address, for example
+   `192.168.1.23`, and `Legion Draft server ... listening on UDP port 24702`. Keep the window open
+   while people play; closing it stops the server.
+5. **Play:**
+   - **On the same PC:** open the game, go to **Legion Draft → Online**, keep Server set to
+     `localhost`, and press **Quick Match**.
+   - **On other computers in the house:** set Server to the address the start script showed,
+     e.g. `192.168.1.23`.
+
+   Players in the same Quick Match room are put together; empty seats get bots.
+
+Tips:
+- **If the PC's address changes** after a reboot, give it a fixed address in your router
+  ("DHCP reservation").
+- **Other computers need the game too.** Either open the same project in Godot and press F5, or
+  export a Windows build (Project → Export; Godot will offer to download export templates).
+- **Playing outside the house** later needs a port forward of UDP 24702 on your router to this
+  PC, and friends connect to your public IP.
+
 ## 2. Pick a host
 
 Any Linux machine with a public IP that allows UDP works. A small VPS is the simplest:

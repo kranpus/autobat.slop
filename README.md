@@ -77,7 +77,7 @@ collection: everyone drafts an army from scratch each match.
   fights a copy of another player's army. Play until you hit the win target (default 10) or run
   out of lives (default 5). Final placings award gold and scouting maps in the main game.
 - **Online play:** this uses the matchmaking server; see **[HOSTING.md](HOSTING.md)** for how
-  to run your own.
+  to run your own. On a home Windows PC, run `server\start_server_windows.bat`.
   - **Quick Match** joins an open room. Rooms start on their own and fill empty seats with bots.
   - **Create Match** makes a public room or a private one with a 5-letter code.
   - **Browse** lists public rooms, and you can join any room by its code.
