@@ -225,6 +225,11 @@ Notes:
 - **Draft payouts** are calculated by the server and apply to matches still in progress.
 - **The battle multiplier** is sent to players when they connect and whenever you change it.
   Their game remembers it, so it applies to all their battles.
+- **Unlocking a unit also unlocks the expedition region(s) it drops in,** so it can actually be
+  found. Those regions only ever offer unlocked units.
+- **Players' games check in with the server by themselves,** at startup and every 5 minutes in
+  the menus, to pick up locks and gold settings, so changes reach players even if they only
+  play offline modes. The check-in is silent and isn't logged.
 - **Unit locks** are saved with the gold settings and sent to players the same way. Legion Draft
   matches already running pick up a change at their next shop phase. Units already on a draft
   board stay for that match. Players who own a locked unit keep it, but it sits out of battles

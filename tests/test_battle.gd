@@ -436,6 +436,17 @@ func test_unit_locks() -> void:
 	profile.data["rating"] = 5000
 	profile.data["pending_choice"] = {}
 	check(not profile.can_explore("dragons_hoard") and profile.explore("dragons_hoard").is_empty(), "a locked region can't be explored")
+	party.run_command("unlock storm_dragon")
+	check(not UnitLocks.is_region_locked("dragons_hoard") and profile.can_explore("dragons_hoard"), "unlocking a unit also unlocks the regions it drops in")
+	var only_storm := true
+	for i in 10:
+		profile.data["pending_choice"] = {}
+		profile.data["maps"] = 99
+		for o in profile.explore("dragons_hoard")["options"]:
+			if o["unit"] != "storm_dragon":
+				only_storm = false
+	check(only_storm, "an auto-unlocked region still only offers unlocked units")
+	party.run_command("lock reset")
 	party.run_command("unlock region Dragon's Hoard")
 	check(not UnitLocks.is_region_locked("dragons_hoard") and not profile.can_explore("dragons_hoard"), "an unlocked region whose units are all locked still can't be explored")
 	party.run_command("unlock new")

@@ -97,6 +97,17 @@ func _ready() -> void:
 
 	Audio.play_music("menu")
 
+	# Check in with the server for unit/region locks and gold settings now and
+	# every 5 minutes while idle in the menus (quietly skipped if unreachable).
+	Party.sync_from_server.call_deferred()
+	var sync_timer := Timer.new()
+	sync_timer.wait_time = 300.0
+	sync_timer.autostart = true
+	sync_timer.timeout.connect(func():
+		if _battle == null and not Party.is_active():
+			Party.sync_from_server())
+	add_child(sync_timer)
+
 
 ## Headless matchmaking server: `godot --headless -- --server [--port=24702]`
 func _run_dedicated_server() -> void:

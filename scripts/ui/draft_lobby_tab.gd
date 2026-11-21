@@ -216,10 +216,10 @@ static func rules_text(s: Dictionary) -> String:
 
 
 func _refresh_conn() -> void:
-	if Party.online and Party.phase != "connecting":
+	if Party.online and Party.phase not in ["connecting", "syncing"]:
 		_conn_label.text = "● connected"
 		_conn_label.add_theme_color_override("font_color", UIKit.GOOD)
-	elif Party.online:
+	elif Party.online and Party.phase == "connecting":
 		_conn_label.text = "connecting..."
 		_conn_label.add_theme_color_override("font_color", UIKit.ACCENT)
 	else:

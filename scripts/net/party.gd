@@ -61,6 +61,8 @@ var turn_deadline_msec := 0
 var placements: Array = []
 var last_outcome := -1.0
 var _pending_online: Array = []
+var _sync_only := false            # quick background check-in for locks/gold, then disconnect
+var _sync_deadline := 0
 
 # Authority side (SERVER or HOST).
 var _rooms := {}             # code -> MatchRoom
@@ -97,8 +99,16 @@ func _ready() -> void:
 	mp.peer_connected.connect(_on_peer_connected)
 	mp.peer_disconnected.connect(_on_peer_disconnected)
 	mp.connected_to_server.connect(_on_connected)
-	mp.connection_failed.connect(func(): _drop_connection("Could not connect."))
-	mp.server_disconnected.connect(func(): _drop_connection("Lost connection to the server."))
+	mp.connection_failed.connect(func():
+		if _sync_only:
+			disconnect_all(true)  # background sync: stay quiet if the server is unreachable
+		else:
+			_drop_connection("Could not connect."))
+	mp.server_disconnected.connect(func():
+		if _sync_only:
+			disconnect_all(true)
+		else:
+			_drop_connection("Lost connection to the server."))
 
 
 # --- state helpers ----------------------------------------------------------
@@ -333,6 +343,20 @@ func _lock_command(lock: bool, words: PackedStringArray) -> String:
 					targets.append(id)
 	for id in targets:
 		UnitLocks.set_locked(id, lock)
+	# Unlocking a unit also opens the expedition regions it drops in, so it
+	# can actually be found (those regions only ever offer unlocked units).
+	if not lock and joined != "all" and joined != "new":
+		var opened: Array = []
+		for rid in GameData.REGIONS:
+			if not UnitLocks.is_region_locked(rid):
+				continue
+			for id in targets:
+				if GameData.REGIONS[rid]["drops"].has(id):
+					UnitLocks.set_region_locked(rid, false)
+					opened.append(GameData.REGIONS[rid]["name"])
+					break
+		if not opened.is_empty():
+			region_note = " Also unlocked region%s %s so %s can be found." % ["" if opened.size() == 1 else "s", ", ".join(PackedStringArray(opened)), "it" if targets.size() == 1 else "they"]
 	if not targets.is_empty():
 		_locks_changed()
 	var out := "%s %d unit%s. %d of %d units are now locked.%s" % ["Locked" if lock else "Unlocked", targets.size(), "" if targets.size() == 1 else "s", UnitLocks.locked_list().size(), GameData.UNITS.size(), region_note]
@@ -494,7 +518,7 @@ func online_list(pname: String) -> void:
 
 func _online_request(pname: String, req: Array) -> void:
 	player_name = pname
-	if role == Role.CLIENT and online and phase != "connecting":
+	if role == Role.CLIENT and online and phase != "connecting" and not _sync_only:
 		if phase == "lobby" and req[0] != "_rq_list":
 			_request("_rq_leave_room", [])
 			_reset_client_state()
@@ -534,7 +558,53 @@ func _connect_to(address: String, port: int, pname: String, is_online: bool, pen
 
 func _on_connected() -> void:
 	my_id = mp.get_unique_id()
+	if _sync_only:
+		_request("_rq_sync", [GAME_VERSION])
+		return
 	_request("_rq_hello", [player_name, GAME_VERSION])
+
+
+## Background check-in: fetch the server's unit/region locks and gold
+## settings, then disconnect. Lets offline play (expeditions, collection,
+## ranked) follow what the server admin unlocked. Silent if unreachable.
+func sync_from_server() -> void:
+	if role != Role.NONE or OS.get_cmdline_user_args().has("--server"):
+		return
+	var addr := server_address().strip_edges()
+	var port := SERVER_PORT
+	if addr.count(":") == 1:
+		port = int(addr.get_slice(":", 1))
+		addr = addr.get_slice(":", 0)
+	if addr == "":
+		return
+	var peer := ENetMultiplayerPeer.new()
+	if peer.create_client(addr, port) != OK:
+		return
+	mp.multiplayer_peer = peer
+	role = Role.CLIENT
+	online = true
+	_sync_only = true
+	_sync_deadline = Time.get_ticks_msec() + 8000
+	phase = "syncing"
+
+
+@rpc("any_peer", "reliable")
+func _rq_sync(version: String) -> void:
+	if role != Role.SERVER:
+		return
+	var id := _sender()
+	if version != GAME_VERSION:
+		_deliver(id, "error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), GAME_VERSION]])
+		return
+	_deliver(id, "synced", [{"rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions()}])
+
+
+@rpc("authority", "reliable")
+func _rc_synced(info: Dictionary) -> void:
+	_rc_rewards(info.get("rewards", {}))
+	_rc_locks(info.get("locked", []), info.get("locked_regions", []))
+	if _sync_only:
+		disconnect_all.call_deferred(true)
 
 
 ## Leave the current room/match. Online players stay connected to the server.
@@ -556,7 +626,8 @@ func disconnect_all(silent: bool = false) -> void:
 	if _beacon:
 		_beacon.close()
 		_beacon = null
-	var was := role != Role.NONE
+	var was := role != Role.NONE and not _sync_only
+	_sync_only = false
 	role = Role.NONE
 	online = false
 	phase = "idle"
@@ -892,7 +963,9 @@ func _rc_notice(text: String) -> void:
 @rpc("authority", "reliable")
 func _rc_error(text: String) -> void:
 	status.emit(text)
-	if phase == "connecting":
+	if _sync_only:
+		disconnect_all.call_deferred(true)
+	elif phase == "connecting":
 		_drop_connection(text)
 
 
@@ -1121,6 +1194,8 @@ func _send_beacon(delta: float) -> void:
 func _process(delta: float) -> void:
 	mp.poll()
 	_poll_console()
+	if _sync_only and Time.get_ticks_msec() > _sync_deadline:
+		disconnect_all(true)
 	_poll_discovery(delta)
 	if _authority():
 		for c in _rooms.keys():
