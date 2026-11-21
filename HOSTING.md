@@ -64,6 +64,13 @@ which starts 30 seconds after the second player joins.
    Players in the same Quick Match room are put together; empty seats get bots.
 
 Tips:
+- **After updating the game files,** just start the server again with
+  `start_server_windows.bat`. It re-imports the project each time, which registers any new
+  scripts and takes a few seconds after the first run.
+- **Errors like `Identifier "ProfileLogic" not declared` or `Could not find type ...`** mean
+  Godot's list of script classes is out of date (a server started without importing). Run
+  `Godot_v4.3-stable_win64_console.exe --headless --path <game folder> --import` once, or use
+  the start script. In the Godot editor, use **Project → Reload Current Project**.
 - **If the PC's address changes** after a reboot, give it a fixed address in your router
   ("DHCP reservation").
 - **Other computers need the game too.** Either open the same project in Godot and press F5, or

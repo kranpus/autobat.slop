@@ -5,3 +5,4 @@
 export/
 *.tmp
 .DS_Store
+server/import.log

@@ -28,11 +28,16 @@ pause
 exit /b 1
 
 :have_godot
-if exist "%PROJECT%\.godot\global_script_class_cache.cfg" goto imported
-echo First run: importing the project. This takes a minute...
-"%GODOT%" --headless --path "%PROJECT%" --import
-
-:imported
+rem Import every time: it registers scripts added by updates (otherwise the
+rem server fails with "Identifier ... not declared"). After the first run
+rem this only takes a few seconds.
+echo Preparing the project (the first time takes a minute)...
+"%GODOT%" --headless --path "%PROJECT%" --import > "%~dp0import.log" 2>&1
+if not exist "%PROJECT%\.godot\global_script_class_cache.cfg" (
+  echo Importing the project failed. See server\import.log for details.
+  pause
+  exit /b 1
+)
 echo.
 echo ============================================================
 echo  Other devices in your house: open the game, go to
