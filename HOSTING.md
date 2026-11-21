@@ -20,9 +20,17 @@ A single server process:
   rewarded by the server. Passwords are stored only as salted PBKDF2-SHA256 hashes. See
   [Accounts and security](#accounts-and-security).
 
-It speaks ENet over **UDP port 24702**, encrypted with DTLS. It also answers on **UDP port 24703**,
-where a new player's game fetches the server's certificate once. That's all it needs: no
-database and no web server.
+Ports:
+
+| Port | Used by |
+| --- | --- |
+| **UDP 24702** | The downloadable game (ENet, encrypted with DTLS). |
+| **UDP 24703** | A new player's game fetching the server's certificate once. |
+| **TCP 24704** | The browser game (WebSocket). Encrypted (`wss://`) when you give the server a real certificate, see [WEB.md](WEB.md). |
+| **TCP 24705** | The browser game's web page, served by the server itself if you've built it into `export/web/`. |
+
+Browser and app players share accounts and meet in the same matches. No database or separate
+web server is needed.
 
 ---
 
@@ -75,8 +83,11 @@ Tips:
   ("DHCP reservation").
 - **Other computers need the game too.** Either open the same project in Godot and press F5, or
   export a Windows build (Project → Export; Godot will offer to download export templates).
-- **Playing outside the house** later needs a port forward of UDP 24702 and 24703 on your
-  router to this PC, and friends connect to your public IP.
+- **Playing in a browser:** build the web version with `tools\build_web_windows.bat` (see
+  [WEB.md](WEB.md)), then restart the server. Anyone in the house can open
+  `http://<this PC's address>:24705` and play, online included.
+- **Playing outside the house** later needs port forwards on your router to this PC: UDP 24702
+  and 24703, plus TCP 24704 for browsers. Friends then connect to your public IP.
 - **Back up player accounts** by copying the server's user data folder:
   `%APPDATA%\Godot\app_userdata\Autobat Legions` (the `accounts` folder, `ranked_armies.json`,
   `server_config.json` and `server_tls.*`).
@@ -129,12 +140,13 @@ docker logs -f legion-draft-server
 ```bash
 sudo ufw allow 22/tcp        # keep SSH working
 sudo ufw allow 24702:24703/udp
+sudo ufw allow 24704/tcp     # browser players (WebSocket)
 sudo ufw enable
 ```
 
 Most providers also have a **cloud firewall** in their web dashboard (Hetzner "Firewalls",
 DigitalOcean "Networking → Firewalls", Oracle "Security Lists"). Add an inbound rule there too:
-**UDP, ports 24702-24703, from anywhere**.
+**UDP, ports 24702-24703, from anywhere**, and **TCP 24704** for browser players.
 
 ---
 
@@ -354,5 +366,9 @@ but a guest's ranked results only count on that guest's own device.
 - **Disconnects:** a player who drops out mid-match is replaced by a bot so the match finishes.
   Empty rooms close straight away; finished rooms close after 2 minutes.
 - **Not included yet:** a leaderboard, email password recovery or a web dashboard.
-- **Security:** see [Accounts and security](#accounts-and-security). LAN games hosted from inside
-  the game (no server) are not encrypted and don't use accounts.
+- **Security:** see [Accounts and security](#accounts-and-security).
+  - LAN games hosted from inside the game (no server) are not encrypted and don't use accounts.
+  - Browser connections are encrypted only with a real certificate (`wss://`, see
+    [WEB.md](WEB.md)). Plain `ws://` is meant for home networks, and the sign-in screen warns
+    about it.
+- **`status`** also shows how many players are connected from the app and from browsers.

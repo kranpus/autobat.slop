@@ -19,6 +19,7 @@ var _toggle_button: Button
 var _buttons: Array[Button] = []
 var _creating := false
 var _busy := false
+var _note: Label
 
 
 func _ready() -> void:
@@ -92,12 +93,27 @@ func _ready() -> void:
 	_status = UIKit.label("", 13, UIKit.TEXT_DIM)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_status)
-	var note := UIKit.label("Your password is sent over an encrypted connection and the server keeps only a salted hash of it, never the password itself.", 11, UIKit.TEXT_DIM)
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	v.add_child(note)
+	_note = UIKit.label("", 11, UIKit.TEXT_DIM)
+	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(_note)
+	_server_edit.text_changed.connect(func(t: String):
+		Profile.settings["server_address"] = t.strip_edges()
+		_update_note())
+	_update_note()
 
 	Party.login_result.connect(_on_login_result)
 	Party.status.connect(_on_status)
+
+
+## Says whether the password travels encrypted. In the browser that depends
+## on the server: wss:// is encrypted, plain ws:// (home networks) is not.
+func _update_note() -> void:
+	if Party.connection_encrypted():
+		_note.text = "Your password is sent over an encrypted connection and the server keeps only a salted hash of it, never the password itself."
+		_note.add_theme_color_override("font_color", UIKit.TEXT_DIM)
+	else:
+		_note.text = "This server connection is NOT encrypted (fine on your home network). Don't reuse a password from anything important. The server stores only a salted hash of it."
+		_note.add_theme_color_override("font_color", UIKit.ACCENT)
 
 
 ## Sign in with the saved login straight away (shows progress meanwhile).

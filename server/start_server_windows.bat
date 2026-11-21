@@ -44,6 +44,9 @@ echo  Other devices in your house: open the game, go to
 echo  Legion Draft - Online, and set Server to one of these:
 powershell -NoProfile -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch '^(127|169\.254)\.' } | ForEach-Object { '     ' + $_.IPAddress + '    [' + $_.InterfaceAlias + ']' }"
 echo  On this PC itself, use:  localhost
+echo.
+echo  Browser version (after tools\build_web_windows.bat): open
+echo     http://ADDRESS:24705   using one of the addresses above
 echo ============================================================
 echo.
 echo Starting the server on UDP port %PORT%. Close this window to stop it.

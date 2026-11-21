@@ -23,9 +23,9 @@ The first time it opens, the editor imports the assets, which takes a few second
 **Phones and tablets:** the game also runs on Android and iOS, with scaled-up text and buttons,
 touch controls and pinch-to-zoom. See **[MOBILE.md](MOBILE.md)** for how to build it.
 
-**In a web browser:** an HTML5 build plays offline: expeditions, ranked against generated
-opponents, and Legion Draft against bots. Online play needs the downloadable version. See
-**[WEB.md](WEB.md)** to build it and put it on itch.io.
+**In a web browser:** an HTML5 build plays online through the server (over WebSocket) or
+offline as a guest. Only LAN matches and live duels need the downloadable version. The server
+can host the page itself for your home network. See **[WEB.md](WEB.md)**.
 
 **Accounts:** at startup, sign in to (or create) an account on the server, which then keeps your
 progress, or press **Play offline (guest)** to keep a local profile on this device. You can
@@ -229,6 +229,8 @@ scripts/core/audio.gd         Music + pooled/throttled SFX (autoload "Audio")
 scripts/net/net.gd            ENet live duels (autoload "Net")
 scripts/net/party.gd          Legion Draft networking: server, LAN host, client (autoload "Party")
 scripts/net/match_room.gd     One authoritative Legion Draft match (used by server and LAN host)
+scripts/net/multi_peer.gd     Server: ENet (app) + WebSocket (browser) players as one multiplayer peer
+scripts/net/web_host.gd       Server: tiny HTTP host for the browser build
 scripts/net/passwords.gd      PBKDF2-SHA256 password hashing, login tokens
 scripts/net/account_store.gd  Server-side accounts (one JSON file each, no passwords stored)
 server/                       Dockerfile, docker-compose and run script for the online server
@@ -281,6 +283,8 @@ godot --headless -s res://tests/net_smoke_client.gd -- --server=127.0.0.1 --name
 # Accounts end to end: register, server-side progress, a server-run ranked battle, log in/out,
 # "remember me" tokens, password change and lockout (run on the same machine as the server):
 godot --headless -s res://tests/net_account_test.gd -- --server=127.0.0.1
+# ...and the same over WebSocket, the way the browser version connects:
+godot --headless -s res://tests/net_account_test.gd -- --server=127.0.0.1 --websocket
 
 # LAN modes:  -- --lan-host   /   -- --lan-join=127.0.0.1   /   -- --lan-quick
 

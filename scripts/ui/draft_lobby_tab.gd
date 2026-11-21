@@ -85,14 +85,8 @@ func _ready() -> void:
 	solo_row.add_child(solo_note)
 	lv.add_child(solo_row)
 
-	# Online and LAN play need UDP networking, which browsers don't have.
 	var net_box := UIKit.vbox(8)
 	lv.add_child(net_box)
-	if not Party.network_supported():
-		net_box.visible = false
-		var web_note := UIKit.label("Online and local-network matches need the downloadable version of the game; the browser version can only play against bots.", 13, UIKit.TEXT_DIM)
-		web_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		lv.add_child(web_note)
 
 	# --- Online ---------------------------------------------------------------
 	net_box.add_child(HSeparator.new())
@@ -135,13 +129,21 @@ func _ready() -> void:
 	net_box.add_child(_rooms_box)
 
 	# --- LAN --------------------------------------------------------------------
-	net_box.add_child(HSeparator.new())
-	net_box.add_child(UIKit.label("Local network (no server needed)", 18, UIKit.ACCENT))
+	# Direct LAN matches use UDP, which browsers can't do.
+	var lan_box := UIKit.vbox(8)
+	lv.add_child(lan_box)
+	if not Party.lan_supported():
+		lan_box.visible = false
+		var web_note := UIKit.label("Local-network matches need the downloadable version of the game. In the browser, play online through a server or against bots.", 13, UIKit.TEXT_DIM)
+		web_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lv.add_child(web_note)
+	lan_box.add_child(HSeparator.new())
+	lan_box.add_child(UIKit.label("Local network (no server needed)", 18, UIKit.ACCENT))
 	var brow := UIKit.hbox(8)
 	brow.add_child(UIKit.button("Quick Match (LAN)", func(): Party.quick_lan(Profile.player_name(), _settings())))
 	brow.add_child(UIKit.button("Host Match", func(): Party.host_lan(Profile.player_name(), _settings())))
 	brow.add_child(UIKit.button("Find Matches", func(): Party.start_search()))
-	net_box.add_child(brow)
+	lan_box.add_child(brow)
 	var jrow := UIKit.hbox(8)
 	jrow.add_child(UIKit.label("Join by IP:", 14))
 	_ip = LineEdit.new()
@@ -149,9 +151,9 @@ func _ready() -> void:
 	_ip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	jrow.add_child(_ip)
 	jrow.add_child(UIKit.button("Join", func(): Party.join_lan(_ip.text.strip_edges(), Party.PORT, Profile.player_name())))
-	net_box.add_child(jrow)
+	lan_box.add_child(jrow)
 	_found_box = UIKit.vbox(6)
-	net_box.add_child(_found_box)
+	lan_box.add_child(_found_box)
 
 	_status = UIKit.label("Not connected.", 13, UIKit.TEXT_DIM)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

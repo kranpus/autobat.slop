@@ -15,10 +15,14 @@ services:
     ports:
       - "24702:24702/udp"   # game connections (encrypted)
       - "24703:24703/udp"   # certificate service (new players fetch it once)
+      - "24704:24704/tcp"   # browser game (WebSocket)
+      - "24705:24705/tcp"   # the browser game's web page (if export/web is built)
     # Accounts, ranked armies, settings and the server's TLS key live here,
     # so they survive rebuilding or updating the container.
     volumes:
       - legion-data:/home/godot/.local/share/godot
+      # The browser build (tools/build_web.sh) for the server to host on 24705.
+      - ../export/web:/game/export/web:ro
     environment:
       - PORT=24702
     logging:

@@ -28,7 +28,11 @@ signal ranked_opponents(list: Array)
 
 const GAME_VERSION := "legion-draft-7"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
-const SERVER_PORT := 24702               # dedicated online server
+const SERVER_PORT := 24702               # dedicated online server (ENet/UDP)
+const WS_PORT := 24704                   # same server for browsers (WebSocket/TCP)
+const WEB_PORT := 24705                  # the server can also host the web build (HTTP)
+const MultiPeer := preload("res://scripts/net/multi_peer.gd")
+const WebHost := preload("res://scripts/net/web_host.gd")
 const DISCOVERY_PORT := 24701
 const GAME_TAG := "autobat_draft_v2"
 ## Put your server's address here so players don't have to type it
@@ -163,7 +167,44 @@ func me() -> Dictionary:
 
 func server_address() -> String:
 	var a := str(Profile.settings.get("server_address", ""))
-	return a if a != "" else DEFAULT_SERVER
+	if a != "":
+		return a
+	# In the browser, default to the machine the page came from: when the
+	# server hosts the web build itself, players needn't type anything.
+	if OS.has_feature("web"):
+		var host := str(JavaScriptBridge.eval("window.location.hostname", true))
+		if host != "":
+			return host
+	return DEFAULT_SERVER
+
+
+## The browser game talks to the server over WebSocket (browsers can't use
+## UDP). `--websocket` makes a desktop build do the same, for testing.
+static func use_websocket() -> bool:
+	return OS.has_feature("web") or "--websocket" in OS.get_cmdline_user_args()
+
+
+## True if the page is served over HTTPS (browsers then require wss://).
+static func _page_is_https() -> bool:
+	return OS.has_feature("web") and str(JavaScriptBridge.eval("window.location.protocol", true)) == "https:"
+
+
+## WebSocket URL for a server address: a full ws:// / wss:// URL is used as
+## typed; otherwise wss when the page itself is on HTTPS, ws otherwise.
+static func _ws_url(addr: String, port: int) -> String:
+	if addr.contains("://"):
+		return addr
+	return "%s://%s:%d" % ["wss" if _page_is_https() else "ws", addr, port]
+
+
+## Whether passwords sent to this server travel encrypted. Desktop builds
+## always use DTLS; browsers only with wss:// (plain ws:// is for home
+## networks).
+func connection_encrypted() -> bool:
+	if not use_websocket():
+		return true
+	var a := _split_address()
+	return _ws_url(a[0], a[1]).begins_with("wss://")
 
 
 func _sender() -> int:
@@ -206,10 +247,19 @@ func start_server(port: int = SERVER_PORT) -> Error:
 		print("ERROR: could not set up encryption (error %d)" % err)
 		peer.close()
 		return err
-	mp.multiplayer_peer = peer
+	# One SceneMultiplayer serves both transports: ENet for the downloadable
+	# game, WebSocket for the browser game.
+	var multi := MultiPeer.new()
+	multi.max_peers = MAX_SERVER_PEERS
+	multi.add_transport(peer)
+	var ws := _start_websocket()
+	if ws:
+		multi.add_transport(ws)
+	mp.multiplayer_peer = multi
 	role = Role.SERVER
 	my_id = 1
 	_start_cert_service(port + CERT_PORT_OFFSET)
+	_start_web_host()
 	_load_config()
 	accounts = AccountStore.new()
 	_log("Accounts: %d (passwords stored as salted PBKDF2-SHA256 hashes)" % accounts.count())
@@ -285,6 +335,9 @@ func run_command(line: String) -> String:
                                   temporary one (shown once) and sign them out"""
 		"status":
 			out = "%d players online, %d rooms. %s" % [_names.size(), _rooms.size(), _gold_text()]
+			if mp.multiplayer_peer is MultiPeer and (mp.multiplayer_peer as MultiPeer).transport_count() > 1:
+				var mpeer := mp.multiplayer_peer as MultiPeer
+				out += " Connections: %d game app, %d browser." % [mpeer.peers_on(0), mpeer.peers_on(1)]
 		"rooms":
 			var lines: Array = []
 			for c in _rooms:
@@ -536,9 +589,9 @@ func host_lan(pname: String, new_settings: Dictionary) -> Error:
 	return OK
 
 
-## Browsers can't send UDP, which all of the game's networking (ENet) uses,
-## so the web (HTML) build plays offline: no server, LAN or live duels.
-static func network_supported() -> bool:
+## LAN matches and live duels connect players directly over UDP (ENet),
+## which browsers can't do. Online play through the server works everywhere.
+static func lan_supported() -> bool:
 	return not OS.has_feature("web")
 
 
@@ -605,12 +658,8 @@ func _online_request(pname: String, req: Array) -> void:
 			phase = "online"
 		_send_request(req)
 		return
-	var addr := server_address().strip_edges()
-	var port := SERVER_PORT
-	if addr.count(":") == 1:
-		port = int(addr.get_slice(":", 1))
-		addr = addr.get_slice(":", 0)
-	_connect_to(addr, port, pname, true, req)
+	var a := _split_address()
+	_connect_to(a[0], a[1], pname, true, req)
 
 
 func _send_request(req: Array) -> void:
@@ -618,7 +667,7 @@ func _send_request(req: Array) -> void:
 
 
 func _connect_to(address: String, port: int, pname: String, is_online: bool, pending: Array) -> Error:
-	if is_online and _server_cert(address, port) == null:
+	if is_online and not _have_cert(address, port):
 		status.emit("Contacting the server...")
 		_ensure_cert(address, port, func(ok: bool):
 			if ok:
@@ -627,18 +676,19 @@ func _connect_to(address: String, port: int, pname: String, is_online: bool, pen
 				status.emit("Could not reach the server at %s:%d." % [address, port]))
 		return OK
 	disconnect_all(true)
-	var peer: ENetMultiplayerPeer
+	var peer: MultiplayerPeer
 	if is_online:
-		peer = _server_client_peer(address, port)   # dedicated server: encrypted
+		peer = _server_client_peer(address, port)   # dedicated server
 		if peer == null:
 			status.emit("Could not connect to %s:%d." % [address, port])
 			return FAILED
 	else:
-		peer = ENetMultiplayerPeer.new()
-		var err := peer.create_client(address, port)
+		var lan := ENetMultiplayerPeer.new()
+		var err := lan.create_client(address, port)
 		if err != OK:
 			status.emit("Could not connect to %s:%d (error %d)." % [address, port, err])
 			return err
+		peer = lan
 	mp.multiplayer_peer = peer
 	role = Role.CLIENT
 	online = is_online
@@ -674,9 +724,6 @@ func _on_connected() -> void:
 func request_ranked_opponents(pid: String, pname: String, rating: int, code: String) -> void:
 	var req: Array = [GAME_VERSION, pid, pname, rating, code]
 	_awaiting_ranked = true
-	if not network_supported():
-		_ranked_failed()  # browser build: generated opponents only
-		return
 	_ranked_deadline = Time.get_ticks_msec() + 6000
 	if role == Role.CLIENT and online and phase not in ["connecting", "syncing"] and not _sync_only and not _ranked_only:
 		_request("_rq_ranked", req)  # already connected to the server
@@ -690,7 +737,7 @@ func request_ranked_opponents(pid: String, pname: String, rating: int, code: Str
 		_ranked_failed()  # busy with a LAN match: use generated opponents
 		return
 	var a := _split_address()
-	if _server_cert(a[0], a[1]) == null:
+	if not _have_cert(a[0], a[1]):
 		_ensure_cert(a[0], a[1], func(ok: bool):
 			if ok and _awaiting_ranked:
 				request_ranked_opponents(pid, pname, rating, code)
@@ -751,10 +798,10 @@ func _rc_ranked(list: Array) -> void:
 ## settings, then disconnect. Lets offline play (expeditions, collection,
 ## ranked) follow what the server admin unlocked. Silent if unreachable.
 func sync_from_server() -> void:
-	if role != Role.NONE or logged_in or not network_supported() or OS.get_cmdline_user_args().has("--server"):
+	if role != Role.NONE or logged_in or OS.get_cmdline_user_args().has("--server"):
 		return
 	var a := _split_address()
-	if _server_cert(a[0], a[1]) == null:
+	if not _have_cert(a[0], a[1]):
 		_ensure_cert(a[0], a[1], func(ok: bool):
 			if ok:
 				sync_from_server())
@@ -1070,6 +1117,8 @@ func _deliver(id: int, method: String, args: Array) -> void:
 		var pp := enet.get_peer(id)
 		if pp == null or pp.get_state() != ENetPacketPeer.STATE_CONNECTED:
 			return  # peer is disconnecting
+	elif mp.multiplayer_peer is MultiPeer and not (mp.multiplayer_peer as MultiPeer).is_open(id):
+		return  # peer is disconnecting
 	var call_args: Array = [id, "_rc_" + method]
 	call_args.append_array(args)
 	callv("rpc_id", call_args)
@@ -1399,6 +1448,8 @@ func _process(delta: float) -> void:
 	_poll_cert_fetch()
 	if role == Role.SERVER:
 		_poll_cert_service()
+		if _web_host:
+			_web_host.poll()
 		_poll_auth_jobs()
 		_poll_ranked_jobs()
 	_client_session_tick()
@@ -1476,6 +1527,7 @@ var _failures := {}             # account key -> {count, until}
 var _ranked_offers := {}        # peer id -> offered opponents
 var _ranked_jobs: Array = []    # server-simulated ranked battles
 var _cert_server: PacketPeerUDP
+var _web_host: RefCounted   # WebHost: serves the browser build over HTTP
 var _cert_pem: X509Certificate
 var _cert_reply := PackedByteArray()
 var _cert_window := 0
@@ -1551,7 +1603,9 @@ func forget_server_certificate() -> void:
 ## A client connection to the dedicated server, encrypted with DTLS and
 ## pinned to the server's certificate. null on failure (or no certificate yet:
 ## call _ensure_cert first).
-func _server_client_peer(addr: String, port: int) -> ENetMultiplayerPeer:
+func _server_client_peer(addr: String, port: int) -> MultiplayerPeer:
+	if use_websocket():
+		return _ws_client_peer(addr, port)
 	var cert := _server_cert(addr, port)
 	if cert == null:
 		return null
@@ -1567,11 +1621,33 @@ func _server_client_peer(addr: String, port: int) -> ENetMultiplayerPeer:
 	return peer
 
 
+## A WebSocket connection to the server (browser build, or --websocket).
+func _ws_client_peer(addr: String, port: int) -> MultiplayerPeer:
+	if addr == "":
+		return null
+	var peer := WebSocketMultiplayerPeer.new()
+	peer.inbound_buffer_size = 1 << 20
+	peer.outbound_buffer_size = 1 << 20
+	peer.max_queued_packets = 4096
+	if peer.create_client(_ws_url(addr, port)) != OK:
+		return null
+	_last_server = [addr, port]
+	return peer
+
+
+## True when we can connect right away (no certificate to fetch first).
+func _have_cert(addr: String, port: int) -> bool:
+	return use_websocket() or _server_cert(addr, port) != null
+
+
 ## Make sure we have the server's certificate, fetching it the first time.
 ## Calls `then(ok)` (right away if we already have it).
 func _ensure_cert(addr: String, port: int, then: Callable) -> void:
 	if addr == "":
 		then.call(false)
+		return
+	if use_websocket():
+		then.call(true)  # the browser checks wss:// certificates itself
 		return
 	if _server_cert(addr, port) != null:
 		then.call(true)
@@ -1634,7 +1710,7 @@ func _finish_cert_fetch(ok: bool) -> void:
 ## A connection to the server failed. If the server now presents a different
 ## certificate than the one saved here, say so instead of silently trusting it.
 func _check_cert_changed() -> void:
-	if _last_server.is_empty() or FileAccess.file_exists(PINNED_CERT_PATH):
+	if _last_server.is_empty() or use_websocket() or FileAccess.file_exists(PINNED_CERT_PATH):
 		return
 	var addr: String = _last_server[0]
 	var port: int = _last_server[1]
@@ -1658,6 +1734,82 @@ func _check_cert_changed() -> void:
 					DirAccess.remove_absolute(path + ".old")
 				else:
 					DirAccess.rename_absolute(path + ".old", path))
+
+
+# --- server: browsers (WebSocket + web page) ----------------------------------------
+
+## Port from `--name=value`, else the environment variable, else the default.
+static func _arg_port(flag: String, env: String, fallback: int) -> int:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with(flag + "="):
+			return int(arg.get_slice("=", 1))
+	var e := OS.get_environment(env)
+	return int(e) if e.is_valid_int() else fallback
+
+
+static func _arg_text(flag: String, env: String) -> String:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with(flag + "="):
+			return arg.substr(flag.length() + 1)
+	return OS.get_environment(env)
+
+
+## The WebSocket listener for the browser game. Encrypted (wss://) when a
+## certificate the browsers trust is given (--ws-cert / --ws-key, e.g. from
+## Let's Encrypt, or ws_tls.crt / ws_tls.key in the server's data folder);
+## otherwise plain ws://, which is fine on a home network.
+func _start_websocket() -> WebSocketMultiplayerPeer:
+	var ws_port := _arg_port("--ws-port", "WS_PORT", WS_PORT)
+	if ws_port <= 0:
+		print("WebSocket listener disabled (--ws-port=0): browsers can't connect.")
+		return null
+	var tls: TLSOptions = null
+	var cert_path := _arg_text("--ws-cert", "WS_CERT")
+	var key_path := _arg_text("--ws-key", "WS_KEY")
+	if cert_path == "" and FileAccess.file_exists("user://ws_tls.crt"):
+		cert_path = "user://ws_tls.crt"
+		key_path = "user://ws_tls.key"
+	if cert_path != "":
+		var cert := X509Certificate.new()
+		var key := CryptoKey.new()
+		if cert.load(cert_path) != OK or key.load(key_path) != OK:
+			print("ERROR: could not load the WebSocket certificate %s / key %s" % [cert_path, key_path])
+			return null
+		tls = TLSOptions.server(key, cert)
+	var ws := WebSocketMultiplayerPeer.new()
+	ws.inbound_buffer_size = 1 << 18
+	ws.outbound_buffer_size = 1 << 18
+	ws.max_queued_packets = 1024
+	ws.handshake_timeout = 5.0
+	var err := ws.create_server(ws_port, "*", tls)
+	if err != OK:
+		print("WARNING: could not listen for browsers on TCP port %d (error %d)." % [ws_port, err])
+		return null
+	if tls:
+		print("Browsers connect with wss:// on TCP port %d (encrypted)." % ws_port)
+	else:
+		print("Browsers connect with ws:// on TCP port %d. NOT encrypted: fine on your home network; for the internet use --ws-cert/--ws-key (see HOSTING.md)." % ws_port)
+	return ws
+
+
+## Serve the exported web build (export/web) over plain HTTP so devices on
+## the network can play in a browser by opening http://<server-ip>:24705.
+func _start_web_host() -> void:
+	var web_port := _arg_port("--web-port", "WEB_PORT", WEB_PORT)
+	var dir := _arg_text("--web-dir", "WEB_DIR")
+	if dir == "":
+		dir = ProjectSettings.globalize_path("res://export/web")
+	if web_port <= 0:
+		return
+	if not FileAccess.file_exists(dir.path_join("index.html")):
+		print("No web build in %s, so the browser version isn't hosted here (build it with tools/build_web, see WEB.md)." % dir)
+		return
+	_web_host = WebHost.new()
+	if _web_host.start(web_port, dir) != OK:
+		print("WARNING: could not serve the web build on TCP port %d." % web_port)
+		_web_host = null
+		return
+	print("Browser version: open http://<this computer's address>:%d" % web_port)
 
 
 # --- server: certificate service -------------------------------------------------
@@ -1696,7 +1848,9 @@ func _poll_cert_service() -> void:
 
 func _split_address() -> Array:
 	var addr := server_address().strip_edges()
-	var port := SERVER_PORT
+	var port := WS_PORT if use_websocket() else SERVER_PORT
+	if addr.contains("://"):
+		return [addr, port]   # a full WebSocket URL
 	if addr.count(":") == 1:
 		port = int(addr.get_slice(":", 1))
 		addr = addr.get_slice(":", 0)
@@ -1730,7 +1884,7 @@ func try_auto_login() -> bool:
 func _start_auth(request: Array, remember: bool) -> void:
 	_remember = remember
 	var a := _split_address()
-	if _server_cert(a[0], a[1]) == null:
+	if not _have_cert(a[0], a[1]):
 		status.emit("Contacting the server...")
 		_ensure_cert(a[0], a[1], func(ok: bool):
 			if ok:

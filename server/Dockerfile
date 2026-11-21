@@ -29,5 +29,6 @@ RUN godot --headless --path /game --import || true \
 
 ENV PORT=24702
 # 24702: game connections (DTLS-encrypted). 24703: certificate service.
-EXPOSE 24702/udp 24703/udp
+# 24704: browser game (WebSocket). 24705: the browser game's web page.
+EXPOSE 24702/udp 24703/udp 24704/tcp 24705/tcp
 CMD ["godot", "--headless", "--path", "/game", "--", "--server"]

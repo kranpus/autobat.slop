@@ -90,7 +90,7 @@ func _ready() -> void:
 	fv.add_child(frow)
 
 	var np := UIKit.panel(UIKit.PANEL_LIGHT)
-	np.visible = Party.network_supported()   # no live duels in the browser
+	np.visible = Party.lan_supported()   # live duels are direct UDP: not in the browser
 	right.add_child(np)
 	var nv := UIKit.vbox(8)
 	np.add_child(nv)

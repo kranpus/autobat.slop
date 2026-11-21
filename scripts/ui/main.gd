@@ -106,7 +106,7 @@ func _ready() -> void:
 	login_layer.layer = 5
 	add_child(login_layer)
 	Party.session_changed.connect(_refresh_top_bar)
-	if Party.network_supported() and (Profile.settings.has("account") or not bool(Profile.settings.get("start_offline", false))):
+	if (Profile.settings.has("account") or not bool(Profile.settings.get("start_offline", false))):
 		var screen := show_login()
 		if not screen.auto_login() and bool(Profile.settings.get("start_offline", false)):
 			screen.queue_free()
