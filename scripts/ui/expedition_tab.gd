@@ -1,4 +1,6 @@
 extends VBoxContainer
+
+const LootReveal := preload("res://scripts/ui/loot_reveal.gd")
 ## Expeditions: spend scouting maps to search a region. The scouts come back
 ## with three different units from that region's drop table and the player
 ## recruits ONE of them. Each region has its own table, so hunting a specific
@@ -58,7 +60,7 @@ func _ready() -> void:
 	# Signed in: the server rolls the expedition and applies the recruit.
 	Profile.choice_ready.connect(func(_c: Dictionary):
 		Audio.play_sfx("scroll")
-		_show_choice())
+		_show_choice(true))
 	Profile.recruit_result.connect(_show_result)
 	refresh()
 
@@ -137,13 +139,32 @@ func _explore(rid: String) -> void:
 	if Profile.explore(rid).is_empty():
 		return
 	Audio.play_sfx("scroll")
-	_show_choice()
+	_show_choice(true)
 
 
-func _show_choice() -> void:
+## The recruit choice. With `animate`, the finds are first revealed loot-box
+## style (least rare to rarest), then the full cards appear.
+func _show_choice(animate: bool = false) -> void:
 	var pc := Profile.pending_choice()
 	if pc.is_empty():
 		return
+	UIKit.clear(_choice_box)
+	if animate:
+		var reveal := LootReveal.new()
+		reveal.setup(str(pc["region"]), pc["options"], UIKit.is_compact(self))
+		reveal.finished.connect(func():
+			# Closed mid-reveal: the banner can reopen the choice later.
+			if _choice_popup.visible:
+				_build_choice(pc, false))
+		_choice_box.add_child(reveal)
+		_choice_popup.popup_centered(Vector2i(980, 520))
+		return
+	_build_choice(pc, true)
+
+
+func _build_choice(pc: Dictionary, fanfare: bool) -> void:
+	if not Profile.has_pending_choice():
+		return  # already chosen
 	UIKit.clear(_choice_box)
 	var region_name: String = GameData.REGIONS[pc["region"]]["name"] if GameData.REGIONS.has(pc["region"]) else "the wilds"
 	_choice_box.add_child(UIKit.label("Your scouts return from %s" % region_name, 22, UIKit.ACCENT))
@@ -155,7 +176,7 @@ func _show_choice() -> void:
 		var opt: Dictionary = pc["options"][i]
 		row.add_child(_make_choice_card(i, opt["unit"], int(opt["shards"]), bool(opt.get("guaranteed", false))))
 		best_rarity = maxi(best_rarity, int(GameData.RARITIES[GameData.UNITS[opt["unit"]]["rarity"]]["order"]))
-	if best_rarity >= 3:
+	if best_rarity >= 3 and fanfare:
 		Audio.play_sfx("roar")
 	_choice_popup.popup_centered(Vector2i(980, 520))
 
