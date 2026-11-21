@@ -22,8 +22,11 @@ signal battle_ready(config: Dictionary)
 signal standings_changed
 signal match_over(placements: Array)
 signal left_match(reason: String)
+## Ranked opponents found on the server (saved armies of players with a
+## similar rating). Empty when the server can't be reached.
+signal ranked_opponents(list: Array)
 
-const GAME_VERSION := "legion-draft-5"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-6"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server
 const DISCOVERY_PORT := 24701
@@ -63,6 +66,11 @@ var last_outcome := -1.0
 var _pending_online: Array = []
 var _sync_only := false            # quick background check-in for locks/gold, then disconnect
 var _sync_deadline := 0
+var _ranked_only := false          # short connection just to fetch ranked opponents
+var _ranked_request: Array = []
+var _awaiting_ranked := false
+var _ranked_deadline := 0
+var ranked_pool: RankedPool         # server only: players' saved ranked armies
 
 # Authority side (SERVER or HOST).
 var _rooms := {}             # code -> MatchRoom
@@ -100,12 +108,16 @@ func _ready() -> void:
 	mp.peer_disconnected.connect(_on_peer_disconnected)
 	mp.connected_to_server.connect(_on_connected)
 	mp.connection_failed.connect(func():
-		if _sync_only:
+		if _ranked_only:
+			_ranked_failed()
+		elif _sync_only:
 			disconnect_all(true)  # background sync: stay quiet if the server is unreachable
 		else:
 			_drop_connection("Could not connect."))
 	mp.server_disconnected.connect(func():
-		if _sync_only:
+		if _ranked_only:
+			_ranked_failed()
+		elif _sync_only:
 			disconnect_all(true)
 		else:
 			_drop_connection("Lost connection to the server."))
@@ -180,6 +192,8 @@ func start_server(port: int = SERVER_PORT) -> Error:
 	role = Role.SERVER
 	my_id = 1
 	_load_config()
+	ranked_pool = RankedPool.new()
+	ranked_pool.load_file()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--battle-gold="):
 			rewards["battle_mult"] = maxf(0.0, float(arg.get_slice("=", 1)))
@@ -242,6 +256,8 @@ func run_command(line: String) -> String:
   lock new / unlock new           the unreleased set: 40 new units + 8 new regions
   unlock all                      every unit and region
   lock reset                      back to the defaults (the new units and regions locked)
+  ranked                          how many player armies are saved for ranked matchmaking
+  ranked clear                    delete all saved ranked armies
   say <message>                   show a message to every connected player"""
 		"status":
 			out = "%d players online, %d rooms. %s" % [_names.size(), _rooms.size(), _gold_text()]
@@ -283,6 +299,15 @@ func run_command(line: String) -> String:
 			for id in GameData.unit_ids_sorted():
 				lines.append("  %-22s %-10s %s" % [id, GameData.UNITS[id]["rarity"], "LOCKED" if UnitLocks.is_locked(id) else "open"])
 			out = "\n".join(PackedStringArray(lines)) + "\n%d of %d units locked." % [UnitLocks.locked_list().size(), GameData.UNITS.size()]
+		"ranked":
+			if ranked_pool == null:
+				out = "Ranked pool only exists on the dedicated server."
+			elif a.size() >= 2 and a[1].to_lower() == "clear":
+				ranked_pool.entries.clear()
+				ranked_pool.save_file()
+				out = "Ranked pool cleared."
+			else:
+				out = ranked_pool.stats()
 		"regions":
 			var lines: Array = []
 			for rid in GameData.REGIONS:
@@ -518,7 +543,7 @@ func online_list(pname: String) -> void:
 
 func _online_request(pname: String, req: Array) -> void:
 	player_name = pname
-	if role == Role.CLIENT and online and phase != "connecting" and not _sync_only:
+	if role == Role.CLIENT and online and phase != "connecting" and not _sync_only and not _ranked_only:
 		if phase == "lobby" and req[0] != "_rq_list":
 			_request("_rq_leave_room", [])
 			_reset_client_state()
@@ -558,10 +583,80 @@ func _connect_to(address: String, port: int, pname: String, is_online: bool, pen
 
 func _on_connected() -> void:
 	my_id = mp.get_unique_id()
+	if _ranked_only:
+		_request("_rq_ranked", _ranked_request)
+		return
 	if _sync_only:
 		_request("_rq_sync", [GAME_VERSION])
 		return
 	_request("_rq_hello", [player_name, GAME_VERSION])
+
+
+# --- ranked opponents ---------------------------------------------------------
+
+## Save this army on the server (with the current rating) and ask for armies
+## other players saved at a similar rating. Answers with `ranked_opponents`.
+func request_ranked_opponents(pid: String, pname: String, rating: int, code: String) -> void:
+	var req: Array = [GAME_VERSION, pid, pname, rating, code]
+	_awaiting_ranked = true
+	_ranked_deadline = Time.get_ticks_msec() + 6000
+	if role == Role.CLIENT and online and phase not in ["connecting", "syncing"] and not _sync_only and not _ranked_only:
+		_request("_rq_ranked", req)  # already connected to the server
+		return
+	if _sync_only:
+		disconnect_all(true)
+	if role != Role.NONE:
+		_ranked_failed()  # busy with a LAN match: use generated opponents
+		return
+	var addr := server_address().strip_edges()
+	var port := SERVER_PORT
+	if addr.count(":") == 1:
+		port = int(addr.get_slice(":", 1))
+		addr = addr.get_slice(":", 0)
+	var peer := ENetMultiplayerPeer.new()
+	if addr == "" or peer.create_client(addr, port) != OK:
+		_ranked_failed()
+		return
+	mp.multiplayer_peer = peer
+	role = Role.CLIENT
+	online = true
+	_ranked_only = true
+	_ranked_request = req
+	phase = "syncing"
+
+
+func _ranked_failed() -> void:
+	if _awaiting_ranked:
+		_awaiting_ranked = false
+		ranked_opponents.emit([])
+	if _ranked_only:
+		disconnect_all.call_deferred(true)
+
+
+@rpc("any_peer", "reliable")
+func _rq_ranked(version: String, pid: String, pname: String, rating: int, code: String) -> void:
+	if role != Role.SERVER or ranked_pool == null:
+		return
+	var id := _sender()
+	if not _allow(id):
+		return
+	if version != GAME_VERSION:
+		_deliver(id, "error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), GAME_VERSION]])
+		return
+	if ranked_pool.add(pid, pname, rating, code):
+		ranked_pool.save_file()
+	var out: Array = []
+	for e in ranked_pool.find(clampi(rating, 0, 5000), pid.left(40), 3):
+		out.append({"name": e["name"], "rating": e["rating"], "code": e["code"], "saved_at": e["saved_at"]})
+	_deliver(id, "ranked", [out])
+
+
+@rpc("authority", "reliable")
+func _rc_ranked(list: Array) -> void:
+	_awaiting_ranked = false
+	ranked_opponents.emit(list)
+	if _ranked_only:
+		disconnect_all.call_deferred(true)
 
 
 ## Background check-in: fetch the server's unit/region locks and gold
@@ -626,8 +721,9 @@ func disconnect_all(silent: bool = false) -> void:
 	if _beacon:
 		_beacon.close()
 		_beacon = null
-	var was := role != Role.NONE and not _sync_only
+	var was := role != Role.NONE and not _sync_only and not _ranked_only
 	_sync_only = false
+	_ranked_only = false
 	role = Role.NONE
 	online = false
 	phase = "idle"
@@ -963,6 +1059,8 @@ func _rc_notice(text: String) -> void:
 @rpc("authority", "reliable")
 func _rc_error(text: String) -> void:
 	status.emit(text)
+	if _ranked_only or _awaiting_ranked:
+		_ranked_failed()
 	if _sync_only:
 		disconnect_all.call_deferred(true)
 	elif phase == "connecting":
@@ -1196,6 +1294,8 @@ func _process(delta: float) -> void:
 	_poll_console()
 	if _sync_only and Time.get_ticks_msec() > _sync_deadline:
 		disconnect_all(true)
+	if _awaiting_ranked and Time.get_ticks_msec() > _ranked_deadline:
+		_ranked_failed()
 	_poll_discovery(delta)
 	if _authority():
 		for c in _rooms.keys():

@@ -210,6 +210,8 @@ Ctrl+P then Ctrl+Q to detach again.
 | `gold draft-table 500 300 200 100` | Base Legion Draft payout for 1st, 2nd, 3rd…; the last number applies to every lower place. |
 | `gold reset` | Back to the defaults (x1, x1, 400/250/150/60). |
 | `say Server restarting in 5 minutes` | Show a message to every connected player. |
+| `ranked` | How many player armies are saved for ranked matchmaking, and their rating range. |
+| `ranked clear` | Delete all saved ranked armies. |
 | `units` | List all 60 units and whether each is locked or open. |
 | `lock Storm Dragon` / `lock goblin ogre` | Lock units by name or id. Locked units stop appearing in expeditions, draft shops and ranked opponents, are removed from army codes, and don't deploy in battles. Useful for emergency balance fixes. |
 | `unlock storm_dragon` | Unlock units again. |
@@ -236,6 +238,23 @@ Notes:
   until it's unlocked.
 - **Startup flags:** you can also set values when starting the server, e.g.
   `-- --server --battle-gold=1.5 --draft-gold=2`. These override the saved file for that run.
+
+## Ranked matchmaking
+
+When a player presses **Find Opponents** in the Battle tab, their game:
+1. sends their current army and rating to the server, which saves it as that player's latest
+   army (one per player, under an anonymous ID);
+2. receives up to 3 armies saved by *other* players at a similar rating. The search starts
+   within ±50 rating and widens until it finds enough, aiming for one closest match, one
+   slightly below and one slightly above.
+
+Empty slots, or all three if the server can't be reached, are filled with generated training
+opponents. Saved armies are kept for 30 days in `ranked_armies.json`, in the server's Godot user
+data folder.
+
+Player profiles still live on players' own computers, so a modified game could upload an army it
+doesn't really own. The server clamps levels and tiers to legal values and strips locked units,
+but fully trusted ranked play would need accounts with server-side profiles.
 
 ## Operating notes
 

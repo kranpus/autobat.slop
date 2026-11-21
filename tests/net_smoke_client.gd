@@ -31,6 +31,9 @@ func _initialize() -> void:
 			mode = "lan-host"
 		elif arg == "--lan-quick":
 			mode = "lan-quick"
+		elif arg.begins_with("--ranked="):
+			mode = "ranked"
+			lan_ip = arg.get_slice("=", 1)  # the rating to save the army at
 		elif arg.begins_with("--lan-join="):
 			mode = "lan-join"
 			lan_ip = arg.get_slice("=", 1)
@@ -59,6 +62,20 @@ func _initialize() -> void:
 			party.join_lan(lan_ip, party.PORT, player)
 		"lan-quick":
 			party.quick_lan(player, settings)
+		"ranked":
+			# Save this player's army at the given rating and print the matches.
+			var profile = root.get_node("Profile")
+			profile.data["server_address"] = server
+			profile.data["rating"] = int(lan_ip)
+			profile.data["name"] = player
+			party.ranked_opponents.connect(func(list: Array):
+				var out: Array = []
+				for e in list:
+					out.append("%s@%d" % [e["name"], int(e["rating"])])
+				print("[%s] ranked at %d -> opponents: %s" % [player, int(lan_ip), out])
+				done = true
+				quit(0))
+			party.request_ranked_opponents(profile.player_id(), player, int(lan_ip), profile.army_code())
 
 
 ## LAN lobbies: guests ready up; the owner fills with bots and starts once

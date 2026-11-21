@@ -137,6 +137,19 @@ func rating() -> int:
 	return int(data["rating"])
 
 
+## Anonymous id for this player's saved ranked army on the server.
+func player_id() -> String:
+	if str(data.get("player_id", "")).length() < 16:
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		var id := ""
+		for i in 24:
+			id += "0123456789abcdef"[rng.randi_range(0, 15)]
+		data["player_id"] = id
+		save()
+	return str(data["player_id"])
+
+
 func player_name() -> String:
 	return str(data["name"])
 

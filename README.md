@@ -54,8 +54,10 @@ touch controls and pinch-to-zoom. See **[MOBILE.md](MOBILE.md)** for how to buil
    - **Moving squads:** drag a squad to another column (or use ◀ ▶); ▲ ▼ set the order within
      a column.
 5. **Fight: Battle tab.**
-   - **Ranked Arena:** choose one of three opponents (Easy / Even / Hard) matched to your army
-     power, and win rating (Elo), gold and maps.
+   - **Ranked Arena:** **Find Opponents** saves your army on the server with your current rating
+     and matches you against armies that **other players saved at a similar rating**: one close
+     match, one slightly lower and one slightly higher. Win rating (Elo), gold and maps. Empty
+     slots, or all three when offline, are filled with generated training opponents.
    - **Friend Challenge:** paste a friend's *army code* (Army tab → Copy) to fight their exact army.
    - **Live Duel:** one player hosts, the other joins by IP (LAN, or the internet with a forwarded
      UDP port, default 24680). Ranked.

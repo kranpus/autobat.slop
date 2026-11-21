@@ -20,6 +20,7 @@ func _initialize() -> void:
 	test_room_rule_toggles()
 	test_server_gold_commands()
 	test_unit_locks()
+	test_ranked_pool()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -476,3 +477,39 @@ func test_unit_locks() -> void:
 	check(not states.is_empty() and (states[0]["excluded"] as Array).size() == 40, "match state carries the server's locks to clients")
 	profile.data = backup
 	profile.save()
+
+
+func test_ranked_pool() -> void:
+	print("ranked matchmaking pool")
+	var pool := RankedPool.new()
+	var code := Army.encode("P", 1000, [{"unit": "goblin", "level": 3, "tier": 2, "row": "front"}])
+	for r in [700, 940, 985, 1000, 1010, 1060, 1400]:
+		pool.add("pid%d" % r, "Player %d" % r, r, code)
+	pool.add("me", "Me", 1000, code)
+	check(not pool.add("bad", "Bad", 1000, "garbage"), "invalid army codes are rejected")
+	pool.add("pid1000", "Player 1000", 1003, code)
+	check(pool.entries.size() == 8 and int(pool.entries["pid1000"]["rating"]) == 1003, "one saved army per player (latest replaces older)")
+	var found := pool.find(1000, "me", 3)
+	var ratings: Array = []
+	var has_me := false
+	for e in found:
+		ratings.append(int(e["rating"]))
+		if e["pid"] == "me":
+			has_me = true
+	check(found.size() == 3 and not has_me, "finds 3 opponents and never your own army (got %s)" % [ratings])
+	check(int(found[0]["rating"]) == 1003, "closest rating first")
+	var below := false
+	var above := false
+	for r in ratings:
+		if int(r) <= 1000:
+			below = true
+		if int(r) >= 1000:
+			above = true
+		if absi(int(r) - 1000) > 100:
+			below = false
+	check(below and above, "one at/below and one at/above, all within 100 rating")
+	var far := pool.find(2000, "me", 3)
+	check(far.size() == 3 and int(far[0]["rating"]) == 1400, "the search window widens when nobody is close")
+	pool.entries["pid700"]["saved_at"] = 1000
+	pool.prune()
+	check(not pool.entries.has("pid700"), "armies older than 30 days are dropped")

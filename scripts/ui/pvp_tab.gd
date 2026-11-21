@@ -14,6 +14,7 @@ var _rematch_btn: Button
 var _map_picker: OptionButton
 var _map_desc: Label
 var _opponents: Array = []
+var _searching := false
 
 
 func _ready() -> void:
@@ -28,7 +29,7 @@ func _ready() -> void:
 	lv.add_child(UIKit.label("Ranked Arena", 20, UIKit.ACCENT))
 	_record_label = UIKit.label("", 14, UIKit.TEXT_DIM)
 	lv.add_child(_record_label)
-	var info := UIKit.label("Pick an opponent's army and send yours against it. Stronger opponents give more rating and gold. Wins also grant a scouting map.", 13, UIKit.TEXT_DIM)
+	var info := UIKit.label("Find Opponents saves your army on the server and matches you against armies other players saved at a similar rating. Stronger opponents give more rating and gold; wins also grant a scouting map.", 13, UIKit.TEXT_DIM)
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lv.add_child(info)
 	lv.add_child(UIKit.button("Find Opponents", _find_opponents))
@@ -127,6 +128,7 @@ func _ready() -> void:
 	nv.add_child(_status)
 	Net.status_changed.connect(func(t: String): _status.text = t)
 
+	Party.ranked_opponents.connect(_on_ranked_opponents)
 	Profile.changed.connect(refresh)
 	refresh()
 
@@ -139,21 +141,71 @@ func refresh() -> void:
 
 
 func _find_opponents() -> void:
-	var my_power := maxf(500.0, Army.army_power(Profile.battle_squads()))
+	if Profile.battle_squads().is_empty():
+		_show_search_message("Build an army first (Army tab).")
+		return
+	_searching = true
+	_show_search_message("Searching for players near rating %d..." % Profile.rating())
+	# Saves your army on the server (with your current rating) and asks for
+	# armies that other players saved at a similar rating.
+	Party.request_ranked_opponents(Profile.player_id(), Profile.player_name(), Profile.rating(), Profile.army_code())
+
+
+func _on_ranked_opponents(list: Array) -> void:
+	if not _searching:
+		return
+	_searching = false
 	var rating := Profile.rating()
-	_opponents.clear()
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
+	_opponents.clear()
+	for e in list:
+		var army := Army.decode(str(e.get("code", "")))
+		if army.is_empty():
+			continue  # e.g. every unit in it is locked
+		var r := int(e.get("rating", 1000))
+		_opponents.append({
+			"name": str(e.get("name", "Commander")), "rating": r, "squads": army["squads"],
+			"difficulty": "Easy" if r < rating - 25 else ("Hard" if r > rating + 25 else "Even"),
+			"map": BattleMaps.random_map_id(rng), "player": true, "saved_at": int(e.get("saved_at", 0)),
+		})
+	# Fill the remaining slots with generated opponents.
+	var my_power := maxf(500.0, Army.army_power(Profile.battle_squads()))
 	var tiers := [[0.8, -60, "Easy"], [1.0, 0, "Even"], [1.25, 70, "Hard"]]
-	for t in tiers:
-		var opp := Army.generate_opponent(my_power * float(t[0]) * rng.randf_range(0.95, 1.05), maxi(0, rating + int(t[1]) + rng.randi_range(-15, 15)), rng.randi())
-		opp["difficulty"] = t[2]
-		opp["map"] = BattleMaps.random_map_id(rng)
-		_opponents.append(opp)
+	# First cover any missing difficulty, then top up to three.
+	for pass_i in 2:
+		for t in tiers:
+			if _opponents.size() >= 3:
+				break
+			var taken := false
+			for o in _opponents:
+				if o["difficulty"] == t[2]:
+					taken = true
+			if taken and pass_i == 0:
+				continue
+			var opp := Army.generate_opponent(my_power * float(t[0]) * rng.randf_range(0.95, 1.05), maxi(0, rating + int(t[1]) + rng.randi_range(-15, 15)), rng.randi())
+			opp["difficulty"] = t[2]
+			opp["map"] = BattleMaps.random_map_id(rng)
+			opp["player"] = false
+			_opponents.append(opp)
+	var order := {"Easy": 0, "Even": 1, "Hard": 2}
+	_opponents.sort_custom(func(a, b): return int(order[a["difficulty"]]) < int(order[b["difficulty"]]))
 	UIKit.clear(_opponents_box)
+	var players := 0
+	for o in _opponents:
+		if o["player"]:
+			players += 1
+	var note := "%d real player arm%s near your rating" % [players, "y" if players == 1 else "ies"] if players > 0 else "No saved player armies near your rating yet (or the server is offline), so these are training opponents"
+	_opponents_box.add_child(UIKit.label(note + ".", 12, UIKit.TEXT_DIM))
 	for opp in _opponents:
 		_opponents_box.add_child(_make_opponent_card(opp))
 	Audio.play_sfx("scroll")
+
+
+func _show_search_message(text: String) -> void:
+	_opponents.clear()
+	UIKit.clear(_opponents_box)
+	_opponents_box.add_child(UIKit.label(text, 14, UIKit.TEXT_DIM))
 
 
 func _make_opponent_card(opp: Dictionary) -> Control:
@@ -165,6 +217,13 @@ func _make_opponent_card(opp: Dictionary) -> Control:
 	var diff_color: Color = {"Easy": UIKit.GOOD, "Even": UIKit.ACCENT, "Hard": UIKit.BAD}[diff]
 	h.add_child(UIKit.label(opp["name"], 17))
 	h.add_child(UIKit.label(diff, 14, diff_color))
+	if opp.get("player", false):
+		var days := int((Time.get_unix_time_from_system() - float(opp.get("saved_at", 0))) / 86400.0)
+		var tag := UIKit.label("Player · saved %s" % ("today" if days < 1 else "%d day%s ago" % [days, "" if days == 1 else "s"]), 12, Color("9fd3ff"))
+		tag.tooltip_text = "A real player's army, saved when they had rating %d." % int(opp["rating"])
+		h.add_child(tag)
+	else:
+		h.add_child(UIKit.label("Training", 12, UIKit.TEXT_DIM))
 	h.add_child(UIKit.spacer())
 	h.add_child(UIKit.label("Rating %d · Power %s · %d units" % [int(opp["rating"]), Army.format_power(Army.army_power(opp["squads"])), Army.total_units(opp["squads"])], 13, UIKit.TEXT_DIM))
 	v.add_child(h)
