@@ -21,20 +21,37 @@ static func squad_size(unit_id: String, tier: int) -> int:
 	return int(r["squad_base"]) + int(r["squad_step"]) * tier
 
 
-## Stats of a single unit at a given level.
-static func unit_stats(unit_id: String, level: int) -> Dictionary:
+## Stats of a single unit at a given level, optionally changed by modifiers
+## (Legion Draft buffs and trinkets). Supported mod keys:
+##   hp_mult, dmg_mult, speed_mult, cooldown_mult, range_add (ranged only),
+##   aoe_add, regen_pct (fraction of max HP per second), lifesteal, thorns,
+##   flying (bool), armor (String), damage (String)
+static func unit_stats(unit_id: String, level: int, mods: Dictionary = {}) -> Dictionary:
 	var base: Dictionary = GameData.UNITS[unit_id]
 	var m := level_mult(level)
 	var s := base.duplicate()
-	s["hp"] = float(base["hp"]) * m
-	s["dmg"] = float(base["dmg"]) * m
-	s["heal"] = float(base["heal"]) * m
-	s["regen"] = float(base["regen"]) * m
+	s["hp"] = float(base["hp"]) * m * float(mods.get("hp_mult", 1.0))
+	s["dmg"] = float(base["dmg"]) * m * float(mods.get("dmg_mult", 1.0))
+	s["heal"] = float(base["heal"]) * m * float(mods.get("dmg_mult", 1.0))
+	s["regen"] = float(base["regen"]) * m + float(s["hp"]) * float(mods.get("regen_pct", 0.0))
+	s["speed"] = float(base["speed"]) * float(mods.get("speed_mult", 1.0))
+	s["cooldown"] = float(base["cooldown"]) * float(mods.get("cooldown_mult", 1.0))
+	if float(base["range"]) >= 20.0:
+		s["range"] = float(base["range"]) + float(mods.get("range_add", 0.0))
+	s["aoe"] = float(base["aoe"]) + float(mods.get("aoe_add", 0.0))
+	s["lifesteal"] = float(mods.get("lifesteal", 0.0))
+	s["thorns"] = float(mods.get("thorns", 0.0))
+	if bool(mods.get("flying", false)):
+		s["flying"] = true
+	if str(mods.get("armor", "")) in GameData.ARMOR_TYPES:
+		s["armor"] = str(mods["armor"])
+	if str(mods.get("damage", "")) in GameData.DAMAGE_TYPES:
+		s["damage"] = str(mods["damage"])
 	return s
 
 
-static func unit_power(unit_id: String, level: int) -> float:
-	var s := unit_stats(unit_id, level)
+static func unit_power(unit_id: String, level: int, mods: Dictionary = {}) -> float:
+	var s := unit_stats(unit_id, level, mods)
 	var cd: float = s["cooldown"]
 	var dps: float = (float(s["dmg"]) * (1.0 + minf(float(s["aoe"]), 60.0) / 40.0) + float(s["heal"]) * 1.5) / cd + float(s["regen"])
 	var reach_bonus := 1.0 + minf(float(s["range"]), 260.0) / 520.0
@@ -45,11 +62,15 @@ static func unit_power(unit_id: String, level: int) -> float:
 
 
 ## Units deployed per squad. There is no army-wide cap: every squad fights at
-## full size, so the army limit is MAX_SQUADS squads.
+## full size, so the army limit is MAX_SQUADS squads. A squad may carry an
+## explicit "count" (used by Legion Draft) instead of a tier.
 static func deploy_counts(squads: Array) -> Array:
 	var out: Array = []
 	for sq in squads:
-		out.append(squad_size(sq["unit"], int(sq["tier"])))
+		if sq.has("count"):
+			out.append(maxi(1, int(sq["count"])))
+		else:
+			out.append(squad_size(sq["unit"], int(sq.get("tier", 0))))
 	return out
 
 
@@ -64,7 +85,7 @@ static func army_power(squads: Array) -> float:
 	var counts := deploy_counts(squads)
 	var p := 0.0
 	for i in squads.size():
-		p += unit_power(squads[i]["unit"], int(squads[i]["level"])) * float(counts[i])
+		p += unit_power(squads[i]["unit"], int(squads[i]["level"]), squads[i].get("mods", {})) * float(counts[i])
 	return p
 
 

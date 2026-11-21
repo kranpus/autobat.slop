@@ -21,6 +21,7 @@ config/icon="res://icon.svg"
 Profile="*res://scripts/core/profile.gd"
 Audio="*res://scripts/core/audio.gd"
 Net="*res://scripts/net/net.gd"
+Party="*res://scripts/net/party.gd"
 
 [display]
 

@@ -12,6 +12,8 @@ func _initialize() -> void:
 	test_maps()
 	test_determinism_and_scale()
 	test_opponent_generation()
+	test_draft_rules()
+	test_draft_bot_tournament()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -100,3 +102,65 @@ func test_opponent_generation() -> void:
 	var p := Army.army_power(opp["squads"])
 	check(p >= target * 0.9, "generated power %.0f near target %.0f" % [p, target])
 	check(opp["squads"].size() <= GameData.MAX_SQUADS, "opponent within squad limit")
+
+
+func test_draft_rules() -> void:
+	print("legion draft rules")
+	var r := DraftRun.new(1234)
+	r.begin_turn()
+	check(r.gold == DraftData.TURN_GOLD and r.shop_units.size() == 3 and r.shop_trinkets.size() == 1, "turn 1: 10 gold, 3 units, 1 trinket in shop")
+	# Force a known shop and merge three copies into one slot.
+	r.gold = 100
+	r.shop_units = [{"unit": "goblin", "frozen": false}, {"unit": "goblin", "frozen": false}, {"unit": "goblin", "frozen": false}]
+	check(r.buy_unit(0, 0), "buy into empty slot")
+	check(r.buy_unit(0, 0), "buy duplicate onto same unit")
+	check(r.buy_unit(0, 0) and DraftData.entry_level(r.board[0]) == 2, "3 copies -> level 2")
+	check(DraftData.entry_count(r.board[0]) == 32, "level 2 commons field 32 units")
+	r.shop_units = [{"unit": "elf_archer", "frozen": false}]
+	check(not r.buy_unit(0, 0), "can't place a different unit on an occupied slot")
+	check(r.buy_unit(0, 4), "archer placed in back row")
+	r.shop_trinkets = [{"trinket": "whetstone", "frozen": false}]
+	check(r.buy_trinket(0, 4) and str(r.board[4]["trinket"]) == "whetstone", "equip trinket")
+	var sq := DraftData.board_to_squads(r.board)
+	check(sq.size() == 2 and sq[1]["row"] == "back" and float(sq[1]["mods"]["dmg_mult"]) > 1.1, "board converts to squads with rows and trinket mods")
+	var gold_before := r.gold
+	check(r.sell(0) and r.gold == gold_before + 2 + 2, "selling a Lv2 goblin gives 2 gold + Scavenger bonus")
+	r.shop_units = [{"unit": "titan", "frozen": false}]
+	var dmg_before := int(r.board[4]["dmg_b"])
+	r.buy_unit(0, 1)
+	check(int(r.board[4]["dmg_b"]) == dmg_before + 8, "Titan's on-buy ability buffs allies")
+	check(DraftData.tier_for_battles(0) == 1 and DraftData.tier_for_battles(3) == 2 and DraftData.tier_for_battles(30) == 6, "shop tier rises every 3 battles, max 6")
+	var cheat := DraftData.sanitize_board([{"unit": "titan", "xp": 99, "hp_b": 9999, "trinket": "nope"}])
+	check(int(cheat[0]["xp"]) == DraftData.MAX_XP and int(cheat[0]["hp_b"]) == DraftData.MAX_BONUS and cheat[0]["trinket"] == "", "network boards are sanitized")
+
+
+func test_draft_bot_tournament() -> void:
+	print("legion draft bots")
+	var bots: Array = []
+	for i in 4:
+		bots.append(DraftRun.new(100 + i))
+	var ok := true
+	var max_units := 0
+	for rnd in 15:
+		var boards: Array = []
+		for b in bots:
+			var r: DraftRun = b
+			r.begin_turn()
+			r.auto_play()
+			boards.append(r.end_turn())
+			if r.gold < 0 or r.board.size() != DraftData.BOARD_SLOTS:
+				ok = false
+		for pair in [[0, 1], [2, 3]]:
+			var sim := BattleSim.new()
+			sim.setup(DraftData.board_to_squads(boards[pair[0]]), DraftData.board_to_squads(boards[pair[1]]), rnd * 7 + 1, BattleMaps.random_map_id(sim.rng))
+			max_units = maxi(max_units, sim.n)
+			sim.run_to_end()
+			if not sim.finished:
+				ok = false
+			for side in 2:
+				var r: DraftRun = bots[pair[side]]
+				var outcome := 0.5 if sim.winner == 2 else (1.0 if sim.winner == side else 0.0)
+				r.apply_battle_result(outcome, r.lives - (1 if outcome == 0.0 else 0), r.wins + (1 if outcome == 1.0 else 0))
+	check(ok, "15 rounds of bot drafting and battles run cleanly")
+	check((bots[0] as DraftRun).tier() == 6, "bots reached shop tier 6")
+	print("    largest draft battle: %d units" % max_units)

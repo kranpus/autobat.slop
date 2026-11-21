@@ -347,3 +347,23 @@ func apply_battle_result(mode: String, score: float, opp_rating: int, enemy_kill
 	summary["gold"] = g
 	save()
 	return summary
+
+
+## Rewards for finishing a Legion Draft match. Returns {"gold", "maps"}.
+func apply_draft_result(place: int, player_count: int) -> Dictionary:
+	var gold_reward := 60
+	match place:
+		1:
+			gold_reward = 400
+		2:
+			gold_reward = 250
+		3:
+			gold_reward = 150
+	var maps_reward := 1 if place <= maxi(1, ceili(float(player_count) / 2.0)) else 0
+	data["gold"] = gold() + gold_reward
+	data["maps"] = int(data["maps"]) + maps_reward
+	data["draft_played"] = int(data.get("draft_played", 0)) + 1
+	if place == 1:
+		data["draft_wins"] = int(data.get("draft_wins", 0)) + 1
+	save()
+	return {"gold": gold_reward, "maps": maps_reward}

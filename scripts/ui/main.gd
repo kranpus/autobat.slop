@@ -6,6 +6,8 @@ const ArmyTab := preload("res://scripts/ui/army_tab.gd")
 const ExpeditionTab := preload("res://scripts/ui/expedition_tab.gd")
 const PvpTab := preload("res://scripts/ui/pvp_tab.gd")
 const SettingsTab := preload("res://scripts/ui/settings_tab.gd")
+const DraftLobbyTab := preload("res://scripts/ui/draft_lobby_tab.gd")
+const DraftScreenScript := preload("res://scripts/ui/draft_screen.gd")
 const BattleScreen := preload("res://scripts/battle/battle_screen.gd")
 
 var menu_layer: CanvasLayer
@@ -15,6 +17,9 @@ var _gold_label: Label
 var _maps_label: Label
 var _rating_label: Label
 var _battle: Node = null
+var _battle_mode := ""
+var draft_layer: CanvasLayer
+var draft_screen: DraftScreenScript
 
 
 func _ready() -> void:
@@ -57,6 +62,9 @@ func _ready() -> void:
 	pvp_tab.name = "Battle"
 	pvp_tab.battle_requested.connect(start_battle)
 	tabs.add_child(pvp_tab)
+	var draft_tab := DraftLobbyTab.new()
+	draft_tab.name = "Legion Draft"
+	tabs.add_child(draft_tab)
 	var settings_tab := SettingsTab.new()
 	settings_tab.name = "Settings"
 	tabs.add_child(settings_tab)
@@ -65,6 +73,18 @@ func _ready() -> void:
 	Profile.changed.connect(_refresh_top_bar)
 	Net.match_ready.connect(start_battle)
 	_refresh_top_bar()
+
+	# Legion Draft: full-screen shop layer shown while in a match.
+	draft_layer = CanvasLayer.new()
+	draft_layer.layer = 2
+	draft_layer.visible = false
+	add_child(draft_layer)
+	draft_screen = DraftScreenScript.new()
+	draft_layer.add_child(draft_screen)
+	draft_screen.leave_requested.connect(func(): Party.leave())
+	Party.match_started.connect(_show_draft)
+	Party.battle_ready.connect(start_battle)
+	Party.left_match.connect(_on_left_draft)
 
 	var tick := Timer.new()
 	tick.wait_time = 1.0
@@ -106,7 +126,11 @@ func _refresh_top_bar() -> void:
 func start_battle(config: Dictionary) -> void:
 	if _battle != null:
 		return
+	_battle_mode = str(config.get("mode", ""))
+	if _battle_mode != "draft" and Party.is_in_match():
+		return
 	menu_layer.visible = false
+	draft_layer.visible = false
 	var screen := BattleScreen.new()
 	screen.config = config
 	screen.closed.connect(_on_battle_closed)
@@ -119,6 +143,26 @@ func _on_battle_closed() -> void:
 	if _battle:
 		_battle.queue_free()
 		_battle = null
+	Audio.play_music("menu")
+	if _battle_mode == "draft" and Party.is_in_match():
+		Party.battle_viewed()
+		_show_draft()
+		return
+	menu_layer.visible = true
+	Profile.changed.emit()
+
+
+func _show_draft() -> void:
+	menu_layer.visible = false
+	draft_layer.visible = true
+	draft_screen.refresh()
+
+
+func _on_left_draft(_reason: String) -> void:
+	if _battle and _battle_mode == "draft":
+		_battle.queue_free()
+		_battle = null
+	draft_layer.visible = false
 	menu_layer.visible = true
 	Audio.play_music("menu")
 	Profile.changed.emit()

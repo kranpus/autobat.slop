@@ -29,9 +29,11 @@ func _ready() -> void:
 	view.setup(sim)
 	view.battle_finished.connect(_on_finished)
 	_build_hud()
-	if config.get("mode", "") == "live":
+	var mode: String = config.get("mode", "")
+	if mode == "live":
 		Net.result_verified.connect(_on_verified)
-		# Both players start automatically so they stay in step.
+	if mode == "live" or mode == "draft":
+		# Start automatically so multiplayer matches keep moving.
 		_auto_start_timer = Timer.new()
 		_auto_start_timer.one_shot = true
 		_auto_start_timer.wait_time = 3.0
@@ -144,6 +146,10 @@ func _build_hud() -> void:
 	sv.add_child(map_d)
 	if config.get("mode", "") == "live":
 		sv.add_child(UIKit.label("Live duel starting...", 16))
+	elif config.get("mode", "") == "draft":
+		var rl := UIKit.label("Legion Draft round %d. Starting..." % int(config.get("round", 0)), 16)
+		rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		sv.add_child(rl)
 	else:
 		var go := UIKit.button("FIGHT!", _begin)
 		go.custom_minimum_size = Vector2(200, 48)
@@ -214,7 +220,10 @@ func _on_finished(winner: int) -> void:
 	var enemy := 1 - _local_team
 	var killed := sim.start_count[enemy] - sim.alive_count[enemy]
 	var opp_rating := int(config.get("rating_b", 1000)) if _local_team == 0 else int(config.get("rating_a", 1000))
-	var summary := Profile.apply_battle_result(mode, score, opp_rating, killed)
+	# Draft battles are decided and rewarded by the match host, not here.
+	var summary := {"gold": 0, "maps": 0, "rating": 0}
+	if mode != "draft":
+		summary = Profile.apply_battle_result(mode, score, opp_rating, killed)
 	if mode == "live":
 		Net.report_result(sim.checksum())
 
@@ -236,7 +245,11 @@ func _on_finished(winner: int) -> void:
 	v.add_child(UIKit.label("Your survivors: %d / %d" % [sim.alive_count[mine], sim.start_count[mine]], 15))
 	v.add_child(UIKit.label("Enemies defeated: %d / %d" % [killed, sim.start_count[enemy]], 15))
 	v.add_child(UIKit.label("Battle time: %d s" % int(sim.time), 15, UIKit.TEXT_DIM))
-	v.add_child(UIKit.label("+%d gold" % int(summary["gold"]), 16, Color("ffd76a")))
+	if mode == "draft":
+		var note := "Win: +1 win toward the goal." if score >= 1.0 else ("Loss: -1 life." if score <= 0.0 else "Draw: no change.")
+		v.add_child(UIKit.label(note, 16, title_color))
+	else:
+		v.add_child(UIKit.label("+%d gold" % int(summary["gold"]), 16, Color("ffd76a")))
 	if int(summary["maps"]) > 0:
 		v.add_child(UIKit.label("+%d scouting map" % int(summary["maps"]), 16, Color("9fd3ff")))
 	if mode == "ranked" or mode == "live":

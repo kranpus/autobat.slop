@@ -49,6 +49,14 @@ License texts that shipped with the packs are in [`assets/licenses/`](assets/lic
 | fx/stone.png | effect/sling_bullet_0_new.png |
 | fx/fire.png | effect/cloud_fire_1.png |
 
+Trinket icons (`assets/sprites/trinkets/`), from the same pack's `item/` folder: iron_ring (ring/bronze),
+whetstone (misc/misc_stone_new), ration (food/bread_ration_new), swift_boots (armor/feet/boots_3_stripe_new),
+spiked_shield (armor/shields/large_shield_2_new), war_horn (misc/misc_horn), blood_amulet (amulet/crystal_red),
+blast_powder (misc/misc_bottle), training_manual (book/book_orange), dragonhide (armor/torso/gold_dragon_hide_new),
+rune_blade (weapon/blessed_blade), quickdraw_gloves (armor/hands/glove_4_new), ember_charm (amulet/celtic_red),
+giants_mantle (armor/back/cloak_3), elixir (potion/effervescent), wind_fan (misc/misc_fan_new),
+legion_helm (armor/headgear/helmet_art_1), titans_orb (misc/misc_orb).
+
 ## Sound effects — `assets/sfx/`
 
 | Game file | Source | Author | License |

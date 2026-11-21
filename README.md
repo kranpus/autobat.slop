@@ -46,6 +46,46 @@ The first time it opens, the editor imports the assets, which takes a few second
    - **Battlefield picker:** choose one of the 20 maps (or Random) for friend challenges and duels
      you host. Each ranked opponent card shows the map you'll fight on.
 
+## Legion Draft (multiplayer game mode)
+
+A separate mode for a group of players, picked from the **Legion Draft** tab. It uses no
+collection: everyone drafts an army from scratch each match.
+
+- **Shop rounds:** each round you get 10 gold. Units and trinkets cost 3, rerolling costs 1, and
+  frozen items stay in the shop for the next round. Click a shop item, then click a board slot.
+- **Board:** 6 slots. Slots 1–2 are the front line, 3–4 the middle and 5–6 the back. Click a
+  unit, then another slot, to move or swap it.
+- **Duplicates level up:** drop a copy onto the same unit, or merge two board units. Lv2 needs 3
+  copies and Lv3 needs 6. Each level makes the squad bigger (common: 16 → 32 → 48 units) and
+  stronger (+40% per level).
+- **Out-of-battle abilities:** each of the 20 units has its own, triggered when bought, sold or
+  levelled up, at the start or end of a turn, when given a trinket, when an ally is sold, or
+  after a win or loss. Examples: Rats breed +2 units each turn, the Golden Dragon earns gold, and
+  the Lich grows stronger whenever you sell an ally.
+- **Trinkets:** 18 across 6 tiers. Held trinkets change how a squad fights: lifesteal, thorns,
+  splash, flying, magic damage, faster attacks, +50% units, and more. Consumables give permanent
+  boosts or an extra copy toward the next level.
+- **Shop tier:** rises every 3 battles, from 1 to 6. Tier 2 unlocks uncommon units, 3 rare, 4 epic
+  and 5 legendary, and each tier adds stronger trinkets and more shop slots.
+- **Matches:** after each shop phase, players are paired against each other; an odd player out
+  fights a copy of another player's army. Play until you hit the win target (default 10) or run
+  out of lives (default 5). Final placings award gold and scouting maps in the main game.
+- **Matchmaking:**
+  - **Quick Match** joins an open match on your network, or hosts one if none is found.
+  - **Host Match** lets you set wins, lives, max players (2–16) and turn time, and add bots.
+  - **Find Matches** lists matches on your local network.
+  - **Join by IP** is for internet play: the host forwards UDP port 24700.
+
+  A player who disconnects mid-match is replaced by a bot.
+- **How it's networked:** the host is authoritative. It collects boards, pairs players, and
+  decides every battle by running the deterministic simulation on worker threads, while each
+  player watches a replay of their own fight. Shop actions run on each player's machine, so a
+  modified client could cheat its board. Boards are range-checked, but a fully cheat-proof ladder
+  would need the shop to run on the host or a server too.
+
+Rules and content live in `scripts/draft/draft_data.gd`, the shop and ability logic (plus the bot
+player) in `scripts/draft/draft_run.gd`, and networking in `scripts/net/party.gd`.
+
 ### Battlefields
 
 20 maps (`scripts/core/battle_maps.gd`), each with its own floor, size (2200–3000 px wide) and
@@ -113,6 +153,9 @@ scripts/core/army.gd          Squad sizes, power, army codes, opponent generator
 scripts/core/profile.gd       Save data, upgrades, expeditions, rewards (autoload "Profile")
 scripts/core/audio.gd         Music + pooled/throttled SFX (autoload "Audio")
 scripts/net/net.gd            ENet live duels (autoload "Net")
+scripts/net/party.gd          Legion Draft lobbies, LAN discovery, match host (autoload "Party")
+scripts/draft/draft_data.gd   Draft rules, unit abilities, trinkets
+scripts/draft/draft_run.gd    A player's draft run: shop, merging, abilities, bot AI
 scripts/battle/battle_sim.gd  Deterministic simulation
 scripts/battle/battle_view.gd MultiMesh renderer + camera
 scripts/battle/battle_screen.gd  HUD, start and result screens
@@ -136,7 +179,9 @@ godot --headless -s res://tests/test_battle.gd
 
 The tests check army-code round trips and cheat clamping, that squads deploy uncapped, that
 every one of the 20 maps resolves a battle with no units stuck in terrain, a 1000+ vs 1000+
-battle, determinism (same seed gives the same checksum), and opponent generation.
+battle, determinism (same seed gives the same checksum), and opponent generation. They also check the Legion Draft rules (merging, levels, trinkets, abilities,
+selling, shop tiers, board sanitizing) and run a 15-round, 4-bot draft tournament through
+real battles.
 
 ## Status
 

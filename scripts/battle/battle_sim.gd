@@ -55,6 +55,8 @@ var aoe := PackedFloat32Array()
 var heal := PackedFloat32Array()
 var regen := PackedFloat32Array()
 var radius := PackedFloat32Array()
+var lifesteal := PackedFloat32Array()
+var thorns := PackedFloat32Array()
 
 # --- projectiles (pooled) ---------------------------------------------------
 var pr_count := 0
@@ -71,6 +73,7 @@ var pr_dmg := PackedFloat32Array()
 var pr_aoe := PackedFloat32Array()
 var pr_speed := PackedFloat32Array()
 var pr_ang := PackedFloat32Array()
+var pr_src := PackedInt32Array()
 var pr_free: Array[int] = []
 
 # --- map & obstacles --------------------------------------------------------
@@ -191,7 +194,7 @@ func _spawn_army(squads: Array, t: int) -> void:
 			var sq: Dictionary = squads[i]
 			var cols: int = depth_cols[m]
 			var spacing := _spacing(sq["unit"])
-			var stats := Army.unit_stats(sq["unit"], int(sq["level"]))
+			var stats := Army.unit_stats(sq["unit"], int(sq["level"]), sq.get("mods", {}))
 			var front_x := map_w * 0.5 - float(row_x[row])
 			for u in int(counts[i]):
 				var c := u % cols
@@ -243,6 +246,8 @@ func _add_unit(uid: String, s: Dictionary, t: int, x: float, y: float) -> void:
 	heal.append(s["heal"])
 	regen.append(s["regen"])
 	radius.append(s["radius"])
+	lifesteal.append(float(s.get("lifesteal", 0.0)))
+	thorns.append(float(s.get("thorns", 0.0)))
 	alive_count[t] += 1
 	start_count[t] += 1
 	start_hp[t] += float(s["hp"])
@@ -341,7 +346,7 @@ func _approach_and_act(i: int, t: int, healing: bool) -> void:
 		return
 	if proj[i] == 0:
 		events.append([Ev.MELEE_HIT, px[t], py[t], i])
-		_deal_damage(team[i], dtype[i], dmg[i], t, px[t], py[t], aoe[i], true)
+		_deal_damage(i, team[i], dtype[i], dmg[i], t, px[t], py[t], aoe[i], true)
 	else:
 		_spawn_projectile(i, t)
 		events.append([Ev.SHOT, px[i], py[i], proj[i]])
@@ -431,9 +436,10 @@ func _find_wounded_ally(i: int) -> int:
 
 # --- damage -----------------------------------------------------------------
 
-func _deal_damage(src_team: int, dt_idx: int, amount: float, primary: int, x: float, y: float, radius_aoe: float, melee: bool) -> void:
+## src: attacking unit index (or -1), used for lifesteal and thorns.
+func _deal_damage(src: int, src_team: int, dt_idx: int, amount: float, primary: int, x: float, y: float, radius_aoe: float, melee: bool) -> void:
 	if primary >= 0 and alive[primary] == 1:
-		_damage_unit(primary, amount, dt_idx, melee)
+		_damage_unit(primary, amount, dt_idx, melee, src)
 	if radius_aoe <= 0.0:
 		return
 	events.append([Ev.BLAST, x, y, radius_aoe])
@@ -451,26 +457,39 @@ func _deal_damage(src_team: int, dt_idx: int, amount: float, primary: int, x: fl
 					var dy := py[j] - y
 					var rr := radius_aoe + radius[j]
 					if dx * dx + dy * dy <= rr * rr:
-						_damage_unit(j, splash, dt_idx, melee)
+						_damage_unit(j, splash, dt_idx, melee, src)
 						hits += 1
 						if hits >= MAX_SPLASH_TARGETS:
 							return
 				j = cell_next[j]
 
 
-func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool) -> void:
+func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1) -> void:
 	var row: Array = GameData.DAMAGE_MULT[dt_idx]
 	var m: float = row[armor[j]]
 	if melee and flying[j] == 1:
 		m *= GameData.MELEE_VS_FLYING_MULT
-	hp[j] -= amount * m * rng.randf_range(0.9, 1.1)
+	var dealt := amount * m * rng.randf_range(0.9, 1.1)
+	hp[j] -= dealt
 	hit_tick[j] = tick
+	if src >= 0 and alive[src] == 1:
+		if lifesteal[src] > 0.0:
+			hp[src] = minf(max_hp[src], hp[src] + dealt * lifesteal[src])
+		if melee and thorns[j] > 0.0:
+			hp[src] -= dealt * thorns[j]
+			hit_tick[src] = tick
+			if hp[src] <= 0.0:
+				_kill(src)
 	if hp[j] <= 0.0 and alive[j] == 1:
-		hp[j] = 0.0
-		alive[j] = 0
-		death_tick[j] = tick
-		alive_count[team[j]] -= 1
-		events.append([Ev.DIE, px[j], py[j], j])
+		_kill(j)
+
+
+func _kill(j: int) -> void:
+	hp[j] = 0.0
+	alive[j] = 0
+	death_tick[j] = tick
+	alive_count[team[j]] -= 1
+	events.append([Ev.DIE, px[j], py[j], j])
 
 
 # --- projectiles ------------------------------------------------------------
@@ -485,6 +504,7 @@ func _spawn_projectile(i: int, t: int) -> void:
 		pr_team.append(0)
 		pr_target.append(-1)
 		pr_dtype.append(0)
+		pr_src.append(-1)
 		pr_x.append(0.0)
 		pr_y.append(0.0)
 		pr_tx.append(0.0)
@@ -500,6 +520,7 @@ func _spawn_projectile(i: int, t: int) -> void:
 	pr_team[p] = team[i]
 	pr_target[p] = t
 	pr_dtype[p] = dtype[i]
+	pr_src[p] = i
 	pr_x[p] = px[i]
 	pr_y[p] = py[i] - radius[i] * 0.5
 	pr_tx[p] = px[t]
@@ -528,7 +549,7 @@ func _update_projectiles() -> void:
 			pr_alive[p] = 0
 			pr_free.append(p)
 			events.append([Ev.IMPACT, pr_tx[p], pr_ty[p], pr_kind[p]])
-			_deal_damage(pr_team[p], pr_dtype[p], pr_dmg[p], pr_target[p], pr_tx[p], pr_ty[p], pr_aoe[p], false)
+			_deal_damage(pr_src[p], pr_team[p], pr_dtype[p], pr_dmg[p], pr_target[p], pr_tx[p], pr_ty[p], pr_aoe[p], false)
 		else:
 			pr_x[p] += dx / d * stp
 			pr_y[p] += dy / d * stp
