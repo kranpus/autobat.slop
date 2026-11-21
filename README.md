@@ -23,6 +23,10 @@ The first time it opens, the editor imports the assets, which takes a few second
 **Phones and tablets:** the game also runs on Android and iOS, with scaled-up text and buttons,
 touch controls and pinch-to-zoom. See **[MOBILE.md](MOBILE.md)** for how to build it.
 
+**In a web browser:** an HTML5 build plays offline: expeditions, ranked against generated
+opponents, and Legion Draft against bots. Online play needs the downloadable version. See
+**[WEB.md](WEB.md)** to build it and put it on itch.io.
+
 **Accounts:** at startup, sign in to (or create) an account on the server, which then keeps your
 progress, or press **Play offline (guest)** to keep a local profile on this device. You can
 switch later in **Settings → Account**. See [HOSTING.md](HOSTING.md#accounts-and-security) for how

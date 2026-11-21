@@ -148,7 +148,7 @@ func _make_card(index: int, sq: Dictionary, deployed: int, first: bool, last: bo
 	name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	info.add_child(name_l)
 	if UnitLocks.is_locked(id):
-		info.add_child(UIKit.label("🔒 Locked by server: won't deploy", 12, UIKit.BAD))
+		info.add_child(UIKit.label("⊘ Locked by server: won't deploy", 12, UIKit.BAD))
 	else:
 		info.add_child(UIKit.label("Lv %d · x%d · Power %s" % [int(sq["level"]), deployed, Army.format_power(Army.unit_power(id, int(sq["level"])) * float(deployed))], 12, UIKit.TEXT_DIM))
 	h.add_child(info)

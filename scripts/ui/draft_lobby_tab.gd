@@ -74,9 +74,29 @@ func _ready() -> void:
 	_max_rounds.tooltip_text = "Used when Lives is off: the match ends after this many rounds, ranked by wins."
 	lv.add_child(g)
 
-	# --- Online ---------------------------------------------------------------
+	# --- Solo -------------------------------------------------------------------
 	lv.add_child(HSeparator.new())
-	lv.add_child(UIKit.label("Online", 18, UIKit.ACCENT))
+	lv.add_child(UIKit.label("Solo", 18, UIKit.ACCENT))
+	var solo_row := UIKit.hbox(8)
+	solo_row.add_child(UIKit.button("Play vs Bots", func(): Party.host_solo(Profile.player_name(), _settings())))
+	var solo_note := UIKit.label("A practice match on this device against bots (one per seat up to Max players).", 12, UIKit.TEXT_DIM)
+	solo_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	solo_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	solo_row.add_child(solo_note)
+	lv.add_child(solo_row)
+
+	# Online and LAN play need UDP networking, which browsers don't have.
+	var net_box := UIKit.vbox(8)
+	lv.add_child(net_box)
+	if not Party.network_supported():
+		net_box.visible = false
+		var web_note := UIKit.label("Online and local-network matches need the downloadable version of the game; the browser version can only play against bots.", 13, UIKit.TEXT_DIM)
+		web_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lv.add_child(web_note)
+
+	# --- Online ---------------------------------------------------------------
+	net_box.add_child(HSeparator.new())
+	net_box.add_child(UIKit.label("Online", 18, UIKit.ACCENT))
 	var srow := UIKit.hbox(8)
 	srow.add_child(UIKit.label("Server", 14))
 	_server = LineEdit.new()
@@ -88,7 +108,7 @@ func _ready() -> void:
 	srow.add_child(_server)
 	_conn_label = UIKit.label("", 13, UIKit.TEXT_DIM)
 	srow.add_child(_conn_label)
-	lv.add_child(srow)
+	net_box.add_child(srow)
 	var orow := UIKit.hbox(8)
 	orow.add_child(UIKit.button("Quick Match", func(): Party.online_quick(Profile.player_name(), _settings())))
 	orow.add_child(UIKit.button("Create Match", func(): Party.online_create(Profile.player_name(), _settings(), not _private.button_pressed)))
@@ -96,7 +116,7 @@ func _ready() -> void:
 	_private.text = "Private (code only)"
 	orow.add_child(_private)
 	orow.add_child(UIKit.button("Browse", func(): Party.online_list(Profile.player_name())))
-	lv.add_child(orow)
+	net_box.add_child(orow)
 	var crow := UIKit.hbox(8)
 	crow.add_child(UIKit.label("Join with code", 14))
 	_code = LineEdit.new()
@@ -107,21 +127,21 @@ func _ready() -> void:
 	crow.add_child(UIKit.button("Join", func(): Party.online_join(Profile.player_name(), _code.text)))
 	crow.add_child(UIKit.spacer())
 	crow.add_child(UIKit.button("Disconnect", func(): Party.disconnect_all()))
-	lv.add_child(crow)
+	net_box.add_child(crow)
 	var onote := UIKit.label("Quick Match puts you in an open room that starts by itself and fills empty seats with bots. Create Match gives you a code to share with friends.", 12, UIKit.TEXT_DIM)
 	onote.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	lv.add_child(onote)
+	net_box.add_child(onote)
 	_rooms_box = UIKit.vbox(6)
-	lv.add_child(_rooms_box)
+	net_box.add_child(_rooms_box)
 
 	# --- LAN --------------------------------------------------------------------
-	lv.add_child(HSeparator.new())
-	lv.add_child(UIKit.label("Local network (no server needed)", 18, UIKit.ACCENT))
+	net_box.add_child(HSeparator.new())
+	net_box.add_child(UIKit.label("Local network (no server needed)", 18, UIKit.ACCENT))
 	var brow := UIKit.hbox(8)
 	brow.add_child(UIKit.button("Quick Match (LAN)", func(): Party.quick_lan(Profile.player_name(), _settings())))
 	brow.add_child(UIKit.button("Host Match", func(): Party.host_lan(Profile.player_name(), _settings())))
 	brow.add_child(UIKit.button("Find Matches", func(): Party.start_search()))
-	lv.add_child(brow)
+	net_box.add_child(brow)
 	var jrow := UIKit.hbox(8)
 	jrow.add_child(UIKit.label("Join by IP:", 14))
 	_ip = LineEdit.new()
@@ -129,9 +149,9 @@ func _ready() -> void:
 	_ip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	jrow.add_child(_ip)
 	jrow.add_child(UIKit.button("Join", func(): Party.join_lan(_ip.text.strip_edges(), Party.PORT, Profile.player_name())))
-	lv.add_child(jrow)
+	net_box.add_child(jrow)
 	_found_box = UIKit.vbox(6)
-	lv.add_child(_found_box)
+	net_box.add_child(_found_box)
 
 	_status = UIKit.label("Not connected.", 13, UIKit.TEXT_DIM)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -269,7 +289,7 @@ func _refresh_lobby() -> void:
 		_lobby_box.add_child(_wrapped(msg, 14, UIKit.TEXT_DIM))
 		return
 	var s := Party.settings
-	var where := "LAN match" if not Party.online else ("Quick match" if Party.room_quick else "Match")
+	var where := ("Solo match" if Party.solo else "LAN match") if not Party.online else ("Quick match" if Party.room_quick else "Match")
 	_lobby_box.add_child(UIKit.label(where, 20, UIKit.ACCENT))
 	if Party.online and not Party.room_quick:
 		var code_row := UIKit.hbox(8)

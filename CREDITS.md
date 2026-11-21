@@ -76,3 +76,10 @@ legion_helm (armor/headgear/helmet_art_1), titans_orb (misc/misc_orb).
 ## Engine
 
 [Godot Engine](https://godotengine.org), MIT license.
+
+## Fonts
+
+- **DejaVu Sans** (subset with arrows and symbols, `assets/fonts/DejaVuSans-Symbols.ttf`),
+  Bitstream Vera license with public-domain DejaVu changes. Used as a fallback so UI symbols
+  show in the browser build. License: `assets/licenses/DejaVu_fonts_license.txt`.
+  <https://dejavu-fonts.github.io/>

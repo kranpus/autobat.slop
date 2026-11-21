@@ -54,6 +54,8 @@ var owner_id := 0
 var room_code := ""
 var room_public := true
 var room_quick := false
+## Playing Legion Draft against bots on this device (no network).
+var solo := false
 var auto_start_msec := 0
 var my_id := 0
 var player_name := ""
@@ -534,6 +536,32 @@ func host_lan(pname: String, new_settings: Dictionary) -> Error:
 	return OK
 
 
+## Browsers can't send UDP, which all of the game's networking (ENet) uses,
+## so the web (HTML) build plays offline: no server, LAN or live duels.
+static func network_supported() -> bool:
+	return not OS.has_feature("web")
+
+
+## Legion Draft against bots on this device: the same authoritative room a
+## LAN host runs, but with no network at all (works in the browser too).
+func host_solo(pname: String, new_settings: Dictionary) -> Error:
+	disconnect_all(true)
+	var s := MatchRoom.clean_settings(new_settings)
+	mp.multiplayer_peer = OfflineMultiplayerPeer.new()
+	role = Role.HOST
+	solo = true
+	my_id = 1
+	player_name = pname
+	_reset_client_state()
+	_names[1] = pname
+	_create_room("LAN", s, false, false)
+	_join_room(1, "LAN", pname)
+	for i in mini(int(s["max_players"]), 8) - 1:
+		add_bot()
+	status.emit("Solo match against bots: add or remove bots, then press Start.")
+	return OK
+
+
 func join_lan(address: String, port: int, pname: String) -> Error:
 	return _connect_to(address, port, pname, false, [])
 
@@ -646,6 +674,9 @@ func _on_connected() -> void:
 func request_ranked_opponents(pid: String, pname: String, rating: int, code: String) -> void:
 	var req: Array = [GAME_VERSION, pid, pname, rating, code]
 	_awaiting_ranked = true
+	if not network_supported():
+		_ranked_failed()  # browser build: generated opponents only
+		return
 	_ranked_deadline = Time.get_ticks_msec() + 6000
 	if role == Role.CLIENT and online and phase not in ["connecting", "syncing"] and not _sync_only and not _ranked_only:
 		_request("_rq_ranked", req)  # already connected to the server
@@ -720,7 +751,7 @@ func _rc_ranked(list: Array) -> void:
 ## settings, then disconnect. Lets offline play (expeditions, collection,
 ## ranked) follow what the server admin unlocked. Silent if unreachable.
 func sync_from_server() -> void:
-	if role != Role.NONE or logged_in or OS.get_cmdline_user_args().has("--server"):
+	if role != Role.NONE or logged_in or not network_supported() or OS.get_cmdline_user_args().has("--server"):
 		return
 	var a := _split_address()
 	if _server_cert(a[0], a[1]) == null:
@@ -785,6 +816,7 @@ func disconnect_all(silent: bool = false) -> void:
 	_auth_request = []
 	_sessions.clear()
 	_ranked_offers.clear()
+	solo = false
 	role = Role.NONE
 	online = false
 	phase = "idle"

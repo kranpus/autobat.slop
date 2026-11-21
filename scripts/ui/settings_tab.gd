@@ -116,6 +116,11 @@ func _build_account() -> void:
 	if not is_instance_valid(_account_box):
 		return
 	UIKit.clear(_account_box)
+	if not Party.network_supported():
+		var web := UIKit.label("Browser version: you play offline, and progress is saved in this browser. Download the game to sign in and play online.", 14)
+		web.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_account_box.add_child(web)
+		return
 	if is_instance_valid(_name_edit):
 		_name_edit.text = Profile.player_name()
 		_name_edit.editable = not Profile.online

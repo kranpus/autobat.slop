@@ -82,7 +82,7 @@ func _make_card(id: String) -> Control:
 	info_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(info_l)
 	if UnitLocks.is_locked(id):
-		var lk := UIKit.label("🔒 locked by server", 11, UIKit.BAD)
+		var lk := UIKit.label("⊘ locked by server", 11, UIKit.BAD)
 		lk.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(lk)
 	elif owned and (Profile.can_tier_up(id) or Profile.can_level_up(id)):
@@ -112,7 +112,7 @@ func _build_detail() -> void:
 	_detail.add_child(head)
 
 	if UnitLocks.is_locked(id):
-		var note := UIKit.label("🔒 Locked by the server: this unit can't be found or deployed until it's unlocked. You keep it and its upgrades.", 13, UIKit.BAD)
+		var note := UIKit.label("⊘ Locked by the server: this unit can't be found or deployed until it's unlocked. You keep it and its upgrades.", 13, UIKit.BAD)
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		note.custom_minimum_size = Vector2(240, 0)
 		_detail.add_child(note)

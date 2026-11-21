@@ -169,7 +169,20 @@ static func auto_ui_scale() -> float:
 
 ## Apply the player's interface size (Settings) or the automatic one.
 ## `--ui-scale=1.6` on the command line overrides it (handy for testing).
+## Symbols used in the UI (arrows, stars, triangles...) come from a bundled
+## subset of DejaVu Sans. Desktop systems usually have such a font already,
+## but browsers and some phones don't, and showed empty boxes instead.
+static func install_symbol_font() -> void:
+	var base: Font = ThemeDB.fallback_font
+	if base == null or not base.fallbacks.is_empty():
+		return
+	var symbols := load("res://assets/fonts/DejaVuSans-Symbols.ttf") as Font
+	if symbols:
+		base.fallbacks = [symbols]
+
+
 static func apply_ui_scale(tree: SceneTree) -> void:
+	install_symbol_font()
 	var setting := str(Profile.settings.get("ui_scale", "auto"))
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--ui-scale="):
