@@ -144,8 +144,7 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
 5. **Fight: Battle tab.**
    - **Ranked Arena:** **Find Opponents** saves your army on the server with your current rating
      and matches you against armies that **other players saved at a similar rating**: one close
-     match, one slightly lower and one slightly higher (the search leans a little above your
-     rating). Win rating (Elo), gold and maps. Empty slots, or all three when offline, are
+     match, one slightly lower and one slightly higher. Win rating (Elo), gold and maps. Empty slots, or all three when offline, are
      filled with generated training opponents.
    - **Win gold grows with your rating:** x1 up to 1000, then +100% for every 1000 above that
      (x2 at 2000, x3.5 at 3500). The Battle tab shows your current bonus. Losses and draws pay
@@ -165,9 +164,14 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Music:** battle music varies between three tracks, and challenge bosses get their own
        theme.
      - **Screen shake** can be turned off in Settings.
-   - **Training opponents:** on average a little stronger than your army, about 8% (Easy ≈ 0.9×,
-     Even ≈ 1.05×, Hard ≈ 1.3× your power). Above rating ~950 they carry trinkets too, more and
-     rarer as rating rises.
+   - **Training opponents:** an even fight on average.
+     - **Strength:** Easy ≈ 0.85×, Even ≈ 0.95×, Hard ≈ 1.05× your power, measured in the
+       simulator as roughly 62% / 50% / 41% to win.
+     - **Rating:** they are rated 75 below, level with and 75 above you, matching those odds, so
+       no difficulty is a free climb.
+     - **Trinkets:** above rating ~950 they carry trinkets too, more and rarer as rating rises.
+   - **Rating speed (Elo K-factor):** 24 up to rating 1200, falling steadily to 12 at 3000 and
+     above. An even win is worth about +12 at the start and +6 near the top.
    - **Challenges tab:** 12 hand-made battles in three chapters (Border Skirmishes, The Wild
      Frontier, Dragon Lands).
      - **The fights:** set enemy armies on chosen battlefields, including three challenge-only

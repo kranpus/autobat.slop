@@ -2673,7 +2673,7 @@ func _ranked_offer_for(id: int) -> Array:
 			continue
 		var r := int(e["rating"])
 		offers.append({"name": e["name"], "rating": r, "squads": army["squads"], "player": true, "saved_at": e["saved_at"],
-			"difficulty": "Easy" if r < rating - 25 else ("Hard" if r > rating + 25 else "Even")})
+			"difficulty": "Easy" if r < rating - Army.RANKED_LABEL_GAP else ("Hard" if r > rating + Army.RANKED_LABEL_GAP else "Even")})
 	Army.fill_ghosts(offers, Army.army_power(pl.battle_squads()), rating, _rng)
 	for i in offers.size():
 		offers[i]["map"] = BattleMaps.random_map_id(_rng)

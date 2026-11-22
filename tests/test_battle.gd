@@ -34,6 +34,7 @@ func _initialize() -> void:
 	test_power_formula()
 	test_ranged_splash_nerf()
 	test_unit_stats()
+	test_rating_speed()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -731,7 +732,7 @@ func test_harder_ghosts() -> void:
 			total += Army.army_power(o["squads"]) / mine
 			n += 1
 	var avg := total / float(n)
-	check(avg > 1.03 and avg < 1.13, "generated opponents average %.2fx your power (a little stronger than you)" % avg)
+	check(avg > 0.92 and avg < 1.0, "generated opponents average %.2fx your power (an even fight, measured)" % avg)
 	var low := Army.generate_opponent(5000.0, 900, 5)
 	var low_has: bool = low["squads"].any(func(sq): return sq.has("trinkets"))
 	var high_count := 0
@@ -1083,3 +1084,17 @@ func test_unit_stats() -> void:
 	check(st.report(PackedStringArray(["draft", "win"])).contains("Sorted by draft win"), "the table can be sorted by one mode")
 	check(st.report(PackedStringArray(["bogus"])).begins_with("Unknown option"), "bad options explain the usage")
 	check(st.report(PackedStringArray(["all"])).contains("Titan"), "'all' includes unused units")
+
+
+func test_rating_speed() -> void:
+	print("rating speed (patch 0.9)")
+	check(Army.elo_delta(1000, 1000, 1.0) == 12 and Army.elo_delta(1000, 1000, 0.0) == -12, "an even battle at 1000 is +12 / -12")
+	check(Army.elo_delta(3200, 3200, 1.0) == 6, "an even win near the top is +6")
+	var mid := Army.elo_delta(2100, 2100, 1.0)
+	check(mid > 6 and mid < 12, "in between in the middle of the ladder (+%d at 2100)" % mid)
+	# Fair offsets: with the measured odds, no tier pays on average.
+	var odds := {"Easy": 0.62, "Even": 0.5, "Hard": 0.41}
+	for t in Army.GHOST_TIERS:
+		var p: float = odds[t[2]]
+		var ev := p * Army.elo_delta(1500, 1500 + int(t[1]), 1.0) + (1.0 - p) * Army.elo_delta(1500, 1500 + int(t[1]), 0.0)
+		check(absf(ev) < 1.0, "%s opponents are worth about 0 rating on average (%.2f)" % [t[2], ev])

@@ -175,7 +175,7 @@ func _on_ranked_opponents(list: Array) -> void:
 		var r := int(e.get("rating", 1000))
 		_opponents.append({
 			"name": str(e.get("name", "Commander")), "rating": r, "squads": army["squads"],
-			"difficulty": "Easy" if r < rating - 25 else ("Hard" if r > rating + 25 else "Even"),
+			"difficulty": "Easy" if r < rating - Army.RANKED_LABEL_GAP else ("Hard" if r > rating + Army.RANKED_LABEL_GAP else "Even"),
 			"map": BattleMaps.random_map_id(rng), "player": true, "saved_at": int(e.get("saved_at", 0)),
 		})
 	# Fill the remaining slots with generated opponents (the server already

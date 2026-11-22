@@ -185,11 +185,16 @@ const GHOST_NAMES := [
 
 
 ## Generated ("training") ranked opponents: power relative to yours, rating
-## offset, label. On average a little stronger than you (about 1.08x).
-const GHOST_TIERS := [[0.9, -30, "Easy"], [1.05, 20, "Even"], [1.3, 90, "Hard"]]
-## Saved player armies are searched around your rating plus this, so real
-## opponents also lean slightly stronger.
-const RANKED_SEARCH_BIAS := 20
+## offset, label. Measured in the simulator (each pairing fought from both
+## sides): a generated army at 0.95x your power wins about half the time,
+## 0.85x about 38%, 1.05x about 59%, so the three average out to an even
+## fight. The rating offsets match those odds, so the rating you can win or
+## lose is fair whichever you pick: no tier is a free climb.
+const GHOST_TIERS := [[0.85, -75, "Easy"], [0.95, 0, "Even"], [1.05, 75, "Hard"]]
+## Saved player armies are searched around your rating plus this.
+const RANKED_SEARCH_BIAS := 0
+## Real opponents more than this far from your rating are labelled Easy / Hard.
+const RANKED_LABEL_GAP := 40
 
 
 ## Fill `offers` up to three opponents with generated ones, first covering any
@@ -298,6 +303,23 @@ static func win_gold_mult(rating: int) -> float:
 	return 1.0 + maxf(0.0, float(rating - 1000)) / 1000.0
 
 
-static func elo_delta(my_rating: int, opp_rating: int, score: float, k: float = 32.0) -> int:
+## How fast rating moves (Elo K-factor): 24 up to 1200 rating, falling to 12
+## at 3000 and above, so the top of the ladder takes longer to climb.
+## (Before 0.9 it was 32 at every rating.)
+const RATING_K_LOW := 24.0
+const RATING_K_HIGH := 12.0
+const RATING_K_FROM := 1200
+const RATING_K_TO := 3000
+
+
+static func rating_k(rating: int) -> float:
+	var t := clampf(float(rating - RATING_K_FROM) / float(RATING_K_TO - RATING_K_FROM), 0.0, 1.0)
+	return lerpf(RATING_K_LOW, RATING_K_HIGH, t)
+
+
+## k < 0: the K-factor for my_rating (rating_k).
+static func elo_delta(my_rating: int, opp_rating: int, score: float, k: float = -1.0) -> int:
+	if k < 0.0:
+		k = rating_k(my_rating)
 	var expected := 1.0 / (1.0 + pow(10.0, float(opp_rating - my_rating) / 400.0))
 	return roundi(k * (score - expected))
