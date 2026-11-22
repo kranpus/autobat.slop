@@ -992,14 +992,19 @@ func test_power_formula() -> void:
 	var ra := Army.army_power([{"unit": "elf_archer", "level": 1, "count": 60, "row": "back"}])
 	var rb := Army.army_power([{"unit": "elf_archer", "level": 1, "count": 30, "row": "back"}])
 	check(is_equal_approx(ra / rb, 2.0), "ranged squads still count every unit")
-	# Equal power should mean an even fight: 120 goblins vs 60 goblins with
-	# the stats that make their power equal.
-	var level := 1 + roundi((pow(2.0, 0.85) - 1.0) / 0.08)
-	var wins := 0
-	for seed_i in 6:
-		var sim := BattleSim.new()
-		sim.setup([{"unit": "goblin", "level": 1, "count": 120, "row": "front"}], [{"unit": "goblin", "level": level, "count": 60, "row": "front"}], 40 + seed_i, "open_arena")
-		sim.run_to_end(200000)
-		if sim.winner == 0:
-			wins += 1
-	check(wins >= 1 and wins <= 5, "equal power is an even fight: the bigger squad won %d of 6" % wins)
+	# Equal power should mean an even fight: level up a squad of 60 goblins
+	# until it beats 120 goblins; that should happen close to equal power.
+	var target := Army.squad_power("goblin", 1, 120)
+	var crossover := 0.0
+	for level in range(1, 25):
+		var wins := 0
+		for seed_i in 4:
+			var sim := BattleSim.new()
+			sim.setup([{"unit": "goblin", "level": 1, "count": 120, "row": "front"}], [{"unit": "goblin", "level": level, "count": 60, "row": "front"}], 40 + seed_i, "open_arena")
+			sim.run_to_end(200000)
+			if sim.winner == 1:
+				wins += 1
+		if wins >= 2:
+			crossover = Army.squad_power("goblin", level, 60) / target
+			break
+	check(crossover > 0.85 and crossover < 1.15, "half as many melee units win at about equal power (%.2fx)" % crossover)
