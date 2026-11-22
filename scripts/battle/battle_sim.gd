@@ -17,7 +17,8 @@ const RETARGET_TICKS := 12
 const SEARCH_RINGS := 4
 const FALLBACK_SAMPLES := 24
 const SEPARATION_CHECKS := 10
-const AOE_SPLASH_MULT := 0.6
+const AOE_SPLASH_MULT := 0.6        # splash damage of melee attacks, as a share of the hit
+const RANGED_SPLASH_MULT := 0.45    # ...and of projectiles (patch 0.9: was 0.6)
 const MAX_SPLASH_TARGETS := 6     # keeps splash damage from scaling with crowd density
 const HALF_NEIGHBOURS := [Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1)]
 
@@ -504,7 +505,7 @@ func _deal_damage(src: int, src_team: int, dt_idx: int, amount: float, primary: 
 	if radius_aoe <= 0.0:
 		return
 	events.append([Ev.BLAST, x, y, radius_aoe])
-	var splash := amount * AOE_SPLASH_MULT
+	var splash := amount * (AOE_SPLASH_MULT if melee else RANGED_SPLASH_MULT)
 	var hits := 0
 	var rings := ceili(radius_aoe / CELL)
 	var cx := clampi(int(x / CELL), 0, gw - 1)

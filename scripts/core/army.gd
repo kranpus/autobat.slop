@@ -64,7 +64,9 @@ static func squad_mods(sq: Dictionary) -> Dictionary:
 static func unit_power(unit_id: String, level: int, mods: Dictionary = {}) -> float:
 	var s := unit_stats(unit_id, level, mods)
 	var cd: float = s["cooldown"]
-	var dps: float = (float(s["dmg"]) * (1.0 + minf(float(s["aoe"]), 60.0) / 40.0) + float(s["heal"]) * 1.5) / cd + float(s["regen"])
+	var splash_share := BattleSim.AOE_SPLASH_MULT if str(s["projectile"]) == "none" else BattleSim.RANGED_SPLASH_MULT
+	var splash_bonus := minf(float(s["aoe"]), 60.0) / 40.0 * splash_share / BattleSim.AOE_SPLASH_MULT
+	var dps: float = (float(s["dmg"]) * (1.0 + splash_bonus) + float(s["heal"]) * 1.5) / cd + float(s["regen"])
 	var reach_bonus := 1.0 + minf(float(s["range"]), 260.0) / 520.0
 	# Big units are worth more than raw stats suggest (they can't be swarmed
 	# as efficiently), so rarer units carry a calibrated multiplier.

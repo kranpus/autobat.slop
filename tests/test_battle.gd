@@ -32,6 +32,8 @@ func _initialize() -> void:
 	test_challenges()
 	test_target_modes()
 	test_power_formula()
+	test_ranged_splash_nerf()
+	test_unit_stats()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -191,6 +193,9 @@ func test_match_room() -> void:
 	var room := MatchRoom.new("TEST1", {"wins": 3, "lives": 2, "max_players": 4, "turn_time": 60}, true, false)
 	var inbox: Array = []
 	room.outbox.connect(func(id: int, method: String, args: Array): inbox.append([id, method, args]))
+	var recorded: Array = []
+	room.battle_recorded.connect(func(squads: Array, score: float): recorded.append([squads, score]))
+	var human_results: Array = []
 	check(room.add_player(42, "Tester") == "", "human joins the room")
 	for i in 3:
 		room.add_bot(42)
@@ -225,8 +230,11 @@ func test_match_room() -> void:
 					if JSON.stringify(server_board, "", true) != JSON.stringify(client.board, "", true):
 						replay_ok = false
 				"results":
+					human_results.append(float(m[2][0]["outcome"]))
 					room.shop_ready(42, room.round_num)
 	check(room.phase == "over", "match finished (%d rounds played by the human)" % rounds)
+	check(recorded.size() == human_results.size() and recorded.map(func(r): return r[1]) == human_results,
+		"unit stats get the human's board and result every battle, never the bots' (%d battles)" % recorded.size())
 	check(replay_ok, "server's replayed board always matches the client's board")
 	var places := {}
 	for id in room.players:
@@ -1008,3 +1016,70 @@ func test_power_formula() -> void:
 			crossover = Army.squad_power("goblin", level, 60) / target
 			break
 	check(crossover > 0.85 and crossover < 1.15, "half as many melee units win at about equal power (%.2fx)" % crossover)
+
+
+func test_ranged_splash_nerf() -> void:
+	print("ranged splash (patch 0.9)")
+	# The same hit, once as a melee blow and once as a projectile: the units
+	# next to the target take less from the projectile's splash.
+	var lost := []
+	for melee in [true, false]:
+		var sim := BattleSim.new()
+		sim.setup([{"unit": "lich", "level": 1, "count": 1, "row": "back"}], [{"unit": "ogre", "level": 30, "count": 4, "row": "front"}], 5, "open_arena")
+		var targets: Array = []
+		for i in sim.team.size():
+			if sim.team[i] == 1:
+				targets.append(i)
+		for k in targets.size():
+			sim.px[targets[k]] = 600.0 + 4.0 * k
+			sim.py[targets[k]] = 400.0
+		sim._rebuild_grid()
+		var before := 0.0
+		for k in range(1, targets.size()):
+			before += sim.hp[targets[k]]
+		sim._deal_damage(-1, 0, 0, 100.0, targets[0], 600.0, 400.0, 40.0, melee)
+		var after := 0.0
+		for k in range(1, targets.size()):
+			after += sim.hp[targets[k]]
+		lost.append(before - after)
+	check(lost[1] > 0.0 and absf(lost[1] / lost[0] - BattleSim.RANGED_SPLASH_MULT / BattleSim.AOE_SPLASH_MULT) < 0.001,
+		"projectile splash deals %.0f%% of melee splash (%.1f vs %.1f)" % [100.0 * lost[1] / lost[0], lost[1], lost[0]])
+	check(is_equal_approx(BattleSim.RANGED_SPLASH_MULT, 0.45) and is_equal_approx(BattleSim.AOE_SPLASH_MULT, 0.6), "ranged splash 45% of the hit, melee splash still 60%")
+	# Strength follows: a splash caster lost power, a melee splasher didn't.
+	var lich_full := Army.unit_power("lich", 1)
+	var ogre_full := Army.unit_power("ogre", 1)
+	check(lich_full < 1.0 * _old_power("lich") and is_equal_approx(ogre_full, _old_power("ogre")), "splash counts less in a ranged unit's Strength only")
+	check(PatchNotes.latest() == UnitStats.current_patch(), "the patch notes cover this version (%s)" % PatchNotes.latest())
+
+
+## Unit power with the pre-0.9 splash formula (every splash counted fully).
+func _old_power(unit_id: String) -> float:
+	var s := Army.unit_stats(unit_id, 1)
+	var dps: float = (float(s["dmg"]) * (1.0 + minf(float(s["aoe"]), 60.0) / 40.0) + float(s["heal"]) * 1.5) / float(s["cooldown"]) + float(s["regen"])
+	return sqrt(float(s["hp"]) * dps * (1.0 + minf(float(s["range"]), 260.0) / 520.0)) * float(GameData.RARITIES[s["rarity"]]["power_mult"])
+
+
+func test_unit_stats() -> void:
+	print("unit stats (server)")
+	var st := UnitStats.new()
+	var patch := UnitStats.current_patch()
+	st.record("ranked", [{"unit": "goblin"}, {"unit": "goblin"}, {"unit": "elf_archer"}], 1.0)
+	st.record("ranked", [{"unit": "goblin"}], 0.0)
+	st.record("ranked", [{"unit": "lich"}], 0.5)
+	st.record("draft", [{"unit": "goblin"}, {"unit": "ogre"}], 0.0)
+	st.record("draft", [{"unit": "nope"}], 1.0)          # unknown units are ignored
+	st.record("challenge", [{"unit": "goblin"}], 1.0)     # only ranked and draft count
+	check(st.armies(patch, "ranked") == 3 and st.armies(patch, "draft") == 1, "armies counted per mode")
+	var rows := {}
+	for r in st.rows(patch):
+		rows[r["unit"]] = r
+	var g: Dictionary = rows["goblin"]["ranked"]
+	check(g["games"] == 2 and g["wins"] == 1 and g["losses"] == 1, "a unit counts once per army (goblin 1-1 in ranked)")
+	check(is_equal_approx(g["use"], 2.0 / 3.0) and is_equal_approx(g["win"], 0.5), "use rate and win rate")
+	check(is_equal_approx(rows["lich"]["ranked"]["win"], 0.5) and rows["lich"]["ranked"]["draws"] == 1, "draws count half")
+	check(rows["ogre"]["draft"]["losses"] == 1 and is_equal_approx(rows["ogre"]["draft"]["use"], 1.0) and rows["ogre"]["ranked"]["games"] == 0, "draft kept apart from ranked")
+	var text := st.report(PackedStringArray())
+	check(text.contains("Goblin Skirmisher") and text.contains("66.7%") and text.contains("3 ranked armies") and not text.contains("Titan"), "the console table lists used units with their rates")
+	check(st.report(PackedStringArray(["draft", "win"])).contains("Sorted by draft win"), "the table can be sorted by one mode")
+	check(st.report(PackedStringArray(["bogus"])).begins_with("Unknown option"), "bad options explain the usage")
+	check(st.report(PackedStringArray(["all"])).contains("Titan"), "'all' includes unused units")

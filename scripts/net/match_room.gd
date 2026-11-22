@@ -12,6 +12,9 @@ signal outbox(peer_id: int, method: String, args: Array)
 signal room_log(text: String)
 ## The match ended: final placements with rewards (the server credits accounts).
 signal finished(placements: Array)
+## Each human board after a battle (for the server's unit stats): its squads
+## and 1 win / 0 loss / 0.5 draw.
+signal battle_recorded(squads: Array, score: float)
 
 const READY_TIMEOUT_MS := 200000
 const AUTO_START_MS := 30000          # quick-match rooms start this long after 2+ players join
@@ -372,7 +375,7 @@ func _queue_battle(a: int, b: int, ghost: bool) -> void:
 	var sim := BattleSim.new()
 	sim.setup(sq_a, sq_b, seed_value, map)
 	var task := WorkerThreadPool.add_task(sim.run_to_end.bind(200000), false, "draft battle")
-	_sims.append({"task": task, "sim": sim, "a": a, "b": b, "ghost": ghost})
+	_sims.append({"task": task, "sim": sim, "a": a, "b": b, "ghost": ghost, "sq_a": sq_a, "sq_b": sq_b})
 	var cfg := {
 		"mode": "draft", "round": round_num, "seed": seed_value, "map": map, "use_lives": settings["use_lives"],
 		"squads_a": sq_a, "squads_b": sq_b,
@@ -395,6 +398,10 @@ func _finish_battles() -> void:
 		outcome[s["a"]] = 1.0 if w == 0 else (0.0 if w == 1 else 0.5)
 		if not s["ghost"]:
 			outcome[s["b"]] = 1.0 if w == 1 else (0.0 if w == 0 else 0.5)
+		for side in (["a"] if s["ghost"] else ["a", "b"]):
+			var pid: int = s[side]
+			if players.has(pid) and not bool(players[pid].get("bot", false)):
+				battle_recorded.emit(s["sq_" + side], outcome[pid])
 	_sims.clear()
 	var winners: Array = []
 	var losers: Array = []

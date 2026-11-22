@@ -13,6 +13,7 @@ const LoginScreen := preload("res://scripts/ui/login_screen.gd")
 const TrinketTab := preload("res://scripts/ui/trinket_tab.gd")
 const LeaderboardTab := preload("res://scripts/ui/leaderboard_tab.gd")
 const ChallengesTab := preload("res://scripts/ui/challenges_tab.gd")
+const PatchNotesTab := preload("res://scripts/ui/patch_notes_tab.gd")
 
 var menu_layer: CanvasLayer
 var tabs: TabContainer
@@ -94,10 +95,22 @@ func _ready() -> void:
 	var draft_tab := DraftLobbyTab.new()
 	draft_tab.name = "Legion Draft"
 	tabs.add_child(draft_tab)
+	var notes_tab := PatchNotesTab.new()
+	notes_tab.name = "Patch Notes"
+	tabs.add_child(notes_tab)
 	var settings_tab := SettingsTab.new()
 	settings_tab.name = "Settings"
 	tabs.add_child(settings_tab)
 	tabs.tab_changed.connect(func(_i): Audio.play_sfx("toggle", -8.0))
+	# Marks the Patch Notes tab until this version's notes have been opened.
+	var notes_index := notes_tab.get_index()
+	if str(Profile.settings.get("seen_patch", "")) != PatchNotes.latest():
+		tabs.set_tab_title(notes_index, "Patch Notes (new)")
+	tabs.tab_changed.connect(func(i: int):
+		if i == notes_index and str(Profile.settings.get("seen_patch", "")) != PatchNotes.latest():
+			Profile.settings["seen_patch"] = PatchNotes.latest()
+			Profile.save_settings()
+			tabs.set_tab_title(notes_index, "Patch Notes"))
 
 	Profile.changed.connect(_refresh_top_bar)
 	Net.match_ready.connect(start_battle)

@@ -26,7 +26,7 @@ signal left_match(reason: String)
 ## similar rating). Empty when the server can't be reached.
 signal ranked_opponents(list: Array)
 
-const GAME_VERSION := "legion-draft-13"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-14"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server (ENet/UDP)
 const WS_PORT := 24704                   # same server for browsers (WebSocket/TCP)
@@ -77,6 +77,7 @@ var _ranked_request: Array = []
 var _awaiting_ranked := false
 var _ranked_deadline := 0
 var ranked_pool: RankedPool         # server only: players' saved ranked armies
+var unit_stats: UnitStats           # server only: unit use and win rates (admin console)
 
 # Authority side (SERVER or HOST).
 var _rooms := {}             # code -> MatchRoom
@@ -378,6 +379,8 @@ func start_server(port: int = SERVER_PORT) -> Error:
 	_log("Accounts: %d (passwords stored as salted PBKDF2-SHA256 hashes)" % accounts.count())
 	ranked_pool = RankedPool.new()
 	ranked_pool.load_file()
+	unit_stats = UnitStats.new()
+	unit_stats.load_file()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--battle-gold="):
 			rewards["battle_mult"] = maxf(0.0, float(arg.get_slice("=", 1)))
@@ -485,9 +488,17 @@ func run_command(line: String) -> String:
   drops pity <rarity> <n>         guarantee rare/epic/legendary every n expeditions (0 = off)
   drops reset                     back to the defaults
   update-url <url>                where out-of-date games download the new version
+  unitstats                       unit use and win rates in ranked and Legion Draft
+                                  (this patch); options: ranked|draft, use|win|games|name,
+                                  all, a row limit, a patch e.g. 'unitstats draft win 20'
+  unitstats patches               patches with recorded stats
+  unitstats csv [patch]           save a spreadsheet of a patch's stats
+  unitstats reset [patch]         delete a patch's stats (default: this patch)
   accounts                        number of accounts and who is signed in
   accounts reset-password <user>  give a player who forgot their password a new
                                   temporary one (shown once) and sign them out"""
+		"unitstats":
+			out = _unitstats_command(a.slice(1))
 		"status":
 			out = "%d players online, %d rooms. %s" % [_names.size(), _rooms.size(), _gold_text()]
 			if mp.multiplayer_peer is MultiPeer and (mp.multiplayer_peer as MultiPeer).transport_count() > 1:
@@ -585,6 +596,30 @@ func run_command(line: String) -> String:
 
 ## lock/unlock: unit ids or names ("Storm Dragon" -> storm_dragon), or the
 ## keywords "new" (units locked by default), "all", and "reset" (lock only).
+func _unitstats_command(args: PackedStringArray) -> String:
+	if unit_stats == null:
+		return "Unit stats are kept by the dedicated server only."
+	var sub := args[0].to_lower() if not args.is_empty() else ""
+	var patch := args[1] if args.size() > 1 else UnitStats.current_patch()
+	match sub:
+		"patches":
+			var list := unit_stats.patches()
+			if list.is_empty():
+				return "No unit stats recorded yet."
+			var parts: Array = []
+			for p in list:
+				parts.append("%s (%d ranked, %d draft armies)" % [p, unit_stats.armies(p, "ranked"), unit_stats.armies(p, "draft")])
+			return "Patches with unit stats: " + ", ".join(PackedStringArray(parts)) + ". This server is patch %s." % UnitStats.current_patch()
+		"reset":
+			unit_stats.save_if_due(true)
+			return "Deleted the unit stats of patch %s." % patch if unit_stats.reset(patch) else "No unit stats for patch %s." % patch
+		"csv":
+			unit_stats.save_if_due(true)
+			var path := unit_stats.write_csv(patch)
+			return "Saved %s" % path if path != "" else "Couldn't write the spreadsheet."
+	return unit_stats.report(args)
+
+
 func _lock_command(lock: bool, words: PackedStringArray) -> String:
 	if words.is_empty():
 		return "Usage: lock <unit> [unit...] | unlock <unit> [unit...] | lock new | unlock new | unlock all | lock reset"
@@ -1306,6 +1341,7 @@ func _create_room(code: String, new_settings: Dictionary, is_public: bool, quick
 	r.room_log.connect(_log)
 	if role == Role.SERVER:
 		r.finished.connect(_credit_draft)   # draft rewards go to signed-in accounts
+		r.battle_recorded.connect(func(squads: Array, score: float): unit_stats.record("draft", squads, score))
 	_rooms[code] = r
 	return r
 
@@ -1666,9 +1702,18 @@ func _send_beacon(delta: float) -> void:
 
 # --- per frame ----------------------------------------------------------------
 
+func _notification(what: int) -> void:
+	# Stopping the server (window closed, Ctrl+C, docker stop): keep the
+	# latest unit stats.
+	if (what == NOTIFICATION_WM_CLOSE_REQUEST or what == NOTIFICATION_PREDELETE) and unit_stats:
+		unit_stats.save_if_due(true)
+
+
 func _process(delta: float) -> void:
 	mp.poll()
 	_poll_console()
+	if unit_stats:
+		unit_stats.save_if_due()
 	if _sync_only and Time.get_ticks_msec() > _sync_deadline:
 		disconnect_all(true)
 	if _awaiting_ranked and Time.get_ticks_msec() > _ranked_deadline:
@@ -2660,7 +2705,7 @@ func _rq_ranked_battle(index: int) -> void:
 	var sim := BattleSim.new()
 	sim.setup(mine, opp["squads"], seed_value, opp["map"])
 	var task := WorkerThreadPool.add_task(sim.run_to_end.bind(200000), false, "ranked battle")
-	_ranked_jobs.append({"task": task, "sim": sim, "peer": id, "user": user, "opp": opp})
+	_ranked_jobs.append({"task": task, "sim": sim, "peer": id, "user": user, "opp": opp, "mine": mine})
 	_deliver(id, "ranked_start", [{
 		"mode": "ranked_online", "seed": seed_value, "map": opp["map"], "squads_a": mine, "squads_b": opp["squads"],
 		"name_a": str(pl.data.get("name", user)), "name_b": opp["name"], "rating_a": pl.rating(), "rating_b": int(opp["rating"]),
@@ -2719,6 +2764,7 @@ func _poll_ranked_jobs() -> void:
 			summary = pl.complete_challenge(str(j["challenge"]), score >= 1.0)
 		else:
 			summary = pl.apply_battle_result("ranked", score, int(j["opp"]["rating"]), killed)
+			unit_stats.record("ranked", j["mine"], score)
 		summary["score"] = score
 		accounts.save(user)
 		var id := int(j["peer"])

@@ -179,6 +179,8 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Rewards:** a fixed reward for the first win: gold, maps, specific trinkets, and units
        such as the Ogre Brute, Lich, Phoenix and Golden Dragon. Replays pay nothing.
      - **Signed in:** the server runs the battle and pays the reward.
+   - **Patch Notes tab:** balance changes by version, newest first. Marked "(new)" until you've
+     opened the current version's notes. Edit `scripts/core/patch_notes.gd` to add a patch.
    - **Leaderboard tab:** the top 50 signed-in players by rating (players need at least one
      ranked battle), with your own rank. Guests can view it but aren't on it.
    - **Friend Challenge:** paste a friend's *army code* (Army tab → Copy) to fight their exact army.
@@ -298,6 +300,8 @@ obstacles (x/y as fractions of the map; anything left of centre is mirrored auto
   undead and treants, magic melts heavy armor.
 - Splash damage (capped at 6 targets per hit), healers, regeneration, and flying units (melee hits
   them for only 60%).
+  - **Melee splash** hits nearby enemies for 60% of the blow.
+  - **Projectile splash** (stones, magic, fire) hits them for 45% (patch 0.9; was 60%).
 - Battle controls: mouse wheel to zoom, drag to pan, 1x/2x/4x speed, skip to result.
 
 ## How the 1000+ unit battles work
@@ -340,6 +344,7 @@ scripts/core/battle_maps.gd   The 20 battlefields and their obstacles
 scripts/core/army.gd          Squad sizes, power, army codes, opponent generator, Elo
 scripts/core/profile_logic.gd Profile rules: upgrades, expeditions, trinkets, rewards (shared by game and server)
 scripts/core/trinkets.gd      The 100 trinkets, hunting sites and their effects
+scripts/core/patch_notes.gd   Patch notes shown in the game (balance changes per version)
 scripts/core/profile.gd       The game's profile: local guest save or the server's copy (autoload "Profile")
 scripts/core/audio.gd         Music + pooled/throttled SFX (autoload "Audio")
 scripts/net/net.gd            ENet live duels (autoload "Net")
@@ -349,6 +354,7 @@ scripts/net/multi_peer.gd     Server: ENet (app) + WebSocket (browser) players a
 scripts/net/web_host.gd       Server: tiny HTTP host for the browser build
 scripts/net/passwords.gd      PBKDF2-SHA256 password hashing, login tokens
 scripts/net/account_store.gd  Server-side accounts (one JSON file each, no passwords stored)
+scripts/net/unit_stats.gd     Server-only unit use / win rates per patch (console: unitstats)
 server/                       Dockerfile, docker-compose and run script for the online server
 scripts/draft/draft_data.gd   Draft rules, unit abilities, trinkets
 scripts/draft/draft_run.gd    A player's draft run: shop, merging, abilities, bot AI

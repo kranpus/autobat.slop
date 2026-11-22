@@ -146,6 +146,7 @@ admin> gold battle 1.5
 Battle gold is now x1.5.
 admin> drops unit legendary 0.25
 admin> accounts reset-password SomePlayer
+admin> unitstats draft win 20
 admin> exit
 ```
 

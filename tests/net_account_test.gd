@@ -131,6 +131,13 @@ func _run() -> void:
 
 	check(cfg["squads_a"].any(func(sq): return sq.get("trinkets", []).has(trinket)), "the battle used the equipped trinket")
 
+	print("unit stats on the server")
+	var unit_name: String = GameData.UNITS[owned[0]]["name"]
+	var table := await _admin("unitstats ranked games")
+	print("    " + table.replace("\n", "\n    ").left(900))
+	check(table.contains(unit_name), "the server counted the ranked battle for %s" % unit_name)
+	check((await _admin("unitstats patches")).contains(ProjectSettings.get_setting("application/config/version")), "stats are kept under this patch")
+
 	print("challenges on the server")
 	var gold_c: int = profile.gold()
 	party.request_challenge_battle("rat_problem")
@@ -235,6 +242,23 @@ var _last_login: Array = [false, ""]
 
 func _login_done() -> void:
 	await party.login_result
+
+
+## Runs a console command on the server through its admin inbox (as admin.sh does).
+func _admin(command: String) -> String:
+	var id := "t%d" % randi()
+	DirAccess.make_dir_recursive_absolute("user://admin")
+	var f := FileAccess.open("user://admin/commands.txt", FileAccess.WRITE)
+	f.store_string("%s\t%s\n" % [id, command])
+	f.close()
+	for _i in 40:
+		await _wait_ms(250)
+		var text := FileAccess.get_file_as_string("user://admin/replies.txt")
+		var start := text.rfind("### %s\n" % id)
+		var end := text.rfind("### end %s" % id)
+		if start >= 0 and end > start:
+			return text.substr(start + id.length() + 5, end - start - id.length() - 5).strip_edges()
+	return ""
 
 
 func _wait_ms(ms: int) -> void:

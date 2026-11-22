@@ -270,6 +270,11 @@ Ctrl+P then Ctrl+Q to detach again.
 | `unlock new` / `lock new` | Release (or re-lock) the unreleased content all at once: the 40 new units **and** the 8 new regions. |
 | `unlock all` | Unlock every unit and region. |
 | `lock reset` | Back to the defaults: the 40 new units and 8 new regions locked, everything else open. |
+| `unitstats` | Unit balance stats for the current patch: each unit's **use rate** (share of armies that include it) and **win rate** with W-L-D, in ranked and in Legion Draft side by side. Only units that have been used are listed. See below. |
+| `unitstats draft win 20` | Options in any order: `ranked` / `draft` (sort by that mode only), `use` / `win` / `games` / `name` (sort key), `all` (also list unused units), a number (show only that many rows), a patch such as `0.9`. |
+| `unitstats patches` | The patches that have stats, with how many armies each recorded. |
+| `unitstats csv [patch]` | Save a spreadsheet (`unit_stats_<patch>.csv`) next to the server's settings. |
+| `unitstats reset [patch]` | Delete a patch's stats (default: the current patch). |
 
 Notes:
 - **Drop chances** are saved with the other settings and sent to players like the unit locks.
@@ -291,6 +296,29 @@ Notes:
   until it's unlocked.
 - **Startup flags:** you can also set values when starting the server, e.g.
   `-- --server --battle-gold=1.5 --draft-gold=2`. These override the saved file for that run.
+
+### Unit stats
+
+The server keeps balance statistics that only you can see. Players never receive them.
+
+- **Ranked:** every server-run ranked battle counts the signed-in player's army. The opponent is
+  a saved copy or a generated army, so it isn't counted again. Guests' offline battles aren't
+  counted.
+- **Legion Draft:** every battle on the server counts each human player's board. Bots' boards
+  are left out, but a human's win or loss against a bot counts.
+- **Counting:** a unit counts once per army, however many squads of it the army has.
+  - **Use rate:** the armies that include it ÷ all armies recorded.
+  - **Win rate:** how those armies did. Draws count as half a win.
+  - **Small samples:** a `*` marks a rate from under 20 games.
+- **Per patch:** stats are kept per release version (the patch number in the **Patch Notes** tab
+  and on the sign-in screen). Every balance patch starts a fresh table, and older patches stay
+  available for comparison, e.g. `unitstats 0.9`.
+- **Storage:**
+  - **File:** `unit_stats.json` in the server's user data folder (the `legion-data` Docker
+    volume). It is saved every 10 seconds.
+  - **Spreadsheet:** to copy one off a Docker server, run `server/admin.sh "unitstats csv"`,
+    then
+    `docker cp "legion-draft-server:/home/godot/.local/share/godot/app_userdata/Autobat Legions/unit_stats_0.9.csv" .`
 
 ## Accounts and security
 
