@@ -400,6 +400,41 @@ func _poll_console() -> void:
 	_stdin_mutex.unlock()
 	for line in lines:
 		run_command(line)
+	_poll_admin_inbox()
+
+
+## Commands can also be dropped into a file, which server/admin.sh does with
+## `docker exec` (no need to attach to the console). Each request is
+## "<id>\t<command>" in admin/commands.txt; the reply goes to
+## admin/replies.txt between "### <id>" and "### end <id>".
+const ADMIN_DIR := "user://admin"
+var _admin_check_msec := 0
+
+
+func _poll_admin_inbox() -> void:
+	var now := Time.get_ticks_msec()
+	if now - _admin_check_msec < 500:
+		return
+	_admin_check_msec = now
+	var inbox := ADMIN_DIR + "/commands.txt"
+	if not FileAccess.file_exists(inbox):
+		return
+	var text := FileAccess.get_file_as_string(inbox)
+	DirAccess.remove_absolute(inbox)
+	if text.strip_edges() == "":
+		return
+	var replies := ADMIN_DIR + "/replies.txt"
+	var keep := FileAccess.file_exists(replies) and FileAccess.open(replies, FileAccess.READ).get_length() < 1 << 20
+	var out := FileAccess.open(replies, FileAccess.READ_WRITE if keep else FileAccess.WRITE)
+	if out == null:
+		return
+	out.seek_end()
+	for line in text.split("\n", false):
+		var id := line.get_slice("\t", 0).strip_edges()
+		var cmd := line.substr(id.length() + 1).strip_edges() if line.contains("\t") else line.strip_edges()
+		var reply := run_command(cmd) if cmd != "" else ""
+		out.store_string("### %s\n%s\n### end %s\n" % [id, reply, id])
+	out.close()
 
 
 ## Execute one admin command and print the result. Also usable from code/tests.

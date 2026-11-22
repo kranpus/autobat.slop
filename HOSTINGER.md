@@ -107,7 +107,7 @@ All of these run on the VPS, in the `autobat.slop` folder:
 
 | Task | Command |
 |---|---|
-| Admin console (gold, drops, locks, accounts...) | `docker attach legion-draft-server` (leave with **Ctrl+P, Ctrl+Q**; Ctrl+C would stop the server) |
+| Admin console (gold, drops, locks, accounts...) | `server/admin.sh` (see below) |
 | Server log | `docker compose -f server/docker-compose.vps.yml logs -f legion-draft` |
 | Update to new code | `git pull && docker compose -f server/docker-compose.vps.yml up -d --build` |
 | Restart | `docker compose -f server/docker-compose.vps.yml restart` |
@@ -126,6 +126,40 @@ Out-of-date games show an **Update required** prompt when they connect:
   echo "UPDATE_URL=https://yourname.itch.io/autobat-legions" >> server/.env
   ```
   Or type `update-url https://...` in the admin console.
+
+## The admin console
+
+Connect to the VPS (hPanel → **VPS** → **Browser terminal**, or `ssh root@<IP>`), then:
+
+```bash
+cd autobat.slop
+server/admin.sh
+```
+
+You get an `admin>` prompt. Type commands and press Enter; type `help` for the list and `exit`
+to leave. For example:
+
+```
+admin> status
+0 players online, 0 rooms. Gold: battles x1, draft x1, ...
+admin> gold battle 1.5
+Battle gold is now x1.5.
+admin> drops unit legendary 0.25
+admin> accounts reset-password SomePlayer
+admin> exit
+```
+
+To run a single command without the prompt: `server/admin.sh status` or
+`server/admin.sh "gold battle 1.5"`.
+
+Changes apply immediately and are saved (they survive restarts and updates). This is safe in the
+browser terminal: there's nothing to detach from, and Ctrl+C only leaves the console, not the
+server.
+
+**The raw console:** `docker attach legion-draft-server` connects you to the server's own
+console. Nothing is shown until you type, and it also prints the live log.
+- **Leaving:** press **Ctrl+P then Ctrl+Q**.
+- **Careful:** **Ctrl+C** stops the server. Docker restarts it, but matches in progress are lost.
 
 ## Troubleshooting
 
