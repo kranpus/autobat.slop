@@ -8,6 +8,10 @@ License texts that shipped with the packs are in [`assets/licenses/`](assets/lic
 **Dungeon Crawl Stone Soup 32x32 tiles** by the Crawl tiles team, collected on OpenGameArt by MedicineStorm. CC0.
 <https://opengameart.org/content/dungeon-crawl-32x32-tiles>
 
+The 100 trinket icons in `items/` come from the same pack's `item/` folder (rings, amulets,
+armour, wands, staves, books, potions and misc items). The file-by-file list is in
+[`assets/sprites/items/SOURCES.txt`](assets/sprites/items/SOURCES.txt).
+
 | Game file | Original file (in "Dungeon Crawl Stone Soup Full") |
 |---|---|
 | units/goblin.png | monster/goblin_new.png |

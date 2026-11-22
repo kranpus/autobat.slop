@@ -26,7 +26,7 @@ signal left_match(reason: String)
 ## similar rating). Empty when the server can't be reached.
 signal ranked_opponents(list: Array)
 
-const GAME_VERSION := "legion-draft-7"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-8"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server (ENet/UDP)
 const WS_PORT := 24704                   # same server for browsers (WebSocket/TCP)
@@ -781,7 +781,7 @@ func _rq_ranked(version: String, pid: String, pname: String, rating: int, code: 
 	if ranked_pool.add(pid, pname, rating, code):
 		ranked_pool.save_file()
 	var out: Array = []
-	for e in ranked_pool.find(clampi(rating, 0, 5000), pid.left(40), 3):
+	for e in ranked_pool.find(clampi(rating, 0, 5000) + Army.RANKED_SEARCH_BIAS, pid.left(40), 3):
 		out.append({"name": e["name"], "rating": e["rating"], "code": e["code"], "saved_at": e["saved_at"]})
 	_deliver(id, "ranked", [out])
 
@@ -825,11 +825,14 @@ func _rq_sync(version: String) -> void:
 	if version != GAME_VERSION:
 		_deliver(id, "error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), GAME_VERSION]])
 		return
-	_deliver(id, "synced", [{"rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions()}])
+	_deliver(id, "synced", [{"rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(),
+		"leaderboard": accounts.leaderboard(LEADERBOARD_SIZE) if accounts else []}])
 
 
 @rpc("authority", "reliable")
 func _rc_synced(info: Dictionary) -> void:
+	if typeof(info.get("leaderboard")) == TYPE_ARRAY:
+		_rc_leaderboard(info["leaderboard"], {})
 	_rc_rewards(info.get("rewards", {}))
 	_rc_locks(info.get("locked", []), info.get("locked_regions", []))
 	if _sync_only:
@@ -1498,6 +1501,11 @@ signal login_result(ok: bool, message: String)
 signal session_changed
 ## A server-run ranked battle finished: {gold, maps, rating, score, ...}.
 signal ranked_result(summary: Dictionary)
+## The server's leaderboard arrived: top players, and your own rank
+## ({rank, of, rating}; empty for guests).
+signal leaderboard_received(top: Array, me: Dictionary)
+
+const LEADERBOARD_SIZE := 50
 
 # Client side.
 var logged_in := false          # signed in to an account (survives brief disconnects)
@@ -1509,6 +1517,9 @@ var _auth_request: Array = []   # login request to send once connected
 var _auth_waiting := false      # waiting for the server to answer a login
 var _reconnect_at := 0
 var last_ranked_summary: Dictionary = {}
+var last_leaderboard: Array = []
+var last_leaderboard_me: Dictionary = {}
+var last_leaderboard_msec := 0
 ## The server presented a different certificate than the one saved here.
 var cert_changed := false
 var _last_server: Array = []
@@ -2020,6 +2031,10 @@ func _rc_profile(profile_data: Dictionary, event: String, payload: Dictionary) -
 			Profile.choice_ready.emit(payload)
 		"recruit":
 			Profile.recruit_result.emit(payload)
+		"trinket_choice":
+			Profile.trinket_choice_ready.emit(payload)
+		"trinket_result":
+			Profile.trinket_result.emit(payload)
 
 
 @rpc("authority", "reliable")
@@ -2247,7 +2262,7 @@ func _rq_profile_action(action: Array) -> void:
 	if role != Role.SERVER:
 		return
 	var id := _sender()
-	if not _sessions.has(id) or not _allow(id) or action.is_empty() or action.size() > 3:
+	if not _sessions.has(id) or not _allow(id) or action.is_empty() or action.size() > 4:
 		return
 	var user: String = _sessions[id]
 	var pl := accounts.logic(user)
@@ -2269,6 +2284,20 @@ func _rq_profile_action(action: Array) -> void:
 		"set_army":
 			if action.size() > 1 and typeof(action[1]) == TYPE_ARRAY:
 				pl.set_army(action[1])
+		"hunt_trinkets":
+			var site := str(action[1]) if action.size() > 1 else ""
+			if pl.can_hunt_trinkets(site):
+				payload = pl.hunt_trinkets(site)
+				event = "trinket_choice"
+		"choose_trinket":
+			payload = pl.choose_trinket(int(action[1]) if action.size() > 1 else -1)
+			event = "trinket_result" if not payload.is_empty() else ""
+		"equip_trinket":
+			if action.size() == 4:
+				pl.equip_trinket(str(action[1]), int(action[2]), str(action[3]))
+		"unequip_trinket":
+			if action.size() == 3:
+				pl.unequip_trinket(str(action[1]), int(action[2]))
 		_:
 			return
 	accounts.save(user)
@@ -2297,6 +2326,38 @@ func _account_command(a: PackedStringArray) -> String:
 	return "Usage: accounts | accounts reset-password <user>"
 
 
+# --- leaderboard -------------------------------------------------------------------
+
+## Ask for the leaderboard: over the session when signed in, otherwise with
+## a quick check-in (which carries it). Answers with `leaderboard_received`.
+func request_leaderboard() -> void:
+	if session_active():
+		_request("_rq_leaderboard", [])
+	elif role == Role.NONE and not logged_in:
+		sync_from_server()
+	else:
+		leaderboard_received.emit(last_leaderboard, last_leaderboard_me)
+
+
+@rpc("any_peer", "reliable")
+func _rq_leaderboard() -> void:
+	if role != Role.SERVER or accounts == null:
+		return
+	var id := _sender()
+	if not _allow(id):
+		return
+	var me := accounts.rank_of(_sessions[id]) if _sessions.has(id) else {}
+	_deliver(id, "leaderboard", [accounts.leaderboard(LEADERBOARD_SIZE), me])
+
+
+@rpc("authority", "reliable")
+func _rc_leaderboard(top: Array, me: Dictionary) -> void:
+	last_leaderboard = top
+	last_leaderboard_me = me
+	last_leaderboard_msec = Time.get_ticks_msec()
+	leaderboard_received.emit(top, me)
+
+
 func _credit_draft(list: Array) -> void:
 	for p in list:
 		var id := int(p["id"])
@@ -2322,25 +2383,14 @@ func _ranked_offer_for(id: int) -> Array:
 	var code := pl.army_code()
 	if ranked_pool.add("acct:" + user, str(pl.data.get("name", user)), rating, code):
 		ranked_pool.save_file()
-	for e in ranked_pool.find(rating, "acct:" + user, 3):
+	for e in ranked_pool.find(rating + Army.RANKED_SEARCH_BIAS, "acct:" + user, 3):
 		var army := Army.decode(str(e["code"]))
 		if army.is_empty():
 			continue
 		var r := int(e["rating"])
 		offers.append({"name": e["name"], "rating": r, "squads": army["squads"], "player": true, "saved_at": e["saved_at"],
 			"difficulty": "Easy" if r < rating - 25 else ("Hard" if r > rating + 25 else "Even")})
-	var power := maxf(500.0, Army.army_power(pl.battle_squads()))
-	for t in [[0.8, -60, "Easy"], [1.0, 0, "Even"], [1.25, 70, "Hard"]]:
-		if offers.size() >= 3:
-			break
-		var taken := false
-		for o in offers:
-			if o["difficulty"] == t[2]:
-				taken = true
-		if taken:
-			continue
-		var ghost := Army.generate_opponent(power * float(t[0]) * _rng.randf_range(0.95, 1.05), maxi(0, rating + int(t[1]) + _rng.randi_range(-15, 15)), _rng.randi())
-		offers.append({"name": ghost["name"], "rating": ghost["rating"], "squads": ghost["squads"], "player": false, "saved_at": 0, "difficulty": t[2]})
+	Army.fill_ghosts(offers, Army.army_power(pl.battle_squads()), rating, _rng)
 	for i in offers.size():
 		offers[i]["map"] = BattleMaps.random_map_id(_rng)
 		offers[i]["index"] = i

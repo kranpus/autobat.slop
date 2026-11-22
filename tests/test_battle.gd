@@ -24,6 +24,9 @@ func _initialize() -> void:
 	test_passwords()
 	test_accounts()
 	test_profile_logic()
+	test_trinkets()
+	test_harder_ghosts()
+	test_leaderboard()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -601,3 +604,152 @@ func test_profile_logic() -> void:
 	var res := pl.choose_recruit(0)
 	check(res.has("unit") and not pl.has_pending_choice(), "choosing a recruit resolves it")
 	check(pl.choose_recruit(0).is_empty(), "a choice can't be taken twice")
+
+
+func test_trinkets() -> void:
+	print("trinkets")
+	var counts := {}
+	var names := {}
+	var known_keys := ["hp_mult", "dmg_mult", "cooldown_mult", "speed_mult", "count_mult", "range_add", "aoe_add", "regen_pct", "lifesteal", "thorns", "armor", "damage", "flying"]
+	var bad_keys: Array = []
+	var missing_icons: Array = []
+	for id in Trinkets.ALL:
+		var t: Dictionary = Trinkets.ALL[id]
+		counts[t["rarity"]] = int(counts.get(t["rarity"], 0)) + 1
+		names[t["name"]] = true
+		for k in t["mods"]:
+			if k not in known_keys:
+				bad_keys.append("%s.%s" % [id, k])
+		if not ResourceLoader.exists("res://assets/sprites/items/%s.png" % id):
+			missing_icons.append(id)
+	check(Trinkets.ALL.size() == 100 and names.size() == 100, "100 trinkets with unique names")
+	check(counts == {"common": 30, "uncommon": 25, "rare": 20, "epic": 15, "legendary": 10}, "30/25/20/15/10 by rarity (%s)" % [counts])
+	check(bad_keys.is_empty(), "every trinket uses only supported battle effects %s" % [bad_keys])
+	check(missing_icons.is_empty(), "every trinket has an icon %s" % [missing_icons])
+
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var camp_ok := true
+	for i in 200:
+		for t in Trinkets.roll_hunt("camp", {}, rng):
+			if Trinkets.rarity_of(t) in ["epic", "legendary"]:
+				camp_ok = false
+	check(camp_ok, "the war camp never offers epic or legendary trinkets")
+	var all_commons := {}
+	for t in Trinkets.ids_by_rarity("common"):
+		all_commons[t] = true
+	var owned_but_one := all_commons.duplicate()
+	owned_but_one.erase("iron_band")
+	var prefers_new := true
+	for i in 50:
+		var offer := Trinkets.roll_hunt("camp", owned_but_one, rng)
+		var commons: Array = offer.filter(func(t): return Trinkets.rarity_of(t) == "common")
+		if not commons.is_empty() and not commons.has("iron_band"):
+			prefers_new = false
+	check(prefers_new, "hunts offer trinkets you don't own yet before repeats")
+
+	var pl := ProfileLogic.new()
+	pl.data["maps"] = 10
+	pl.data["rating"] = 1300
+	check(not pl.equip_trinket("goblin", 0, "octoring"), "can't equip a trinket you don't own")
+	var choice := pl.hunt_trinkets("trove")
+	check(choice.get("options", []).size() == 3 and pl.maps() == 7, "a hunt spends maps and offers 3 trinkets")
+	check(pl.hunt_trinkets("camp").is_empty(), "can't hunt again before choosing")
+	var first: String = choice["options"][0]
+	var res := pl.choose_trinket(0)
+	check(res["trinket"] == first and res["new"] and pl.owns_trinket(first), "choosing keeps the trinket")
+	pl.data["trinkets"]["iron_band"] = true
+	pl.data["pending_trinket"] = {"site": "camp", "options": ["iron_band", "copper_band", "bronze_band"]}
+	var gold_before := pl.gold()
+	var dup := pl.choose_trinket(0)
+	check(not dup["new"] and pl.gold() == gold_before + int(Trinkets.DUPLICATE_GOLD["common"]), "a trinket you already own is sold for gold")
+	for t in ["octoring", "tiger_eye_ring", "standard_of_the_legion"]:
+		pl.data["trinkets"][t] = true
+	check(pl.equip_trinket("goblin", 0, "octoring") and pl.equip_trinket("goblin", 1, "tiger_eye_ring"), "two trinkets fit on a unit")
+	check(not pl.equip_trinket("goblin", 2, "iron_band"), "there is no third slot")
+	pl.equip_trinket("rat_swarm", 0, "octoring")
+	check(pl.trinket_holder("octoring") == "rat_swarm" and not pl.trinkets_of("goblin").has("octoring"), "equipping a trinket elsewhere moves it")
+	check(pl.unequip_trinket("rat_swarm", 0) and pl.trinkets_of("rat_swarm").is_empty(), "trinkets can be taken off")
+	# Bad saved data is cleaned up.
+	var messy := ProfileLogic.new({"trinkets": {"octoring": true, "not_real": true}, "units": {"goblin": {"level": 1, "tier": 0, "trinkets": ["octoring", "not_real", "iron_band"]},
+		"rat_swarm": {"level": 1, "tier": 0, "trinkets": ["octoring"]}}})
+	check(messy.trinkets_of("goblin") == ["octoring"] and messy.trinkets_of("rat_swarm").is_empty() and not messy.owns_trinket("not_real"), "saves can't hold unknown, unowned or doubled-up trinkets")
+
+	# Trinkets in battle.
+	var plain := {"unit": "orc_warrior", "level": 5, "tier": 2, "row": "front"}
+	var geared := plain.merged({"trinkets": ["dragon_kings_crest", "standard_of_the_legion"]})
+	check(Army.deploy_counts([geared])[0] == roundi(Army.squad_size("orc_warrior", 2) * 1.4), "Standard of the Legion adds 40% units")
+	check(Army.army_power([geared]) > Army.army_power([plain]) * 1.5, "trinkets raise army power")
+	var sim := BattleSim.new()
+	sim.setup([geared], [plain], 3, "open_arena")
+	var base_hp: float = Army.unit_stats("orc_warrior", 5)["hp"]
+	check(is_equal_approx(sim.max_hp[0], base_hp * 1.25), "the sim applies trinket HP (%.1f vs %.1f)" % [sim.max_hp[0], base_hp * 1.25])
+	var a := BattleSim.new()
+	a.setup([geared], [plain], 11, "open_arena")
+	a.run_to_end(200000)
+	var b := BattleSim.new()
+	b.setup([geared], [plain], 11, "open_arena")
+	b.run_to_end(200000)
+	check(a.checksum() == b.checksum(), "battles with trinkets stay deterministic")
+
+	# Army codes carry trinkets.
+	var code := Army.encode("T", 1000, [geared, plain])
+	var back := Army.decode(code)
+	check(back["squads"][0].get("trinkets", []) == ["dragon_kings_crest", "standard_of_the_legion"] and not back["squads"][1].has("trinkets"), "army codes keep trinkets")
+	var forged := Army.CODE_PREFIX + Marshalls.utf8_to_base64(JSON.stringify({"n": "x", "r": 1, "s": [["goblin", 1, 0, 0, ["octoring", "octoring", "fake", "iron_band"]], ["rat_swarm", 1, 0, 0, ["octoring"]]]}))
+	var f := Army.decode(forged)
+	check(f["squads"][0]["trinkets"] == ["octoring", "iron_band"] and not f["squads"][1].has("trinkets"), "codes can't hold fake, extra or doubled-up trinkets")
+	var old_code := Army.CODE_PREFIX + Marshalls.utf8_to_base64(JSON.stringify({"n": "x", "r": 1, "s": [["goblin", 3, 1, 0]]}))
+	check(Army.decode(old_code)["squads"].size() == 1, "older codes without trinkets still work")
+
+
+func test_harder_ghosts() -> void:
+	print("ranked opponents")
+	var my := [{"unit": "orc_warrior", "level": 8, "tier": 3, "row": "front"}, {"unit": "elf_archer", "level": 8, "tier": 3, "row": "back"}]
+	var mine := Army.army_power(my)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	var total := 0.0
+	var n := 0
+	for i in 40:
+		var offers: Array = []
+		Army.fill_ghosts(offers, mine, 1100, rng)
+		for o in offers:
+			total += Army.army_power(o["squads"]) / mine
+			n += 1
+	var avg := total / float(n)
+	check(avg > 1.12, "generated opponents average %.2fx your power (was ~1.02x)" % avg)
+	var low := Army.generate_opponent(5000.0, 900, 5)
+	var low_has: bool = low["squads"].any(func(sq): return sq.has("trinkets"))
+	var high_count := 0
+	for seed_i in 10:
+		for sq in Army.generate_opponent(20000.0, 1500, seed_i)["squads"]:
+			if sq.has("trinkets"):
+				high_count += 1
+	check(not low_has and high_count >= 10, "high-rated opponents carry trinkets, low-rated ones don't (%d squads)" % high_count)
+
+
+func test_leaderboard() -> void:
+	print("leaderboard")
+	var dir := "user://test_board_%d" % Time.get_ticks_usec()
+	var store := AccountStore.new(dir)
+	var rec := Passwords.make_record("whatever1", 1000)
+	for spec in [["alice", 1250, 10, 2], ["bob", 1100, 5, 5], ["cara", 1250, 12, 4], ["dan", 1000, 0, 0]]:
+		store.create(spec[0], rec)
+		var pl := store.logic(spec[0])
+		pl.data["rating"] = spec[1]
+		pl.data["wins"] = spec[2]
+		pl.data["losses"] = spec[3]
+		store.save(spec[0])
+	var fresh := AccountStore.new(dir)   # built from the files
+	var names: Array = fresh.leaderboard(10).map(func(e): return e["name"])
+	check(names == ["cara", "alice", "bob"], "sorted by rating, then wins; players with no ranked games left out (%s)" % [names])
+	check(fresh.rank_of("ALICE")["rank"] == 2 and fresh.rank_of("dan")["rank"] == 0, "your own rank is found (any letter case)")
+	var pb := fresh.logic("bob")
+	pb.data["rating"] = 1400
+	fresh.save("bob")
+	check(fresh.leaderboard(1)[0]["name"] == "bob", "the leaderboard updates when a profile is saved")
+	check(fresh.leaderboard(2).size() == 2, "the size limit is respected")
+	for f in DirAccess.get_files_at(dir):
+		DirAccess.remove_absolute(dir + "/" + f)
+	DirAccess.remove_absolute(dir)

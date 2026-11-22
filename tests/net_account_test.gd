@@ -88,6 +88,24 @@ func _run() -> void:
 	await _wait_ms(800)
 	check(profile.gold() < 99999999, "a locally edited gold value is overwritten by the server's")
 
+	print("trinkets on the server")
+	var maps_before: int = profile.maps()
+	profile.hunt_trinkets("camp")
+	var tchoice: Dictionary = await profile.trinket_choice_ready
+	check(tchoice.get("options", []).size() == 3 and profile.maps() == maps_before - 1, "the server rolled a trinket hunt and spent the map")
+	profile.choose_trinket(0)
+	var tres: Dictionary = await profile.trinket_result
+	var trinket: String = tres.get("trinket", "")
+	check(profile.owns_trinket(trinket), "the server added the trinket (%s)" % trinket)
+	profile.equip_trinket(owned[0], 0, trinket)
+	await profile.changed
+	await _wait_ms(800)
+	check(profile.trinkets_of(owned[0]) == [trinket], "the server saved the equipped trinket")
+	profile.data["trinkets"]["octoring"] = true   # a forged trinket...
+	profile.equip_trinket(owned[0], 1, "octoring")
+	await _wait_ms(800)
+	check(not profile.owns_trinket("octoring") and not profile.trinkets_of(owned[0]).has("octoring"), "a trinket the account doesn't own is refused")
+
 	print("server-run ranked battle")
 	var gold_before: int = profile.gold()
 	var rating_before: int = profile.rating()
@@ -110,6 +128,17 @@ func _run() -> void:
 	party.request_ranked_battle(int(offers[1]["index"]))
 	await _wait_ms(800)
 	check(party.last_ranked_summary == summary, "an offer can't be fought again without searching again")
+
+	check(cfg["squads_a"].any(func(sq): return sq.get("trinkets", []).has(trinket)), "the battle used the equipped trinket")
+
+	print("leaderboard")
+	party.request_leaderboard()
+	var got: Array = await party.leaderboard_received   # [top, me]
+	var lb: Array = got[0]
+	await _wait_ms(100)
+	var me: Dictionary = party.last_leaderboard_me
+	check(lb.size() > 0 and int(me.get("rank", 0)) > 0, "the leaderboard lists ranked players and your rank (#%d of %d)" % [int(me.get("rank", 0)), int(me.get("of", 0))])
+	check(lb.any(func(e): return str(e["name"]) == user), "you appear on it after a ranked battle")
 
 	print("account file on the server")
 	var path := "user://accounts/%s.json" % user

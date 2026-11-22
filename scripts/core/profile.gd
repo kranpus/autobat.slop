@@ -16,6 +16,10 @@ signal changed
 signal choice_ready(choice: Dictionary)
 ## Logged in only: the server applied a recruit pick ({unit, shards, new}).
 signal recruit_result(result: Dictionary)
+## Logged in only: the server rolled a trinket hunt ({site, options}).
+signal trinket_choice_ready(choice: Dictionary)
+## Logged in only: the server applied a trinket pick ({trinket, new, gold}).
+signal trinket_result(result: Dictionary)
 
 const SAVE_PATH := "user://profile.json"
 const SETTINGS_PATH := "user://settings.json"
@@ -300,6 +304,88 @@ func set_army(entries: Array) -> void:
 		return
 	logic.set_army(entries)
 	save()
+
+
+# --- trinkets ----------------------------------------------------------------------
+
+func owns_trinket(id: String) -> bool:
+	return logic.owns_trinket(id)
+
+
+func trinket_count() -> int:
+	return logic.trinket_count()
+
+
+func owned_trinkets() -> Array:
+	return logic.owned_trinkets()
+
+
+func trinkets_of(unit_id: String) -> Array:
+	return logic.trinkets_of(unit_id)
+
+
+func trinket_holder(id: String) -> String:
+	return logic.trinket_holder(id)
+
+
+func trinket_site_unlocked(site_id: String) -> bool:
+	return logic.trinket_site_unlocked(site_id)
+
+
+func can_hunt_trinkets(site_id: String) -> bool:
+	return logic.can_hunt_trinkets(site_id)
+
+
+func has_pending_trinket() -> bool:
+	return logic.has_pending_trinket()
+
+
+func pending_trinket() -> Dictionary:
+	return logic.pending_trinket()
+
+
+## Offline: returns the choice. Logged in: {} and `trinket_choice_ready` fires.
+func hunt_trinkets(site_id: String) -> Dictionary:
+	if not can_hunt_trinkets(site_id):
+		return {}
+	if online:
+		_remote(["hunt_trinkets", site_id])
+		return {}
+	var res := logic.hunt_trinkets(site_id)
+	save()
+	return res
+
+
+## Offline: returns {trinket, new, gold}. Logged in: {} and `trinket_result` fires.
+func choose_trinket(index: int) -> Dictionary:
+	if online:
+		_remote(["choose_trinket", index])
+		return {}
+	var res := logic.choose_trinket(index)
+	save()
+	return res
+
+
+func equip_trinket(unit_id: String, slot: int, id: String) -> bool:
+	if not logic.equip_trinket(unit_id, slot, id):
+		return false
+	if online:
+		changed.emit()   # shown right away; the server confirms
+		_remote(["equip_trinket", unit_id, slot, id])
+	else:
+		save()
+	return true
+
+
+func unequip_trinket(unit_id: String, slot: int) -> bool:
+	if not logic.unequip_trinket(unit_id, slot):
+		return false
+	if online:
+		changed.emit()
+		_remote(["unequip_trinket", unit_id, slot])
+	else:
+		save()
+	return true
 
 
 ## Offline battles only; logged-in battle rewards are decided by the server.

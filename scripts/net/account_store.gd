@@ -15,6 +15,10 @@ const USERNAME_MAX := 20
 var dir := DIR
 var _records := {}       # key (lowercase username) -> record
 var _logic := {}         # key -> ProfileLogic
+var _board := {}         # key -> {name, rating, wins, losses}: leaderboard index
+var _board_ready := false
+var _board_sorted: Array = []
+var _board_dirty := true
 
 
 func _init(directory: String = DIR) -> void:
@@ -88,6 +92,8 @@ func save(username: String) -> void:
 	var f := FileAccess.open(_path(key), FileAccess.WRITE)
 	if f:
 		f.store_string(JSON.stringify(record))
+	if _board_ready:
+		_index(key, record)
 
 
 ## The account's profile rules object (created on first use, kept cached).
@@ -145,6 +151,73 @@ func revoke_token(username: String, token: String) -> void:
 		return
 	(record.get("tokens", {}) as Dictionary).erase(Passwords.sha256_hex(token))
 	save(username)
+
+
+# --- leaderboard -------------------------------------------------------------------
+
+func _index(key: String, record: Dictionary) -> void:
+	var p: Dictionary = record.get("profile", {})
+	var entry := {"name": str(record.get("username", key)), "rating": int(p.get("rating", 1000)),
+		"wins": int(p.get("wins", 0)), "losses": int(p.get("losses", 0))}
+	if _board.get(key, {}) != entry:
+		_board[key] = entry
+		_board_dirty = true
+
+
+## Read every account once (without keeping the records in memory).
+func _ensure_board() -> void:
+	if _board_ready:
+		return
+	_board_ready = true
+	for file in DirAccess.get_files_at(dir):
+		if not file.ends_with(".json"):
+			continue
+		var key := file.get_basename()
+		if _records.has(key):
+			_index(key, _records[key])
+			continue
+		var parsed = JSON.parse_string(FileAccess.get_file_as_string("%s/%s" % [dir, file]))
+		if typeof(parsed) == TYPE_DICTIONARY:
+			_index(key, parsed)
+
+
+func _sorted_board() -> Array:
+	_ensure_board()
+	if _board_dirty:
+		_board_dirty = false
+		_board_sorted = []
+		for key in _board:
+			var e: Dictionary = _board[key]
+			# Only players who have fought at least one ranked battle.
+			if int(e["wins"]) + int(e["losses"]) > 0:
+				_board_sorted.append(e.merged({"key": key}))
+		_board_sorted.sort_custom(func(a, b):
+			if int(a["rating"]) != int(b["rating"]):
+				return int(a["rating"]) > int(b["rating"])
+			if int(a["wins"]) != int(b["wins"]):
+				return int(a["wins"]) > int(b["wins"])
+			return str(a["key"]) < str(b["key"]))
+	return _board_sorted
+
+
+## The top players: [{rank, name, rating, wins, losses}].
+func leaderboard(limit: int = 50) -> Array:
+	var out: Array = []
+	var sorted := _sorted_board()
+	for i in mini(limit, sorted.size()):
+		var e: Dictionary = sorted[i]
+		out.append({"rank": i + 1, "name": e["name"], "rating": e["rating"], "wins": e["wins"], "losses": e["losses"]})
+	return out
+
+
+## {rank, of, rating}: rank 0 until the player has fought a ranked battle.
+func rank_of(username: String) -> Dictionary:
+	var key := key_of(username)
+	var sorted := _sorted_board()
+	for i in sorted.size():
+		if sorted[i]["key"] == key:
+			return {"rank": i + 1, "of": sorted.size(), "rating": sorted[i]["rating"]}
+	return {"rank": 0, "of": sorted.size(), "rating": int(_board.get(key, {}).get("rating", 1000))}
 
 
 func count() -> int:

@@ -5,6 +5,8 @@ extends HBoxContainer
 var _grid: GridContainer
 var _detail: VBoxContainer
 var _selected := ""
+var _trinket_popup: PopupPanel
+var _trinket_list: VBoxContainer
 
 
 func _ready() -> void:
@@ -170,7 +172,14 @@ func _build_detail() -> void:
 		tier_box.add_child(UIKit.label("Max squad tier! Shards: %d" % int(u["shards"]), 13, UIKit.GOOD))
 	_detail.add_child(tier_box)
 
-	_detail.add_child(UIKit.label("Squad power: %s" % Army.format_power(Army.unit_power(id, level) * float(size_now)), 14, UIKit.ACCENT))
+	var ts: Array = Profile.trinkets_of(id)
+	var power_sq := {"unit": id, "level": level, "tier": tier, "row": "front", "trinkets": ts}
+	_detail.add_child(UIKit.label("Squad power: %s%s" % [Army.format_power(Army.army_power([power_sq])), "  (with trinkets)" if not ts.is_empty() else ""], 14, UIKit.ACCENT))
+
+	# Trinkets: two slots
+	_detail.add_child(UIKit.label("Trinkets (%d slots)" % Trinkets.SLOTS, 16, Color.WHITE))
+	for slot in Trinkets.SLOTS:
+		_detail.add_child(_trinket_slot(id, slot, ts[slot] if slot < ts.size() else ""))
 
 	# Army membership
 	var in_army := false
@@ -191,6 +200,78 @@ func _build_detail() -> void:
 			Profile.set_army(army))
 		add.disabled = Profile.data["army"].size() >= GameData.MAX_SQUADS or UnitLocks.is_locked(id)
 		_detail.add_child(add)
+
+
+func _trinket_slot(unit_id: String, slot: int, t: String) -> Control:
+	var p := UIKit.panel(UIKit.PANEL)
+	var h := UIKit.hbox(8)
+	p.add_child(h)
+	if t == "":
+		h.add_child(UIKit.label("Empty slot", 13, UIKit.TEXT_DIM))
+		h.add_child(UIKit.spacer())
+		var eq := UIKit.button("Equip", func(): _open_trinket_picker(unit_id, slot))
+		eq.disabled = Profile.trinket_count() == 0
+		eq.tooltip_text = "Find trinkets in Expeditions → Trinkets." if Profile.trinket_count() == 0 else ""
+		h.add_child(eq)
+		return p
+	var info: Dictionary = Trinkets.ALL[t]
+	h.add_child(UIKit.icon(Trinkets.texture(t), 32))
+	var v := UIKit.vbox(0)
+	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(UIKit.label(info["name"], 14, GameData.rarity_color(info["rarity"])))
+	var d := UIKit.label(info["desc"], 11, UIKit.TEXT_DIM)
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	v.add_child(d)
+	h.add_child(v)
+	h.add_child(UIKit.button("Change", func(): _open_trinket_picker(unit_id, slot)))
+	h.add_child(UIKit.button("✕", func():
+		Profile.unequip_trinket(unit_id, slot)
+		Audio.play_sfx("click")))
+	return p
+
+
+## A list of your trinkets to put in `slot` (one held by another unit moves).
+func _open_trinket_picker(unit_id: String, slot: int) -> void:
+	if _trinket_popup == null:
+		_trinket_popup = PopupPanel.new()
+		_trinket_popup.theme = UIKit.make_theme()
+		var scroll := ScrollContainer.new()
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		scroll.custom_minimum_size = Vector2(460, 420)
+		_trinket_popup.add_child(scroll)
+		_trinket_list = UIKit.vbox(6)
+		_trinket_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		scroll.add_child(_trinket_list)
+		add_child(_trinket_popup)
+	UIKit.clear(_trinket_list)
+	_trinket_list.add_child(UIKit.label("Choose a trinket for %s" % GameData.UNITS[unit_id]["name"], 18, UIKit.ACCENT))
+	var mine: Array = Profile.trinkets_of(unit_id)
+	for t in Profile.owned_trinkets():
+		if mine.has(t):
+			continue
+		var info: Dictionary = Trinkets.ALL[t]
+		var row := UIKit.panel(UIKit.PANEL_LIGHT)
+		var h := UIKit.hbox(8)
+		row.add_child(h)
+		h.add_child(UIKit.icon(Trinkets.texture(t), 36))
+		var v := UIKit.vbox(0)
+		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		v.add_child(UIKit.label("%s  (%s)" % [info["name"], GameData.RARITIES[info["rarity"]]["name"]], 14, GameData.rarity_color(info["rarity"])))
+		var d := UIKit.label(info["desc"], 11, UIKit.TEXT_DIM)
+		d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		v.add_child(d)
+		var holder := Profile.trinket_holder(t)
+		if holder != "":
+			v.add_child(UIKit.label("Carried by %s (will move)" % GameData.UNITS[holder]["name"], 11, UIKit.ACCENT))
+		h.add_child(v)
+		h.add_child(UIKit.button("Equip", func():
+			_trinket_popup.hide()
+			if Profile.equip_trinket(unit_id, slot, t):
+				Audio.play_sfx("gem")))
+		_trinket_list.add_child(row)
+	if _trinket_list.get_child_count() == 1:
+		_trinket_list.add_child(UIKit.label("No other trinkets yet. Find them in Expeditions → Trinkets.", 13, UIKit.TEXT_DIM))
+	_trinket_popup.popup_centered()
 
 
 func _add_stats(id: String, level: int) -> void:

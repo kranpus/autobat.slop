@@ -279,6 +279,10 @@ works as before. While signed in:
   such as "level up the goblins", "explore the Warrens" or "recruit option 2". The server checks
   and applies them with the same rules code, then sends the profile back. Editing the game or
   its save file changes nothing.
+- **Trinkets live on the server too:** hunts, picks and equipping are server actions, so
+  trinkets can't be faked.
+- **The leaderboard** (top 50 by rating) is built from the accounts on the server. It's sent to
+  signed-in players on request and to guests with the background check-in.
 - **Ranked battles run on the server.** Opponents come from the server; the player picks one;
   the server simulates the battle on a worker thread, pays the gold and rating, and sends the
   same seed so the player watches an identical replay.

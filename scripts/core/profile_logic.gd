@@ -37,6 +37,8 @@ static func default_profile() -> Dictionary:
 		"losses": 0,
 		"units": units,
 		"army": army,
+		"trinkets": {},           # owned trinket id -> true
+		"pending_trinket": {},    # an open trinket hunt choice
 	}
 
 
@@ -62,7 +64,35 @@ func _sanitize() -> void:
 		if GameData.UNITS.has(id):
 			var u: Dictionary = data["units"][id]
 			units[id] = {"level": int(u.get("level", 1)), "tier": int(u.get("tier", 0)), "shards": int(u.get("shards", 0))}
+			if u.has("trinkets"):
+				units[id]["trinkets"] = Trinkets.clean_list(u["trinkets"])
 	data["units"] = units
+	# Trinkets: only known, owned ones, each held by at most one unit.
+	var owned_t := {}
+	var raw_t = data.get("trinkets", {})
+	if typeof(raw_t) == TYPE_DICTIONARY:
+		for t in raw_t:
+			if Trinkets.exists(str(t)):
+				owned_t[str(t)] = true
+	data["trinkets"] = owned_t
+	var held := {}
+	for id in units:
+		var keep: Array = []
+		for t in units[id].get("trinkets", []):
+			if owned_t.has(t) and not held.has(t):
+				held[t] = true
+				keep.append(t)
+		units[id]["trinkets"] = keep
+	var pt = data.get("pending_trinket", {})
+	var clean_pt := {}
+	if typeof(pt) == TYPE_DICTIONARY and Trinkets.SITES.has(str(pt.get("site", ""))):
+		var opts := Trinkets.clean_list(pt.get("options", []))
+		for o in pt.get("options", []):
+			if Trinkets.exists(str(o)) and not opts.has(str(o)):
+				opts.append(str(o))   # clean_list stops at 2; a hunt offers 3
+		if not opts.is_empty():
+			clean_pt = {"site": str(pt["site"]), "options": opts.slice(0, 3)}
+	data["pending_trinket"] = clean_pt
 	var army: Array = []
 	for sq in data.get("army", []):
 		if typeof(sq) == TYPE_DICTIONARY and units.has(str(sq.get("unit", ""))):
@@ -377,7 +407,11 @@ func army_squads() -> Array:
 		var u := unit(sq["unit"])
 		if u.is_empty():
 			continue
-		out.append({"unit": sq["unit"], "level": int(u["level"]), "tier": int(u["tier"]), "row": sq["row"]})
+		var entry := {"unit": sq["unit"], "level": int(u["level"]), "tier": int(u["tier"]), "row": sq["row"]}
+		var ts: Array = u.get("trinkets", [])
+		if not ts.is_empty():
+			entry["trinkets"] = ts.duplicate()
+		out.append(entry)
 	return out
 
 
@@ -413,6 +447,111 @@ func battle_squads() -> Array:
 		if not UnitLocks.is_locked(sq["unit"]):
 			out.append(sq)
 	return out
+
+
+# --- trinkets ------------------------------------------------------------------
+
+func owns_trinket(id: String) -> bool:
+	return data.get("trinkets", {}).has(id)
+
+
+func trinket_count() -> int:
+	return data.get("trinkets", {}).size()
+
+
+## Owned trinkets, rarest first, then by name.
+func owned_trinkets() -> Array:
+	var out: Array = data.get("trinkets", {}).keys()
+	out.sort_custom(func(a, b):
+		var ra := Trinkets.RARITY_ORDER.find(Trinkets.rarity_of(a))
+		var rb := Trinkets.RARITY_ORDER.find(Trinkets.rarity_of(b))
+		if ra != rb:
+			return ra > rb
+		return str(Trinkets.ALL[a]["name"]) < str(Trinkets.ALL[b]["name"]))
+	return out
+
+
+## The trinkets a unit holds (up to Trinkets.SLOTS).
+func trinkets_of(unit_id: String) -> Array:
+	return unit(unit_id).get("trinkets", [])
+
+
+## The unit holding trinket `id`, or "".
+func trinket_holder(id: String) -> String:
+	for uid in data["units"]:
+		if (data["units"][uid].get("trinkets", []) as Array).has(id):
+			return uid
+	return ""
+
+
+## Put trinket `id` in a unit's slot (taking it off whoever held it).
+func equip_trinket(unit_id: String, slot: int, id: String) -> bool:
+	if not owns(unit_id) or not owns_trinket(id) or slot < 0 or slot >= Trinkets.SLOTS:
+		return false
+	var holder := trinket_holder(id)
+	if holder != "":
+		(data["units"][holder]["trinkets"] as Array).erase(id)
+	var ts: Array = data["units"][unit_id].get("trinkets", [])
+	if slot < ts.size():
+		ts[slot] = id
+	else:
+		ts.append(id)
+	data["units"][unit_id]["trinkets"] = ts
+	return true
+
+
+func unequip_trinket(unit_id: String, slot: int) -> bool:
+	var ts: Array = trinkets_of(unit_id)
+	if slot < 0 or slot >= ts.size():
+		return false
+	ts.remove_at(slot)
+	return true
+
+
+func trinket_site_unlocked(site_id: String) -> bool:
+	return Trinkets.SITES.has(site_id) and rating() >= int(Trinkets.SITES[site_id]["min_rating"])
+
+
+func can_hunt_trinkets(site_id: String) -> bool:
+	return trinket_site_unlocked(site_id) and not has_pending_trinket() and maps() >= int(Trinkets.SITES[site_id]["cost_maps"])
+
+
+func has_pending_trinket() -> bool:
+	return not data.get("pending_trinket", {}).is_empty()
+
+
+## The open trinket choice: {"site": id, "options": [trinket ids]}
+func pending_trinket() -> Dictionary:
+	return data.get("pending_trinket", {})
+
+
+## Spend maps and roll three trinkets to choose one from.
+func hunt_trinkets(site_id: String) -> Dictionary:
+	if not can_hunt_trinkets(site_id):
+		return {}
+	if int(data["maps"]) >= MAX_MAPS:
+		data["map_clock"] = int(Time.get_unix_time_from_system())
+	data["maps"] = int(data["maps"]) - int(Trinkets.SITES[site_id]["cost_maps"])
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	data["pending_trinket"] = {"site": site_id, "options": Trinkets.roll_hunt(site_id, data["trinkets"], rng)}
+	return pending_trinket()
+
+
+## Take option `index`: {"trinket": id, "new": bool, "gold": int}. A
+## trinket already owned is turned into gold instead.
+func choose_trinket(index: int) -> Dictionary:
+	var pt := pending_trinket()
+	if pt.is_empty() or index < 0 or index >= pt["options"].size():
+		return {}
+	var id: String = pt["options"][index]
+	data["pending_trinket"] = {}
+	if owns_trinket(id):
+		var g: int = Trinkets.DUPLICATE_GOLD[Trinkets.rarity_of(id)]
+		data["gold"] = gold() + g
+		return {"trinket": id, "new": false, "gold": g}
+	data["trinkets"][id] = true
+	return {"trinket": id, "new": true, "gold": 0}
 
 
 # --- battle results ---------------------------------------------------------

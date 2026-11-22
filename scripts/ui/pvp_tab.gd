@@ -177,25 +177,13 @@ func _on_ranked_opponents(list: Array) -> void:
 			"difficulty": "Easy" if r < rating - 25 else ("Hard" if r > rating + 25 else "Even"),
 			"map": BattleMaps.random_map_id(rng), "player": true, "saved_at": int(e.get("saved_at", 0)),
 		})
-	# Fill the remaining slots with generated opponents.
-	var my_power := maxf(500.0, Army.army_power(Profile.battle_squads()))
-	var tiers := [[0.8, -60, "Easy"], [1.0, 0, "Even"], [1.25, 70, "Hard"]]
-	# First cover any missing difficulty, then top up to three.
-	for pass_i in (0 if Profile.online else 2):
-		for t in tiers:
-			if _opponents.size() >= 3:
-				break
-			var taken := false
-			for o in _opponents:
-				if o["difficulty"] == t[2]:
-					taken = true
-			if taken and pass_i == 0:
-				continue
-			var opp := Army.generate_opponent(my_power * float(t[0]) * rng.randf_range(0.95, 1.05), maxi(0, rating + int(t[1]) + rng.randi_range(-15, 15)), rng.randi())
-			opp["difficulty"] = t[2]
-			opp["map"] = BattleMaps.random_map_id(rng)
-			opp["player"] = false
-			_opponents.append(opp)
+	# Fill the remaining slots with generated opponents (the server already
+	# did this for signed-in players).
+	if not Profile.online:
+		var before := _opponents.size()
+		Army.fill_ghosts(_opponents, Army.army_power(Profile.battle_squads()), rating, rng)
+		for i in range(before, _opponents.size()):
+			_opponents[i]["map"] = BattleMaps.random_map_id(rng)
 	var order := {"Easy": 0, "Even": 1, "Hard": 2}
 	_opponents.sort_custom(func(a, b): return int(order[a["difficulty"]]) < int(order[b["difficulty"]]))
 	UIKit.clear(_opponents_box)

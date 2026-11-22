@@ -108,7 +108,7 @@ func _process(_delta: float) -> bool:
 			main.tabs.current_tab = 3
 		4:
 			_shot("04_battle_tab")
-			main.tabs.current_tab = 4
+			main.tabs.current_tab = 5
 		5:
 			_shot("05_legion_draft_tab")
 			_battle("twin_fords")
@@ -135,7 +135,7 @@ func _process(_delta: float) -> bool:
 				"use_lives": false, "use_wins": false, "use_timer": false, "max_rounds": 10})
 			for i in 3:
 				party.add_bot()
-			main.tabs.current_tab = 4
+			main.tabs.current_tab = 5
 		26:
 			_shot("11_draft_lobby")
 			root.get_node("Party").start_match()

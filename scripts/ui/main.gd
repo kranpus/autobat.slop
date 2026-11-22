@@ -10,10 +10,14 @@ const DraftLobbyTab := preload("res://scripts/ui/draft_lobby_tab.gd")
 const DraftScreenScript := preload("res://scripts/ui/draft_screen.gd")
 const BattleScreen := preload("res://scripts/battle/battle_screen.gd")
 const LoginScreen := preload("res://scripts/ui/login_screen.gd")
+const TrinketTab := preload("res://scripts/ui/trinket_tab.gd")
+const LeaderboardTab := preload("res://scripts/ui/leaderboard_tab.gd")
 
 var menu_layer: CanvasLayer
 var tabs: TabContainer
 var collection_tab: Control
+var expedition_tab: Control
+var trinket_tab: Control
 var _gold_label: Label
 var _maps_label: Label
 var _rating_label: Label
@@ -61,13 +65,24 @@ func _ready() -> void:
 	var army_tab := ArmyTab.new()
 	army_tab.name = "Army"
 	tabs.add_child(army_tab)
-	var exp_tab := ExpeditionTab.new()
-	exp_tab.name = "Expeditions"
-	tabs.add_child(exp_tab)
+	# Expeditions has two sub-tabs: regions (units) and trinket hunts.
+	var exp_tabs := TabContainer.new()
+	exp_tabs.name = "Expeditions"
+	tabs.add_child(exp_tabs)
+	expedition_tab = ExpeditionTab.new()
+	expedition_tab.name = "Regions"
+	exp_tabs.add_child(expedition_tab)
+	trinket_tab = TrinketTab.new()
+	trinket_tab.name = "Trinkets"
+	exp_tabs.add_child(trinket_tab)
+	exp_tabs.tab_changed.connect(func(_i): Audio.play_sfx("toggle", -8.0))
 	var pvp_tab := PvpTab.new()
 	pvp_tab.name = "Battle"
 	pvp_tab.battle_requested.connect(start_battle)
 	tabs.add_child(pvp_tab)
+	var board_tab := LeaderboardTab.new()
+	board_tab.name = "Leaderboard"
+	tabs.add_child(board_tab)
 	var draft_tab := DraftLobbyTab.new()
 	draft_tab.name = "Legion Draft"
 	tabs.add_child(draft_tab)

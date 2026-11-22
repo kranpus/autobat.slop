@@ -45,7 +45,22 @@ accounts, password hashing and encryption work.
    is guaranteed to include one. Epic or better is guaranteed every 15 expeditions, and
    Legendary every 40 (counting only regions that have legendaries). The tab shows the
    countdowns, and the guaranteed unit is marked on its card.
+   **Trinket hunts: Expeditions → Trinkets.**
+   - **Hunting:** spend maps at one of three sites to turn up **3 trinkets** and keep **one**:
+     - **Abandoned War Camp:** 1 map, mostly common.
+     - **Sunken Vault:** 2 maps, rating 1050.
+     - **Dragon's Trove:** 3 maps, rating 1200, best legendary odds.
+   - **The collection:** there are **100 unique trinkets** to collect (30 common, 25 uncommon,
+     20 rare, 15 epic, 10 legendary). Examples: +HP, +damage, faster attacks, speed, range,
+     splash, regeneration, lifesteal, thorns, extra units in the squad, damage/armor type
+     changes, and flying.
+   - **Duplicates:** hunts prefer trinkets you don't own yet. A trinket you already have is sold
+     for gold.
+   - The sub-tab shows each site's odds and your whole collection.
 2. **Level up: Collection tab.** Spend gold to raise a unit's level (+8% HP and damage per level).
+   **Trinkets:** each unit has **2 trinket slots**. Equip, swap or remove them in the unit's
+   details panel. A trinket can only be on one unit at a time, so equipping it elsewhere moves
+   it. Trinkets go into battle with the army and into its army code.
 3. **Increase quantity: Collection tab.** Spend shards and gold to raise the squad tier, which
    adds units to the squad. Each tier also raises the level cap by 4.
 
@@ -65,8 +80,14 @@ accounts, password hashing and encryption work.
 5. **Fight: Battle tab.**
    - **Ranked Arena:** **Find Opponents** saves your army on the server with your current rating
      and matches you against armies that **other players saved at a similar rating**: one close
-     match, one slightly lower and one slightly higher. Win rating (Elo), gold and maps. Empty
-     slots, or all three when offline, are filled with generated training opponents.
+     match, one slightly lower and one slightly higher (the search leans a little above your
+     rating). Win rating (Elo), gold and maps. Empty slots, or all three when offline, are
+     filled with generated training opponents.
+   - **Training opponents:** on average about 20% stronger than your army (Easy ≈ 0.95×,
+     Even ≈ 1.15×, Hard ≈ 1.4× your power). Above rating ~950 they carry trinkets too, more and
+     rarer as rating rises.
+   - **Leaderboard tab:** the top 50 signed-in players by rating (players need at least one
+     ranked battle), with your own rank. Guests can view it but aren't on it.
    - **Friend Challenge:** paste a friend's *army code* (Army tab → Copy) to fight their exact army.
    - **Live Duel:** one player hosts, the other joins by IP (LAN, or the internet with a forwarded
      UDP port, default 24680). Ranked.
@@ -223,7 +244,8 @@ scenes/main.tscn              Entry scene (UI is built in code)
 scripts/core/game_data.gd     All units, rarities, regions, damage tables  ← tweak balance here
 scripts/core/battle_maps.gd   The 20 battlefields and their obstacles
 scripts/core/army.gd          Squad sizes, power, army codes, opponent generator, Elo
-scripts/core/profile_logic.gd Profile rules: upgrades, expeditions, rewards (shared by game and server)
+scripts/core/profile_logic.gd Profile rules: upgrades, expeditions, trinkets, rewards (shared by game and server)
+scripts/core/trinkets.gd      The 100 trinkets, hunting sites and their effects
 scripts/core/profile.gd       The game's profile: local guest save or the server's copy (autoload "Profile")
 scripts/core/audio.gd         Music + pooled/throttled SFX (autoload "Audio")
 scripts/net/net.gd            ENet live duels (autoload "Net")

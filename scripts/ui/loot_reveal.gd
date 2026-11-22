@@ -1,10 +1,11 @@
 extends VBoxContainer
-## Loot-box style reveal for an expedition's three finds.
+## Loot-box style reveal for an expedition's three finds (units) or a trinket
+## hunt's three trinkets.
 ##
-## Every slot spins through all the units the region can drop, slowing down
-## until it lands on the real find. Slots stop one after another from the
+## Every slot spins through everything that could be found there, slowing
+## down until it lands on the real find. Slots stop one after another from the
 ## least rare find to the rarest, so the best pull always comes last.
-## Units the player hasn't found yet flash past as silhouettes.
+## Things the player hasn't found yet flash past as silhouettes.
 
 signal finished
 
@@ -24,21 +25,47 @@ var _skip: Button
 
 
 var _compact := false
+var _trinkets := false   # revealing trinkets instead of units
 
 
+## Units from an expedition: options are [{unit, shards, guaranteed}].
 func setup(region_id: String, options: Array, compact: bool = false) -> void:
+	var pool: Array = GameData.region_drops(region_id).keys() if GameData.REGIONS.has(region_id) else []
+	var opts: Array = []
+	for o in options:
+		opts.append({"id": o["unit"], "guaranteed": bool(o.get("guaranteed", false))})
+	var region_name: String = GameData.REGIONS[region_id]["name"] if GameData.REGIONS.has(region_id) else "the wilds"
+	_begin("Your scouts return from %s..." % region_name, pool, opts, compact)
+
+
+## Trinkets from a hunt: `ids` are the three trinkets offered.
+func setup_trinkets(site_id: String, ids: Array, compact: bool = false) -> void:
+	_trinkets = true
+	var pool: Array = []
+	if Trinkets.SITES.has(site_id):
+		var weights: Dictionary = Trinkets.SITES[site_id]["weights"]
+		for t in Trinkets.ALL:
+			if int(weights.get(Trinkets.rarity_of(t), 0)) > 0:
+				pool.append(t)
+	var opts: Array = []
+	for t in ids:
+		opts.append({"id": t, "guaranteed": false})
+	var site_name: String = Trinkets.SITES[site_id]["name"] if Trinkets.SITES.has(site_id) else "the ruins"
+	_begin("Your hunters return from %s..." % site_name, pool, opts, compact)
+
+
+func _begin(title_text: String, pool: Array, options: Array, compact: bool) -> void:
 	_compact = compact
 	add_theme_constant_override("separation", 16)
 	alignment = BoxContainer.ALIGNMENT_CENTER
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_pool = GameData.region_drops(region_id).keys() if GameData.REGIONS.has(region_id) else []
+	_pool = pool
 	for o in options:
-		if not _pool.has(o["unit"]):
-			_pool.append(o["unit"])
+		if not _pool.has(o["id"]):
+			_pool.append(o["id"])
 	_pool.shuffle()
 
-	var region_name: String = GameData.REGIONS[region_id]["name"] if GameData.REGIONS.has(region_id) else "the wilds"
-	var title := UIKit.label("Your scouts return from %s..." % region_name, 18 if compact else 22, UIKit.ACCENT)
+	var title := UIKit.label(title_text, 18 if compact else 22, UIKit.ACCENT)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
 
@@ -49,8 +76,8 @@ func setup(region_id: String, options: Array, compact: bool = false) -> void:
 	# Reveal order: least rare first; equal rarities keep their card order.
 	var order: Array = range(options.size())
 	order.sort_custom(func(a, b):
-		var ra := _rarity_order(options[a]["unit"])
-		var rb := _rarity_order(options[b]["unit"])
+		var ra := _rarity_order(options[a]["id"])
+		var rb := _rarity_order(options[b]["id"])
 		return ra < rb if ra != rb else a < b)
 	var stops := {}
 	var t := SPIN_FIRST
@@ -58,7 +85,7 @@ func setup(region_id: String, options: Array, compact: bool = false) -> void:
 		var i: int = order[rank]
 		if rank > 0:
 			t += SPIN_STEP
-			if _rarity_order(options[i]["unit"]) >= 3:
+			if _rarity_order(options[i]["id"]) >= 3:
 				t += RARE_SUSPENSE
 		stops[i] = t
 
@@ -73,8 +100,24 @@ func setup(region_id: String, options: Array, compact: bool = false) -> void:
 	add_child(_skip)
 
 
+func _rarity(id: String) -> String:
+	return Trinkets.rarity_of(id) if _trinkets else str(GameData.UNITS[id]["rarity"])
+
+
 func _rarity_order(id: String) -> int:
-	return int(GameData.RARITIES[GameData.UNITS[id]["rarity"]]["order"])
+	return int(GameData.RARITIES[_rarity(id)]["order"])
+
+
+func _texture(id: String) -> Texture2D:
+	return Trinkets.texture(id) if _trinkets else GameData.unit_texture(id)
+
+
+func _name(id: String) -> String:
+	return str(Trinkets.ALL[id]["name"]) if _trinkets else str(GameData.UNITS[id]["name"])
+
+
+func _owned(id: String) -> bool:
+	return Profile.owns_trinket(id) if _trinkets else Profile.owns(id)
 
 
 func _make_slot(opt: Dictionary, stop_at: float) -> Dictionary:
@@ -93,7 +136,7 @@ func _make_slot(opt: Dictionary, stop_at: float) -> Dictionary:
 	var rarity_l := UIKit.label("?", 13, UIKit.TEXT_DIM)
 	rarity_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(rarity_l)
-	var icon := UIKit.unit_icon(_pool[randi() % _pool.size()], 80 if _compact else 120)
+	var icon := UIKit.icon(_texture(_pool[randi() % _pool.size()]), 80 if _compact else 120)
 	icon.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	v.add_child(icon)
 	var name_l := UIKit.label("", 17)
@@ -103,7 +146,7 @@ func _make_slot(opt: Dictionary, stop_at: float) -> Dictionary:
 	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(tag)
 	return {
-		"unit": opt["unit"], "guaranteed": bool(opt.get("guaranteed", false)), "stop_at": stop_at,
+		"id": opt["id"], "guaranteed": bool(opt.get("guaranteed", false)), "stop_at": stop_at,
 		"panel": panel, "style": style, "icon": icon, "name": name_l, "rarity": rarity_l, "tag": tag,
 		"idx": randi() % _pool.size(), "next_tick": 0.0, "done": false,
 	}
@@ -140,22 +183,22 @@ func _process(delta: float) -> void:
 ## frame tinted by the rarity flashing past.
 func _show_unit(s: Dictionary, id: String, final: bool) -> void:
 	var icon: TextureRect = s["icon"]
-	icon.texture = GameData.unit_texture(id)
-	var known := final or Profile.owns(id)
+	icon.texture = _texture(id)
+	var known := final or _owned(id)
 	icon.modulate = Color.WHITE if known else Color(0, 0, 0, 0.85)
-	var color := GameData.rarity_color(GameData.UNITS[id]["rarity"])
-	(s["name"] as Label).text = GameData.UNITS[id]["name"] if known else "???"
+	var color := GameData.rarity_color(_rarity(id))
+	(s["name"] as Label).text = _name(id) if known else "???"
 	(s["name"] as Label).add_theme_color_override("font_color", color if final else Color(color, 0.7))
 	(s["style"] as StyleBoxFlat).border_color = color if final else Color(color, 0.45)
 
 
 func _land(s: Dictionary) -> void:
 	s["done"] = true
-	var id: String = s["unit"]
-	var rarity: String = GameData.UNITS[id]["rarity"]
+	var id: String = s["id"]
+	var rarity := _rarity(id)
 	var color := GameData.rarity_color(rarity)
 	var order := _rarity_order(id)
-	var is_new := not Profile.owns(id)
+	var is_new := not _owned(id)
 	_show_unit(s, id, true)
 	var style: StyleBoxFlat = s["style"]
 	style.bg_color = UIKit.PANEL_LIGHT.lerp(color, 0.12 + 0.04 * order)
@@ -164,7 +207,9 @@ func _land(s: Dictionary) -> void:
 	(s["rarity"] as Label).add_theme_color_override("font_color", color)
 	var tags: Array = []
 	if is_new:
-		tags.append("NEW UNIT!")
+		tags.append("NEW TRINKET!" if _trinkets else "NEW UNIT!")
+	elif _trinkets:
+		tags.append("Owned: +%d gold" % int(Trinkets.DUPLICATE_GOLD[rarity]))
 	if s["guaranteed"]:
 		tags.append("★ GUARANTEED")
 	(s["tag"] as Label).text = "  ".join(PackedStringArray(tags)) if not tags.is_empty() else " "

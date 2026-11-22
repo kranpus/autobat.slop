@@ -194,7 +194,7 @@ func _spawn_army(squads: Array, t: int) -> void:
 			var sq: Dictionary = squads[i]
 			var cols: int = depth_cols[m]
 			var spacing := _spacing(sq["unit"])
-			var stats := Army.unit_stats(sq["unit"], int(sq["level"]), sq.get("mods", {}))
+			var stats := Army.unit_stats(sq["unit"], int(sq["level"]), Army.squad_mods(sq))
 			var front_x := map_w * 0.5 - float(row_x[row])
 			for u in int(counts[i]):
 				var c := u % cols
