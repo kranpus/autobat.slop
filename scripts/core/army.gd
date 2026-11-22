@@ -72,6 +72,20 @@ static func unit_power(unit_id: String, level: int, mods: Dictionary = {}) -> fl
 	return sqrt(float(s["hp"]) * dps * reach_bonus) * rarity_mult
 
 
+## How much a squad's size counts toward its power, by role. Measured in the
+## simulator: doubling a melee squad makes it about 1.8x as strong (only the
+## front of a crowd can reach the enemy), so melee and tank squads grow with
+## count^0.85. Ranged units, casters and healers all act at once, so their
+## count stays fully counted.
+const COUNT_EXPONENT := {"melee": 0.85, "tank": 0.85}
+
+
+## Power of `count` units of a kind (the building block of army power).
+static func squad_power(unit_id: String, level: int, count: int, mods: Dictionary = {}) -> float:
+	var e := float(COUNT_EXPONENT.get(str(GameData.UNITS[unit_id]["role"]), 1.0))
+	return unit_power(unit_id, level, mods) * pow(float(maxi(0, count)), e)
+
+
 ## Units deployed per squad. There is no army-wide cap: every squad fights at
 ## full size, so the army limit is MAX_SQUADS squads. A squad may carry an
 ## explicit "count" (used by Legion Draft) instead of a tier.
@@ -99,7 +113,7 @@ static func army_power(squads: Array) -> float:
 	var counts := deploy_counts(squads)
 	var p := 0.0
 	for i in squads.size():
-		p += unit_power(squads[i]["unit"], int(squads[i]["level"]), squad_mods(squads[i])) * float(counts[i])
+		p += squad_power(squads[i]["unit"], int(squads[i]["level"]), int(counts[i]), squad_mods(squads[i]))
 	return p
 
 

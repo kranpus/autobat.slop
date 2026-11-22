@@ -130,6 +130,11 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
    | Rare | 6 → 36 |
    | Epic | 2 → 12 |
    | Legendary | 1 → 11 |
+   **Strength (army power):** each squad's power is its units' power (HP × damage, range and
+   rarity) times the unit count.
+   - **Melee and tank squads** count their size as count^0.85: twice the units ≈ 1.8× the power,
+     because only the front of a crowd reaches the enemy (measured in the battle simulator).
+   - **Ranged units, casters and healers** count every unit.
 4. **Build an army: Army tab.** Up to 8 squads. There is **no unit cap**: every squad fights at
    full size, so a maxed army of commons and uncommons is about 1,100 units per side.
    - **Columns:** the tab has three columns, **Back line | Middle | Front line**, laid out like

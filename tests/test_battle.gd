@@ -31,6 +31,7 @@ func _initialize() -> void:
 	test_rank_progression()
 	test_challenges()
 	test_target_modes()
+	test_power_formula()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -981,3 +982,24 @@ func test_target_modes() -> void:
 	b.setup([{"unit": "griffon", "level": 5, "count": 12, "row": "front"}, {"unit": "hippogriff", "level": 5, "count": 12, "row": "front"}], enemy, 77, "goblin_warrens")
 	b.run_to_end(200000)
 	check(a.checksum() == b.checksum(), "battles with targeting stay deterministic")
+
+
+func test_power_formula() -> void:
+	print("army power")
+	var big := Army.army_power([{"unit": "goblin", "level": 1, "count": 120, "row": "front"}])
+	var small := Army.army_power([{"unit": "goblin", "level": 1, "count": 60, "row": "front"}])
+	check(absf(big / small - 1.8) < 0.05, "doubling a melee squad counts as about 1.8x power (%.2fx)" % (big / small))
+	var ra := Army.army_power([{"unit": "elf_archer", "level": 1, "count": 60, "row": "back"}])
+	var rb := Army.army_power([{"unit": "elf_archer", "level": 1, "count": 30, "row": "back"}])
+	check(is_equal_approx(ra / rb, 2.0), "ranged squads still count every unit")
+	# Equal power should mean an even fight: 120 goblins vs 60 goblins with
+	# the stats that make their power equal.
+	var level := 1 + roundi((pow(2.0, 0.85) - 1.0) / 0.08)
+	var wins := 0
+	for seed_i in 6:
+		var sim := BattleSim.new()
+		sim.setup([{"unit": "goblin", "level": 1, "count": 120, "row": "front"}], [{"unit": "goblin", "level": level, "count": 60, "row": "front"}], 40 + seed_i, "open_arena")
+		sim.run_to_end(200000)
+		if sim.winner == 0:
+			wins += 1
+	check(wins >= 1 and wins <= 5, "equal power is an even fight: the bigger squad won %d of 6" % wins)

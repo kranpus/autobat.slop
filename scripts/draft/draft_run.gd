@@ -444,7 +444,7 @@ func _weakest_slot() -> int:
 		var e: Dictionary = board[s]
 		if e.is_empty():
 			continue
-		var p := Army.unit_power(e["unit"], DraftData.LEVEL_SIM_LEVEL[DraftData.entry_level(e) - 1], DraftData.entry_mods(e)) * float(DraftData.entry_count(e))
+		var p := Army.squad_power(e["unit"], DraftData.LEVEL_SIM_LEVEL[DraftData.entry_level(e) - 1], DraftData.entry_count(e), DraftData.entry_mods(e))
 		if p < low:
 			low = p
 			weakest = s
