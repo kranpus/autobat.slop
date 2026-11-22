@@ -103,6 +103,21 @@ Restart the server after renewing the certificate (Let's Encrypt renews every ~6
 Any other static host works the same way: upload the contents of `export/web/` with
 `index.html` at the root.
 
+## If the page stays black
+
+The page shows an error report when the game can't start: a red box saying what failed, plus
+the browser details. Please send that text. If nothing appears at all:
+
+- **itch.io settings:**
+  - Kind of project: **HTML**.
+  - The zip is ticked **This file will be played in the browser**.
+  - **SharedArrayBuffer support** is off.
+  - The zip has `index.html` at the top level: upload `export/AutobatLegions-web.zip` as built,
+    not a folder that contains it.
+- **The browser needs WebGL 2:** turn on hardware acceleration (Chrome: Settings → System) and
+  update the browser. Very old phones and some locked-down work computers can't run it.
+- **Reload once:** itch caches uploads, so a page can keep an older build for a few minutes.
+
 ## Notes
 
 - **Size:** the first load downloads about 13 MB compressed (most hosts serve gzip). After that the

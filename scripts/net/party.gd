@@ -169,11 +169,15 @@ func server_address() -> String:
 	var a := str(Profile.settings.get("server_address", ""))
 	if a != "":
 		return a
-	# In the browser, default to the machine the page came from: when the
-	# server hosts the web build itself, players needn't type anything.
+	# In the browser, default to the machine the page came from when the game
+	# server hosts the web build itself (plain http on its web port), so home
+	# players needn't type anything. Pages on other hosts (itch.io...) use
+	# DEFAULT_SERVER instead.
 	if OS.has_feature("web"):
 		var host := str(JavaScriptBridge.eval("window.location.hostname", true))
-		if host != "":
+		var port := str(JavaScriptBridge.eval("window.location.port", true))
+		var proto := str(JavaScriptBridge.eval("window.location.protocol", true))
+		if host != "" and (port == str(WEB_PORT) or proto == "http:"):
 			return host
 	return DEFAULT_SERVER
 
