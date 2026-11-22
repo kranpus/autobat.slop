@@ -173,4 +173,11 @@ console. Nothing is shown until you type, and it also prints the live log.
 - **The downloadable game can't connect:** check UDP **24702** and **24703** are open.
 - **"Your game is out of date":** the game and the server must come from the same code. Export
   the game again after updating the server.
+- **The build sits on `fetch_export_templates.py web`:**
+  - **Normally** it shows progress and takes under a minute.
+  - **On a stalled connection to GitHub** it retries by itself and resumes where it stopped.
+  - **If it gives up,** check that the VPS can reach github.com (`curl -I https://github.com`),
+    then run the update command again.
+  - **Updates** reuse the downloaded templates from Docker's cache, so this step only runs on
+    the first build.
 - **Out of disk space while building:** `docker system prune` removes old build layers.

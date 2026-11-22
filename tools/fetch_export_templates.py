@@ -6,11 +6,14 @@
     python3 tools/fetch_export_templates.py web linux windows
 
 It reads just the needed files out of the official archive with HTTP range
-requests (about 17 MB for web). Uses only the Python standard library.
+requests (about 33 MB for web), retrying and resuming if the connection stalls.
+Uses only the Python standard library.
 """
 import os
+import socket
 import struct
 import sys
+import time
 import urllib.request
 import zlib
 
@@ -36,10 +39,42 @@ def template_dir() -> str:
     return os.path.join(base, "export_templates", f"{VERSION}.stable")
 
 
-def fetch(start: int, end: int) -> bytes:
-    req = urllib.request.Request(URL, headers={"Range": f"bytes={start}-{end}"})
-    with urllib.request.urlopen(req, timeout=300) as r:
-        return r.read()
+STALL_SECONDS = 30     # give up on a connection that sends nothing for this long...
+ATTEMPTS = 8           # ...and retry (resuming where it stopped) this many times
+CHUNK = 256 * 1024
+
+
+def fetch(start: int, end: int, label: str = "") -> bytes:
+    """Bytes start..end of the archive. Resumes after stalls and dropped
+    connections, and prints progress for big pieces."""
+    data = bytearray()
+    total = end - start + 1
+    next_report = 2 * 1024 * 1024
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            req = urllib.request.Request(URL, headers={"Range": f"bytes={start + len(data)}-{end}"})
+            with urllib.request.urlopen(req, timeout=STALL_SECONDS) as r:
+                if r.status != 206:
+                    raise OSError(f"server ignored the byte range (HTTP {r.status})")
+                while len(data) < total:
+                    chunk = r.read(min(CHUNK, total - len(data)))
+                    if not chunk:
+                        break
+                    data += chunk
+                    if label and len(data) >= next_report:
+                        print(f"    {label}: {len(data) // (1024 * 1024)} / {total // (1024 * 1024)} MB", flush=True)
+                        next_report += 2 * 1024 * 1024
+            if len(data) >= total:
+                return bytes(data[:total])
+            raise OSError("connection closed early")
+        except (OSError, socket.timeout) as e:
+            if attempt == ATTEMPTS:
+                raise SystemExit(f"Download failed after {ATTEMPTS} attempts: {e}\n"
+                                 "Check the server can reach github.com, then run the build again.")
+            wait = min(30, 2 ** attempt)
+            print(f"    {label or 'download'}: {e}; retrying in {wait} s ({len(data) // 1024} KB kept)", flush=True)
+            time.sleep(wait)
+    return bytes(data)
 
 
 def main() -> int:
@@ -52,8 +87,18 @@ def main() -> int:
         want.update("templates/" + f for f in SETS[s])
     out = template_dir()
     os.makedirs(out, exist_ok=True)
-    with urllib.request.urlopen(urllib.request.Request(URL, method="HEAD"), timeout=60) as r:
-        size = int(r.headers["Content-Length"])
+    print(f"Fetching Godot {VERSION} export templates ({', '.join(wanted_sets)}) from github.com...", flush=True)
+    size = 0
+    for attempt in range(1, ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(URL, method="HEAD"), timeout=STALL_SECONDS) as r:
+                size = int(r.headers["Content-Length"])
+            break
+        except OSError as e:
+            if attempt == ATTEMPTS:
+                raise SystemExit(f"Can't reach the template archive: {e}")
+            print(f"    {e}; retrying", flush=True)
+            time.sleep(min(30, 2 ** attempt))
     tail = fetch(size - 65536, size - 1)
     eocd = tail.rfind(b"PK\x05\x06")
     cd_size, cd_off = struct.unpack("<II", tail[eocd + 12:eocd + 20])
@@ -69,7 +114,7 @@ def main() -> int:
             continue
         lh = fetch(loff, loff + 29)
         ln, le = struct.unpack("<HH", lh[26:30])
-        data = fetch(loff + 30 + ln + le, loff + 30 + ln + le + csize - 1)
+        data = fetch(loff + 30 + ln + le, loff + 30 + ln + le + csize - 1, os.path.basename(name))
         if method == 8:
             data = zlib.decompress(data, -15)
         dest = os.path.join(out, os.path.basename(name))
@@ -78,8 +123,8 @@ def main() -> int:
         if not dest.endswith((".zip", ".txt", ".apk")):
             os.chmod(dest, 0o755)
         got += 1
-        print(f"  {os.path.basename(name)}  ({len(data) // 1024} KB)")
-    print(f"Installed {got} file(s) into {out}")
+        print(f"  {os.path.basename(name)}  ({len(data) // 1024} KB)", flush=True)
+    print(f"Installed {got} file(s) into {out}", flush=True)
     return 0 if got > 1 else 1
 
 

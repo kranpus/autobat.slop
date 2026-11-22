@@ -13,10 +13,13 @@ RUN wget -q "https://github.com/godotengine/godot-builds/releases/download/${GOD
  && unzip -q /tmp/godot.zip -d /tmp \
  && mv "/tmp/Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot \
  && chmod +x /usr/local/bin/godot && rm /tmp/godot.zip
+# Only the web export templates (~33 MB), not the whole 1 GB archive. Fetched
+# before the game files are copied in, so updates reuse this step from the
+# Docker cache instead of downloading the templates again.
+COPY tools/fetch_export_templates.py /tmp/fetch_export_templates.py
+RUN python3 -u /tmp/fetch_export_templates.py web
 WORKDIR /game
 COPY . /game
-# Only the web export templates (~17 MB), not the whole 1 GB archive.
-RUN python3 tools/fetch_export_templates.py web
 RUN godot --headless --path /game --import || true
 RUN mkdir -p export/web \
  && godot --headless --path /game --export-release "Web" /game/export/web/index.html \
