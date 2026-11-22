@@ -1,0 +1,24 @@
+# Caddy config for the VPS setup (server/docker-compose.vps.yml).
+# DOMAIN comes from server/.env, e.g. DOMAIN=play.yourgame.com
+# Caddy fetches and renews the HTTPS certificate for it automatically.
+
+# Plain http:// goes to the HTTPS page (port 80 also answers Let's Encrypt).
+http://{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+# The browser version: https://DOMAIN
+https://{$DOMAIN} {
+	root * /srv
+	encode zstd gzip
+	file_server
+	# Always check for a new build of the page itself.
+	@page path / /index.html
+	header @page Cache-Control "no-cache"
+}
+
+# The browser game's encrypted connection: wss://DOMAIN:24704, passed on to
+# the game server's WebSocket listener inside the Docker network.
+https://{$DOMAIN}:24704 {
+	reverse_proxy legion-draft:24714
+}

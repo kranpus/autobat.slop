@@ -1,0 +1,58 @@
+# Public server on a VPS (Hostinger KVM, Hetzner, DigitalOcean...): the game
+# server plus the browser version on your own domain with HTTPS.
+#
+# Setup (once):   server/setup_vps.sh play.yourgame.com
+# Update:         git pull && docker compose -f server/docker-compose.vps.yml up -d --build
+# Admin console:  docker attach legion-draft-server   (detach: Ctrl+P then Ctrl+Q)
+#
+# Ports: UDP 24702-24703 (game app), TCP 80/443 (web page + certificates),
+# TCP 24704 (browser game, encrypted).
+services:
+  legion-draft:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    image: autobat-legions-server
+    container_name: legion-draft-server
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    ports:
+      - "24702:24702/udp"   # game app connections (DTLS-encrypted)
+      - "24703:24703/udp"   # certificate service for new game apps
+    environment:
+      - PORT=24702
+      - WS_PORT=24714       # browsers: reached through Caddy (wss://DOMAIN:24704)
+      - WEB_PORT=0          # Caddy serves the web page instead
+      - WS_BEHIND_TLS_PROXY=1
+    volumes:
+      - legion-data:/home/godot/.local/share/godot
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  web:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile.web
+    image: autobat-legions-web
+    container_name: legion-draft-web
+    restart: unless-stopped
+    depends_on:
+      - legion-draft
+    ports:
+      - "80:80"
+      - "443:443"
+      - "24704:24704"
+    environment:
+      - DOMAIN=${DOMAIN:?Set DOMAIN in server/.env (run server/setup_vps.sh)}
+    volumes:
+      - caddy-data:/data      # certificates
+      - caddy-config:/config
+
+volumes:
+  legion-data:
+  caddy-data:
+  caddy-config:

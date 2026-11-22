@@ -1,5 +1,8 @@
 # Hosting the Legion Draft server
 
+> **On Hostinger** (or any Ubuntu VPS) with your own domain and HTTPS for the browser version:
+> follow **[HOSTINGER.md](HOSTINGER.md)**. One script sets everything up.
+
 The matchmaking server is this same Godot project running headless with `-- --server`.
 A single server process:
 

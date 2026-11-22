@@ -16,7 +16,8 @@ RUN wget -q "https://github.com/godotengine/godot-builds/releases/download/${GOD
  && chmod +x /usr/local/bin/godot \
  && rm /tmp/godot.zip
 
-RUN useradd --create-home --shell /usr/sbin/nologin godot
+RUN useradd --create-home --shell /usr/sbin/nologin godot \
+ && mkdir -p /game && chown godot:godot /game
 WORKDIR /game
 COPY --chown=godot:godot . /game
 USER godot

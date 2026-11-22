@@ -180,7 +180,10 @@ func server_address() -> String:
 		var host := str(JavaScriptBridge.eval("window.location.hostname", true))
 		var port := str(JavaScriptBridge.eval("window.location.port", true))
 		var proto := str(JavaScriptBridge.eval("window.location.protocol", true))
-		if host != "" and (port == str(WEB_PORT) or proto == "http:"):
+		# ...also when no server address has been built in (DEFAULT_SERVER
+		# left at localhost): then the page's own site runs the server, as
+		# with the VPS setup (server/docker-compose.vps.yml).
+		if host != "" and (port == str(WEB_PORT) or proto == "http:" or DEFAULT_SERVER == "localhost"):
 			return host
 	return DEFAULT_SERVER
 
@@ -1870,6 +1873,8 @@ func _start_websocket() -> WebSocketMultiplayerPeer:
 		return null
 	if tls:
 		print("Browsers connect with wss:// on TCP port %d (encrypted)." % ws_port)
+	elif OS.get_environment("WS_BEHIND_TLS_PROXY") == "1":
+		print("Browsers connect through the HTTPS proxy (wss://, encrypted), which forwards to TCP port %d." % ws_port)
 	else:
 		print("Browsers connect with ws:// on TCP port %d. NOT encrypted: fine on your home network; for the internet use --ws-cert/--ws-key (see HOSTING.md)." % ws_port)
 	return ws

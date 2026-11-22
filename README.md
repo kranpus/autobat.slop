@@ -40,6 +40,9 @@ touch controls and pinch-to-zoom. See **[MOBILE.md](MOBILE.md)** for how to buil
 offline as a guest. Only LAN matches and live duels need the downloadable version. The server
 can host the page itself for your home network. See **[WEB.md](WEB.md)**.
 
+**Putting it online:** [HOSTINGER.md](HOSTINGER.md) sets up a Hostinger VPS (or any Ubuntu
+server) with your domain: the game server plus the browser version over HTTPS, in one script.
+
 **Accounts:** at startup, sign in to (or create) an account on the server, which then keeps your
 progress, or press **Play offline (guest)** to keep a local profile on this device. You can
 switch later in **Settings → Account**. See [HOSTING.md](HOSTING.md#accounts-and-security) for how

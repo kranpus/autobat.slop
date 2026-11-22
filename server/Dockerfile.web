@@ -1,0 +1,28 @@
+# Autobat Legions - the browser version, served over HTTPS by Caddy.
+# Caddy gets and renews free Let's Encrypt certificates for your domain by
+# itself, serves the game page, and forwards the game's encrypted WebSocket
+# (wss://DOMAIN:24704) to the game server. Used by docker-compose.vps.yml.
+
+# --- stage 1: export the web build with headless Godot ---------------------
+FROM debian:bookworm-slim AS build
+ARG GODOT_VERSION=4.3
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates wget unzip python3 libfontconfig1 \
+ && rm -rf /var/lib/apt/lists/*
+RUN wget -q "https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -O /tmp/godot.zip \
+ && unzip -q /tmp/godot.zip -d /tmp \
+ && mv "/tmp/Godot_v${GODOT_VERSION}-stable_linux.x86_64" /usr/local/bin/godot \
+ && chmod +x /usr/local/bin/godot && rm /tmp/godot.zip
+WORKDIR /game
+COPY . /game
+# Only the web export templates (~17 MB), not the whole 1 GB archive.
+RUN python3 tools/fetch_export_templates.py web
+RUN godot --headless --path /game --import || true
+RUN mkdir -p export/web \
+ && godot --headless --path /game --export-release "Web" /game/export/web/index.html \
+ && test -f export/web/index.wasm
+
+# --- stage 2: Caddy with the built files -------------------------------------
+FROM caddy:2.8.4-alpine
+COPY --from=build /game/export/web /srv
+COPY server/Caddyfile /etc/caddy/Caddyfile
