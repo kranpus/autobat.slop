@@ -89,11 +89,14 @@ Firewall**), add the same rules there:
 
 - **Browser:** open **https://play.yourdomain.com**. The Server field is already filled in;
   create an account and play.
-- **Downloadable game:** type `play.yourdomain.com` as the server on the sign-in screen. To build
-  it in, set this in `scripts/net/party.gd` before exporting, so players never have to type it:
+- **Downloadable game:** connects to the server built into it.
+  - **This project's default:** `DEFAULT_SERVER` in `scripts/net/party.gd` is already
+    `play.battleserver.tech`, so players don't type anything.
+  - **A different domain:** change that line before exporting:
   ```gdscript
   const DEFAULT_SERVER := "play.yourdomain.com"
   ```
+  Players can still type another server on the sign-in screen.
 - **itch.io:** to use your own page, put a link to `https://play.yourdomain.com` on your itch
   page. To run it inside itch instead, set `DEFAULT_SERVER` as above, then build and upload the
   web zip (see [WEB.md](WEB.md)). It connects to your server over the encrypted `wss://`.

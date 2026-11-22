@@ -37,7 +37,7 @@ const DISCOVERY_PORT := 24701
 const GAME_TAG := "autobat_draft_v2"
 ## Put your server's address here so players don't have to type it
 ## (players can still change it in the Legion Draft tab).
-const DEFAULT_SERVER := "localhost"
+const DEFAULT_SERVER := "play.battleserver.tech"   # where players connect unless they type another server
 const MAX_SERVER_PEERS := 1000
 const MAX_ROOMS := 400
 const REQUESTS_PER_SECOND := 30

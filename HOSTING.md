@@ -159,7 +159,7 @@ DigitalOcean "Networking → Firewalls", Oracle "Security Lists"). Add an inboun
    `play.yourgame.com` → your VPS's IP address.
 2. In `scripts/net/party.gd`, set
    ```gdscript
-   const DEFAULT_SERVER := "play.yourgame.com"   # or the raw IP address
+   const DEFAULT_SERVER := "play.yourgame.com"   # or the raw IP address (currently play.battleserver.tech)
    ```
    and export the game again. Players then just press **Quick Match**. Anyone can still type a
    different address in the Legion Draft tab (`host` or `host:port`).
