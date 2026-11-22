@@ -246,6 +246,7 @@ Ctrl+P then Ctrl+Q to detach again.
 | `say Server restarting in 5 minutes` | Show a message to every connected player. |
 | `ranked` | How many player armies are saved for ranked matchmaking, and their rating range. |
 | `ranked clear` | Delete all saved ranked armies. |
+| `ranked range 150` | Only match players against saved armies within this many rating points (default 200). Saved with the server settings. |
 | `units` | List all 60 units and whether each is locked or open. |
 | `lock Storm Dragon` / `lock goblin ogre` | Lock units by name or id. Locked units stop appearing in expeditions, draft shops and ranked opponents, are removed from army codes, and don't deploy in battles. Useful for emergency balance fixes. |
 | `unlock storm_dragon` | Unlock units again. |
@@ -355,8 +356,9 @@ When a player presses **Find Opponents** in the Battle tab, their game:
 1. sends their current army and rating to the server, which saves it as that player's latest
    army (one per player, under an anonymous ID);
 2. receives up to 3 armies saved by *other* players at a similar rating. The search starts
-   within ±50 rating and widens until it finds enough, aiming for one closest match, one
-   slightly below and one slightly above.
+   within ±50 rating and widens until it finds enough, but never beyond the **ranked range**
+   (±200 by default, `ranked range <n>` to change). It aims for one closest match, one slightly
+   below and one slightly above.
 
 Empty slots, or all three if the server can't be reached, are filled with generated training
 opponents. Saved armies are kept for 30 days in `ranked_armies.json`, in the server's Godot user

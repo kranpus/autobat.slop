@@ -26,7 +26,7 @@ signal left_match(reason: String)
 ## similar rating). Empty when the server can't be reached.
 signal ranked_opponents(list: Array)
 
-const GAME_VERSION := "legion-draft-9"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-10"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server (ENet/UDP)
 const WS_PORT := 24704                   # same server for browsers (WebSocket/TCP)
@@ -88,6 +88,9 @@ var _rng := RandomNumberGenerator.new()
 ## Gold economy set by the server admin (see console commands). Rooms share
 ## this dictionary, so changes apply to matches already in progress.
 var rewards := DEFAULT_REWARDS.duplicate(true)
+## Ranked: only saved player armies within this many rating points of yours.
+const DEFAULT_RANKED_RANGE := 200
+var ranked_range := DEFAULT_RANKED_RANGE
 var _stdin_thread: Thread
 var _stdin_mutex := Mutex.new()
 var _stdin_lines: Array = []
@@ -333,6 +336,7 @@ func run_command(line: String) -> String:
   lock reset                      back to the defaults (the new units and regions locked)
   ranked                          how many player armies are saved for ranked matchmaking
   ranked clear                    delete all saved ranked armies
+  ranked range <n>                only match players within n rating (default 200)
   say <message>                   show a message to every connected player
   drops                           show drop chance settings
   drops unit <rarity> <mult>      scale unit drop chances, e.g. 'drops unit legendary 0.25'
@@ -386,14 +390,21 @@ func run_command(line: String) -> String:
 				lines.append("  %-22s %-10s %s" % [id, GameData.UNITS[id]["rarity"], "LOCKED" if UnitLocks.is_locked(id) else "open"])
 			out = "\n".join(PackedStringArray(lines)) + "\n%d of %d units locked." % [UnitLocks.locked_list().size(), GameData.UNITS.size()]
 		"ranked":
-			if ranked_pool == null:
+			if a.size() >= 2 and a[1].to_lower() == "range":
+				if a.size() == 3 and a[2].is_valid_int():
+					ranked_range = clampi(int(a[2]), 10, 5000)
+					_save_config()
+					out = "Ranked players are now matched within %d rating of each other." % ranked_range
+				else:
+					out = "Ranked range: %d. Usage: ranked range <rating points>, e.g. 'ranked range 150'" % ranked_range
+			elif ranked_pool == null:
 				out = "Ranked pool only exists on the dedicated server."
 			elif a.size() >= 2 and a[1].to_lower() == "clear":
 				ranked_pool.entries.clear()
 				ranked_pool.save_file()
 				out = "Ranked pool cleared."
 			else:
-				out = ranked_pool.stats()
+				out = ranked_pool.stats() + " Match range: within %d rating." % ranked_range
 		"regions":
 			var lines: Array = []
 			for rid in GameData.REGIONS:
@@ -587,6 +598,7 @@ func _load_config() -> void:
 	if typeof(parsed.get("locked_regions")) == TYPE_ARRAY:
 		UnitLocks.set_locked_regions(parsed["locked_regions"])
 	DropRates.apply(parsed.get("drops", {}))
+	ranked_range = clampi(int(parsed.get("ranked_range", DEFAULT_RANKED_RANGE)), 10, 5000)
 	var r: Dictionary = parsed.get("rewards", {})
 	rewards["battle_mult"] = clampf(float(r.get("battle_mult", 1.0)), 0.0, 100.0)
 	rewards["draft_mult"] = clampf(float(r.get("draft_mult", 1.0)), 0.0, 100.0)
@@ -600,7 +612,7 @@ func _load_config() -> void:
 func _save_config() -> void:
 	var f := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict()}, "\t"))
+		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(), "ranked_range": ranked_range}, "\t"))
 
 
 func _log(text: String) -> void:
@@ -827,7 +839,7 @@ func _rq_ranked(version: String, pid: String, pname: String, rating: int, code: 
 	if ranked_pool.add(pid, pname, rating, code):
 		ranked_pool.save_file()
 	var out: Array = []
-	for e in ranked_pool.find(clampi(rating, 0, 5000) + Army.RANKED_SEARCH_BIAS, pid.left(40), 3):
+	for e in ranked_pool.find(clampi(rating, 0, 10000) + Army.RANKED_SEARCH_BIAS, pid.left(40), 3, ranked_range):
 		out.append({"name": e["name"], "rating": e["rating"], "code": e["code"], "saved_at": e["saved_at"]})
 	_deliver(id, "ranked", [out])
 
@@ -2445,7 +2457,7 @@ func _ranked_offer_for(id: int) -> Array:
 	var code := pl.army_code()
 	if ranked_pool.add("acct:" + user, str(pl.data.get("name", user)), rating, code):
 		ranked_pool.save_file()
-	for e in ranked_pool.find(rating + Army.RANKED_SEARCH_BIAS, "acct:" + user, 3):
+	for e in ranked_pool.find(rating + Army.RANKED_SEARCH_BIAS, "acct:" + user, 3, ranked_range):
 		var army := Army.decode(str(e["code"]))
 		if army.is_empty():
 			continue

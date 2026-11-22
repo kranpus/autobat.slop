@@ -138,7 +138,8 @@ func refresh() -> void:
 	if not is_inside_tree():
 		return
 	var my := Profile.battle_squads()
-	_record_label.text = "Rating %d   ·   Wins %d   ·   Losses %d   ·   Your power %s" % [Profile.rating(), int(Profile.data["wins"]), int(Profile.data["losses"]), Army.format_power(Army.army_power(my))]
+	_record_label.text = "Rating %d   ·   Wins %d   ·   Losses %d   ·   Your power %s   ·   Win gold x%s" % [Profile.rating(), int(Profile.data["wins"]), int(Profile.data["losses"]), Army.format_power(Army.army_power(my)), str(snappedf(Army.win_gold_mult(Profile.rating()), 0.01))]
+	_record_label.tooltip_text = "Ranked wins pay more as your rating rises: x1 up to 1000, +100% for every 1000 above that."
 
 
 func _find_opponents() -> void:

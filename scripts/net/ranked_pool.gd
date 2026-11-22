@@ -73,8 +73,11 @@ func prune() -> void:
 ## Up to `count` armies from other players whose saved rating is close to
 ## `rating`. The search window widens until enough are found. Picks one
 ## close match, then one at/below and one at/above the player when possible.
-func find(rating: int, exclude_pid: String, count: int = 3) -> Array:
-	var window := START_WINDOW
+## Armies near `rating`. The search starts close and widens, but never past
+## `max_window` rating points either way.
+func find(rating: int, exclude_pid: String, count: int = 3, max_window: int = MAX_WINDOW) -> Array:
+	max_window = maxi(1, max_window)
+	var window := mini(START_WINDOW, max_window)
 	var candidates: Array = []
 	while true:
 		candidates = []
@@ -83,9 +86,9 @@ func find(rating: int, exclude_pid: String, count: int = 3) -> Array:
 				continue
 			if absi(int(entries[pid]["rating"]) - rating) <= window:
 				candidates.append(entries[pid])
-		if candidates.size() >= count or window >= MAX_WINDOW:
+		if candidates.size() >= count or window >= max_window:
 			break
-		window *= 2
+		window = mini(window * 2, max_window)
 	if candidates.is_empty():
 		return []
 	# Shuffle first so equally close armies are picked at random.

@@ -277,7 +277,10 @@ func _show_rewards(summary: Dictionary, mode: String) -> void:
 	if Profile.online and mode in ["practice", "live"]:
 		_rewards_box.add_child(UIKit.label("While signed in, only ranked battles and Legion Draft earn rewards.", 13, UIKit.TEXT_DIM))
 		return
-	_rewards_box.add_child(UIKit.label("+%d gold" % int(summary.get("gold", 0)), 16, Color("ffd76a")))
+	var gold_text := "+%d gold" % int(summary.get("gold", 0))
+	if float(summary.get("rank_mult", 1.0)) > 1.0:
+		gold_text += "  (rank bonus x%s)" % str(snappedf(float(summary["rank_mult"]), 0.01))
+	_rewards_box.add_child(UIKit.label(gold_text, 16, Color("ffd76a")))
 	if int(summary.get("maps", 0)) > 0:
 		_rewards_box.add_child(UIKit.label("+%d scouting map" % int(summary["maps"]), 16, Color("9fd3ff")))
 	if mode in ["ranked", "ranked_online", "live"]:

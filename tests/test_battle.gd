@@ -28,6 +28,7 @@ func _initialize() -> void:
 	test_harder_ghosts()
 	test_leaderboard()
 	test_drop_rates()
+	test_rank_progression()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -802,3 +803,51 @@ func test_drop_rates() -> void:
 	check(party.run_command("drops unit mythic 2").begins_with("Usage") and party.run_command("drops pity common 3").begins_with("Usage"), "bad drop commands show usage")
 	party.run_command("drops reset")
 	check(DropRates.to_dict() == {"unit": DropRates.DEFAULT_UNIT, "trinket": DropRates.DEFAULT_TRINKET, "pity": DropRates.DEFAULT_PITY}, "'drops reset' restores the defaults")
+
+
+func test_rank_progression() -> void:
+	print("rank progression")
+	var spire := int(GameData.REGIONS["celestial_spire"]["min_rating"])
+	var needs: Array = []
+	for rid in GameData.REGIONS:
+		needs.append(int(GameData.REGIONS[rid]["min_rating"]))
+	needs.sort()
+	check(spire == 3500 and needs.back() == 3500, "Celestial Spire is the last region, at 3500 rating")
+	var gaps_ok := true
+	var prev := -1
+	for n in needs:
+		if n > 0 and prev > 0 and n - prev < 100:
+			gaps_ok = false
+		prev = n
+	check(gaps_ok, "at least 100 rating between region unlocks (%s)" % [needs])
+	var pl := ProfileLogic.new()
+	pl.data["rating"] = 1250
+	check(pl.region_unlocked("warrens") and not pl.region_unlocked("forest") and not pl.region_unlocked("peaks"), "at 1250: Warrens open, Forest (1300) and Peaks (2500) not yet")
+
+	check(is_equal_approx(Army.win_gold_mult(900), 1.0) and is_equal_approx(Army.win_gold_mult(2000), 2.0) and is_equal_approx(Army.win_gold_mult(3500), 3.5), "win gold x1 up to 1000, x2 at 2000, x3.5 at 3500")
+	var low := ProfileLogic.new()
+	low.data["rating"] = 1000
+	var high := ProfileLogic.new()
+	high.data["rating"] = 2000
+	var g_low := int(low.apply_battle_result("ranked", 1.0, 1000, 0)["gold"])
+	var hs := high.apply_battle_result("ranked", 1.0, 1000, 0)
+	check(int(hs["gold"]) == g_low * 2 and is_equal_approx(float(hs["rank_mult"]), 2.0), "a win at 2000 rating pays double (%d vs %d gold)" % [int(hs["gold"]), g_low])
+	var l_low := int(low.apply_battle_result("ranked", 0.0, 1000, 0)["gold"])
+	var l_high := int(high.apply_battle_result("ranked", 0.0, 1000, 0)["gold"])
+	check(l_low == l_high, "losses pay the same at any rating")
+
+	var pool := RankedPool.new()
+	pool.entries.clear()
+	var code := Army.encode("x", 1000, [{"unit": "goblin", "level": 1, "tier": 0, "row": "front"}])
+	for r in [1000, 1150, 1300, 1600, 2500]:
+		pool.add("p%d" % r, "P%d" % r, r, code)
+	var near: Array = pool.find(1000, "", 3, 200).map(func(e): return int(e["rating"]))
+	near.sort()
+	check(near == [1000, 1150], "only players within the range are offered (%s)" % [near])
+	check(pool.find(2000, "", 3, 200).is_empty(), "nobody in range: no player armies (training opponents fill in)")
+	var party := root.get_node("Party")
+	party.run_command("ranked range 150")
+	check(party.ranked_range == 150, "'ranked range 150' sets the range")
+	var saved = JSON.parse_string(FileAccess.get_file_as_string(party.CONFIG_PATH))
+	check(typeof(saved) == TYPE_DICTIONARY and int(saved.get("ranked_range", 0)) == 150, "the range is saved with the server config")
+	party.run_command("ranked range 200")

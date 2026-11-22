@@ -47,6 +47,25 @@ accounts, password hashing and encryption work.
 
 ## The gameplay loop
 
+**Rating unlocks regions.** Each expedition region needs a ranked rating, spread out from the
+start to the top:
+
+| Rating | Regions |
+|---|---|
+| 0 | Goblin Warrens, Haunted Crypt, Badlands Camp* |
+| 1100 / 1200 | Sunken Marsh*, Hive Tunnels* |
+| 1300 | Whispering Forest |
+| 1500 / 1700 | Elven Glade*, Bone Fields* |
+| 1900 | Dwarven Deeps |
+| 2200 | Giant's Steps* |
+| 2500 | Dragon Peaks |
+| 3000 | Dragon's Hoard* |
+| 3500 | Celestial Spire* |
+
+\* locked until the server admin releases them (see Locked units). Generated ranked opponents
+use rarer units at roughly the same points (rare from 1200, epic from 1700, legendary from
+2500).
+
 1. **Find units: Expeditions tab.** Spend *Scouting Maps* to search a region. Your scouts come
    back with **3 different units** from that region, each shown with its description, role,
    stats and strengths, and you **recruit one**. A new unit joins your collection; one you
@@ -100,6 +119,12 @@ accounts, password hashing and encryption work.
      match, one slightly lower and one slightly higher (the search leans a little above your
      rating). Win rating (Elo), gold and maps. Empty slots, or all three when offline, are
      filled with generated training opponents.
+   - **Win gold grows with your rating:** x1 up to 1000, then +100% for every 1000 above that
+     (x2 at 2000, x3.5 at 3500). The Battle tab shows your current bonus. Losses and draws pay
+     the same at any rating.
+   - **Only nearby players:** you're only matched against saved player armies within **±200
+     rating** of yours (the server admin can change this). If nobody is that close, training
+     opponents fill in.
    - **Training opponents:** on average about 20% stronger than your army (Easy ≈ 0.95×,
      Even ≈ 1.15×, Hard ≈ 1.4× your power). Above rating ~950 they carry trinkets too, more and
      rarer as rating rises.
@@ -124,9 +149,10 @@ Locked units don't appear anywhere: not in expeditions, draft shops or ranked op
 in army codes. Locked units you own sit out of battles.
 
 The new units come from **8 new expedition regions**, which are locked too:
-- **Opening regions (1 map, no rating needed):** Badlands Camp, Sunken Marsh, Hive Tunnels.
-- **Mid regions (2 maps, rating 1000–1100):** Elven Glade, Bone Fields, Giant's Steps.
-- **Top regions (3 maps, rating 1150–1200):** Dragon's Hoard, Celestial Spire.
+- **Opening regions (1 map):** Badlands Camp (no rating needed), Sunken Marsh (1100), Hive
+  Tunnels (1200).
+- **Mid regions (2 maps):** Elven Glade (1500), Bone Fields (1700), Giant's Steps (2200).
+- **Top regions (3 maps):** Dragon's Hoard (3000), Celestial Spire (3500).
 
 The original 5 regions keep their original 20 units. A locked region is hidden from the
 Expeditions tab, and a region can only be explored once some of its units are unlocked.

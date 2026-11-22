@@ -563,12 +563,14 @@ func apply_battle_result(mode: String, score: float, opp_rating: int, enemy_kill
 	var summary := {"gold": 0, "maps": 0, "rating": 0}
 	var g := 20 + enemy_killed / 5
 	if mode == "ranked" or mode == "live":
+		var rank_mult := Army.win_gold_mult(rating())   # your rating before this battle
 		var delta := Army.elo_delta(rating(), opp_rating, score)
 		data["rating"] = maxi(0, rating() + delta)
 		summary["rating"] = delta
 		if score >= 1.0:
 			data["wins"] = int(data["wins"]) + 1
-			g += 100 + maxi(0, (opp_rating - 900) / 4)
+			g = roundi(float(g + 100 + maxi(0, (opp_rating - 900) / 4)) * rank_mult)
+			summary["rank_mult"] = rank_mult
 			summary["maps"] = 1
 		elif score <= 0.0:
 			data["losses"] = int(data["losses"]) + 1

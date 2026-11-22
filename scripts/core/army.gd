@@ -200,12 +200,13 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	# Higher ratings unlock rarer units for ghosts.
+	# Rarer units appear as rating rises, roughly with the expedition ladder.
 	var max_rarity := 1
-	if rating >= 1050:
+	if rating >= 1200:
 		max_rarity = 2
-	if rating >= 1150:
+	if rating >= 1700:
 		max_rarity = 3
-	if rating >= 1300:
+	if rating >= 2500:
 		max_rarity = 4
 	var pool: Array = []
 	for id in UnitLocks.unlocked_ids():
@@ -244,7 +245,7 @@ static func _give_ghost_trinkets(squads: Array, rating: int, rng: RandomNumberGe
 	var chance := clampf(float(rating - 950) / 700.0, 0.0, 0.85)
 	if chance <= 0.0:
 		return
-	var max_order := 1 if rating < 1050 else (2 if rating < 1200 else (3 if rating < 1400 else 4))
+	var max_order := 1 if rating < 1200 else (2 if rating < 1700 else (3 if rating < 2500 else 4))
 	var used := {}
 	for sq in squads:
 		if rng.randf() >= chance:
@@ -273,6 +274,12 @@ static func _give_ghost_trinkets(squads: Array, rating: int, rng: RandomNumberGe
 			ts.append(pick)
 		if not ts.is_empty():
 			sq["trinkets"] = ts
+
+
+## Ranked/live win gold multiplier for your rating: x1 up to 1000, then
+## +100% for every 1000 rating above it (x2 at 2000, x3.5 at 3500).
+static func win_gold_mult(rating: int) -> float:
+	return 1.0 + maxf(0.0, float(rating - 1000)) / 1000.0
 
 
 static func elo_delta(my_rating: int, opp_rating: int, score: float, k: float = 32.0) -> int:
