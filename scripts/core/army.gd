@@ -69,13 +69,18 @@ static func unit_power(unit_id: String, level: int, mods: Dictionary = {}) -> fl
 	var cd: float = s["cooldown"]
 	var splash_share := BattleSim.AOE_SPLASH_MULT if str(s["projectile"]) == "none" else BattleSim.RANGED_SPLASH_MULT
 	var splash_bonus := minf(float(s["aoe"]), 60.0) / 40.0 * splash_share / SPLASH_POWER_REF
-	var dps: float = (float(s["dmg"]) * (1.0 + splash_bonus) + float(s["heal"]) * 1.5) / cd + float(s["regen"])
+	var dps: float = (float(s["dmg"]) * (1.0 + splash_bonus) + float(s["heal"]) * HEAL_POWER) / cd + float(s["regen"])
 	var reach_bonus := 1.0 + minf(float(s["range"]), 260.0) / 520.0
 	# Big units are worth more than raw stats suggest (they can't be swarmed
 	# as efficiently), so rarer units carry a calibrated multiplier.
 	var rarity_mult: float = GameData.RARITIES[s["rarity"]]["power_mult"]
 	var ab := ability_power(s)
 	return sqrt(float(s["hp"]) * ab.x * dps * ab.y * reach_bonus) * rarity_mult
+
+
+## What a point of healing is worth in power, against a point of damage.
+## (1.5 before 0.9.2; the simulator showed healers were overrated.)
+const HEAL_POWER := 0.7
 
 
 ## The share of a hit that splash damage was worth when the power formula was
@@ -92,24 +97,24 @@ const ABILITY_TUNING := {
 	"chill": 0.35,        # x (chill seconds / cooldown, up to 1), on toughness
 	"curse": 0.12,         # x (seconds / cooldown, up to 1), on damage
 	"weaken": 0.15,       # x (seconds / cooldown, up to 1), on toughness
-	"burn": 0.5,          # x burn share, on damage
+	"burn": 0.2,          # x burn share, on damage
 	"chain": 1.0,         # x chain damage share (later jumps rarely find targets: capped at CHAIN_POWER_CAP)
 	"double_strike": 0.55, # x extra targets, on damage
 	"charge": 0.25,       # x (multiplier - 1), on damage
-	"rebirth": 0.7,       # x health share revived, on toughness
-	"unstoppable": 1.1,   # x projectile resistance, on toughness
-	"devour": 0.25,        # x lifesteal share, on toughness
-	"raise_dead": 0.25,    # on toughness and damage
+	"rebirth": 0.2,       # x health share revived, on toughness
+	"unstoppable": 3.0,   # x projectile resistance, on toughness
+	"devour": 0.1,        # x lifesteal share, on toughness
+	"raise_dead": 0.15,    # on toughness and damage
 	"quake": 0.15,        # x (stun seconds / cooldown, up to 1), on toughness and damage
-	"predator": 0.3,      # x bonus (share of targets that are ranged), on damage
-	"knockback": 0.1,     # on toughness
-	"death_blast": 0.4,   # x health share, on damage
-	"heads": 0.8,         # x attack speed per head (about 1.5 heads on average), on damage
-	"soul_harvest": 0.6,  # x heal share, on toughness; kills also add damage
+	"predator": 0.05,      # x bonus (share of targets that are ranged), on damage
+	"knockback": 0.0,     # on toughness
+	"death_blast": 2.0,   # x health share, on damage
+	"heads": 0.2,         # x attack speed per head (about 1.5 heads on average), on damage
+	"soul_harvest": 0.2,  # x heal share, on toughness; kills also add damage
 	"dread": 0.2,         # on toughness
 	"rising_storm": 0.5,  # on damage (the cap is reached after ~20 blows)
 	"resurrect": 0.35,    # on toughness and damage
-	"aegis": 0.25,        # on toughness
+	"aegis": 0.8,        # on toughness
 }
 const CHAIN_POWER_CAP := 1.2
 
@@ -163,7 +168,7 @@ static func ability_power(s: Dictionary) -> Vector2:
 		"heads":
 			return Vector2(1.0, 1.0 + ABILITY_TUNING["heads"] * v)
 		"soul_harvest":
-			return Vector2(1.0 + ABILITY_TUNING["soul_harvest"] * v, 1.1)
+			return Vector2(1.0 + ABILITY_TUNING["soul_harvest"] * v, 1.0)
 		"dread":
 			return Vector2(1.0 + ABILITY_TUNING["dread"], 1.0)
 		"rising_storm":
