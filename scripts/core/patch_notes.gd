@@ -7,29 +7,35 @@ extends RefCounted
 
 const LIST := [
 	{"version": "0.9.2", "date": "2026-11-22", "title": "Abilities",
-		"summary": "Splash is now rare: 16 units trade it for abilities of their own, and melee splash is nerfed.",
+		"summary": "Splash is now rare, melee splash is nerfed, and 23 units have battle abilities of their own, including every epic and legendary.",
 		"sections": [
 			{"name": "Splash", "notes": [
 				{"kind": "nerf", "text": "Melee splash: blows now splash nearby enemies for 45% of the damage, down from 60%. Ranged splash stays at 35%."},
 				{"kind": "change", "text": "Only six units splash now: Orc Sorcerer, Hill Giant, Cyclops, Fire Giant, Golden Dragon and Grand Avatar. Every other former splasher has a battle ability instead (shown on its card in the Collection)."},
 			]},
 			{"name": "New abilities", "notes": [
-				{"kind": "change", "text": "Stun: Ogre Brute (0.6s) and Stone Giant (1s) knock their target senseless: it can't move or attack."},
+				{"kind": "change", "text": "Stun: the Ogre Brute's club knocks its target senseless for 0.6s: it can't move or attack."},
 				{"kind": "change", "text": "Chill: Ice Dragon's breath halves the target's speed, moving and attacking, for 3s."},
 				{"kind": "change", "text": "Burn: Salamander Firebrand sets its target ablaze for 120% of the hit again over 4s."},
-				{"kind": "change", "text": "Chain Lightning: Elven Mage (2 jumps), Storm Titan (3) and Storm Dragon (5). Each attack jumps to more enemies nearby, 30% weaker each jump."},
+				{"kind": "change", "text": "Chain Lightning: Elven Mage (2 jumps) and Storm Dragon (5). Each attack jumps to more enemies nearby, 30% weaker each jump."},
 				{"kind": "change", "text": "Shatter: Frost Giant's hits make the target take 30% more damage from everyone for 4s."},
 				{"kind": "change", "text": "Wither: the Sphinx's spells make the target deal 35% less damage for 4s."},
 				{"kind": "change", "text": "Charge: the Minotaur's first blow against each new target deals triple damage."},
 				{"kind": "change", "text": "Double Strike: the Ettin's two clubs hit two enemies at once."},
-				{"kind": "change", "text": "Rebirth: the Phoenix (60% health) and the Bone Dragon (40%) rise again the first time they die."},
+				{"kind": "change", "text": "Rebirth: the Phoenix rises again with 60% of its health the first time it dies."},
 				{"kind": "change", "text": "Unstoppable: the Juggernaut can't be stunned or chilled and takes 35% less damage from arrows, stones and spells."},
 				{"kind": "change", "text": "Devour: the Shadow Dragon heals itself for 40% of the damage it deals."},
 				{"kind": "change", "text": "Raise Dead: enemies the Lich kills rise as skeletons on its side, up to 6 per Lich."},
 			]},
+			{"name": "Epic and legendary", "notes": [
+				{"kind": "change", "text": "Every epic and legendary now has an ability of its own. New: Quake (Hill Giant: every third blow stuns everything around the target), Predator (Griffon: double damage to ranged units, casters and healers), Knockback (Stone Giant), Molten Core (Fire Giant: erupts when it dies), Many Heads (Hydra: attacks faster as it's wounded), Soul Harvest (Bone Dragon: kills heal it and add damage), Dread (Golden Dragon: enemies nearby deal 35% less damage), Rising Storm (Storm Titan: each blow hits harder), Resurrection (Seraph: brings a fallen ally back every 6s) and Divine Aegis (Grand Avatar: allies nearby take 25% less damage)."},
+				{"kind": "change", "text": "The Storm Titan's chain lightning, the Bone Dragon's rebirth and the Stone Giant's stun from earlier 0.9.2 builds became Rising Storm, Soul Harvest and Knockback, so no two epics or legendaries share an ability."},
+				{"kind": "nerf", "text": "Epic and legendary squads grow more slowly: squad upgrades cost 1.75x (epic) and 2x (legendary) the shards."},
+				{"kind": "change", "text": "Epic and legendary units counted for too much in army Strength (at equal Strength, armies with them won only 30-40% of the time). Their Strength is lowered to match how they actually fight, so ranked opponents and challenge ratings are fairer."},
+			]},
 			{"name": "Strength and challenges", "notes": [
 				{"kind": "change", "text": "Abilities count toward army Strength, tuned with thousands of simulated battles so armies of equal Strength stay close fights."},
-				{"kind": "change", "text": "Challenge bosses use their new abilities too: Vorlath raises the dead, Ashwing is reborn, the Colossus throws chain lightning. The Titan Awakens and The Golden Wyrm got bigger armies to make up for the splash they lost (recommended 2050 and 3650); the rest were re-measured."},
+				{"kind": "change", "text": "Challenge bosses use their new abilities too: Vorlath raises the dead, Ashwing is reborn, the Colossus's storm builds with every blow, Aurathrax fills enemies with dread. Recommended power re-measured."},
 			]},
 		]},
 	{"version": "0.9.1", "date": "2026-11-22", "title": "Splash Down, Again",

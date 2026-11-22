@@ -1228,4 +1228,53 @@ func test_abilities() -> void:
 	check(s3.stun_until[jug] == 0, "...and can't be stunned")
 	check(is_equal_approx(float(Army.unit_stats("shadow_dragon", 1)["lifesteal"]), 0.4), "Shadow Dragon devours (40% lifesteal)")
 	check(Army.unit_power("lich", 5) > Army.unit_power("lich", 5) / Army.ability_power(Army.unit_stats("lich", 5)).x, "abilities count toward Strength")
+	# Epic and legendary abilities.
+	r = _ability_battle(one.call("hill_giant"), foes)
+	check(int(r["ev"].get(BattleSim.Ev.QUAKE, 0)) > 0 and r["stun"] > 0, "Hill Giant's quake stuns")
+	r = _ability_battle(one.call("golden_dragon"), foes)
+	check(r["weaken"] > 0, "Golden Dragon's dread weakens enemies nearby")
+	r = _ability_battle(one.call("seraph") + [{"unit": "orc_warrior", "level": 8, "tier": 6, "row": "front"}], foes)
+	sim = r["sim"]
+	var back: Array = range(sim.n).filter(func(i): return sim.raised[i] == 2)
+	check(int(r["ev"].get(BattleSim.Ev.RESURRECT, 0)) > 0 and back.all(func(i): return sim.team[i] == 0), "Seraph resurrects fallen allies (%d)" % back.size())
+	r = _ability_battle(one.call("hydra"), foes)
+	sim = r["sim"]
+	var hydras: Array = range(sim.n).filter(func(i): return sim.ab_id[i] == BattleSim.Ab.HEADS)
+	check(hydras.any(func(i): return sim.ab_used[i] > 0 and sim.cooldown[i] < sim.ab_base[i]), "Hydra attacks faster as it loses heads")
+	r = _ability_battle(one.call("titan"), foes)
+	sim = r["sim"]
+	check(range(sim.n).any(func(i): return sim.ab_id[i] == BattleSim.Ab.RISING_STORM and sim.ab_used[i] > 3), "Storm Titan's storm builds up")
+	r = _ability_battle(one.call("bone_dragon"), foes)
+	sim = r["sim"]
+	check(range(sim.n).any(func(i): return sim.ab_id[i] == BattleSim.Ab.SOUL_HARVEST and sim.ab_used[i] > 0 and sim.ab_used[i] <= 5), "Bone Dragon harvests souls (up to 5 stacks)")
+	r = _ability_battle(one.call("grand_avatar") + [{"unit": "orc_warrior", "level": 8, "tier": 6, "row": "front"}], foes)
+	check(int(r["ev"].get(BattleSim.Ev.AURA, 0)) > 0, "Grand Avatar shields its allies")
+	r = _ability_battle(one.call("fire_giant"), [{"unit": "goblin", "level": 10, "tier": 10, "row": "front"}])
+	sim = r["sim"]
+	check(range(sim.n).any(func(i): return sim.ab_id[i] == BattleSim.Ab.DEATH_BLAST and sim.alive[i] == 0), "Fire Giants fall (and erupt)")
+	var s4 := BattleSim.new()
+	s4.setup([{"unit": "griffon", "level": 1, "tier": 0, "row": "front"}], [{"unit": "elf_archer", "level": 1, "tier": 0, "row": "back"}, {"unit": "orc_warrior", "level": 1, "tier": 0, "row": "front"}], 1, "open_arena")
+	var archer: int = range(s4.n).filter(func(i): return s4.team[i] == 1 and s4.role[i] == BattleSim.Role.RANGED)[0]
+	var orc: int = range(s4.n).filter(func(i): return s4.team[i] == 1 and s4.role[i] == BattleSim.Role.MELEE)[0]
+	var a0 := s4.hp[archer]
+	s4.rng.seed = 3
+	s4._damage_unit(archer, 50.0, 0, true, 0)
+	var o0 := s4.hp[orc]
+	s4.rng.seed = 3
+	s4._damage_unit(orc, 50.0, 0, true, 0)
+	var vs_ranged := (a0 - s4.hp[archer]) / float(s4._dmg_mult[0 * s4._armor_count + s4.armor[archer]])
+	var vs_melee := (o0 - s4.hp[orc]) / float(s4._dmg_mult[0 * s4._armor_count + s4.armor[orc]])
+	check(absf(vs_ranged / vs_melee - 2.0) < 0.01, "Griffon's predator doubles damage to ranged units")
+	var s5 := BattleSim.new()
+	s5.setup([{"unit": "stone_giant", "level": 1, "tier": 0, "row": "back"}], [{"unit": "goblin", "level": 1, "tier": 0, "row": "front"}], 1, "open_arena")
+	var gob: int = range(s5.n).filter(func(i): return s5.team[i] == 1)[0]
+	var x0 := s5.px[gob]
+	s5._on_hit(0, 0, gob, 10.0, 10.0, 0)
+	check(s5.px[gob] > x0 + 50.0 and s5.stun_until[gob] > s5.tick, "Stone Giant's boulders knock enemies back")
+	# Slower squad growth.
+	var pl := ProfileLogic.new()
+	pl.data["units"]["golden_dragon"] = {"level": 1, "tier": 4, "shards": 0}
+	pl.data["units"]["hill_giant"] = {"level": 1, "tier": 4, "shards": 0}
+	pl.data["units"]["ogre"] = {"level": 1, "tier": 4, "shards": 0}
+	check(int(pl.tier_up_cost("golden_dragon")["shards"]) == ceili(2 * 5 * 0.75 * 2.0) and int(pl.tier_up_cost("hill_giant")["shards"]) == ceili(3 * 5 * 0.75 * 1.75) and int(pl.tier_up_cost("ogre")["shards"]) == ceili(5 * 5 * 0.75), "epic and legendary squads need more shards to grow")
 	UnitLocks.set_locked_list(UnitLocks.defaults())
