@@ -7,6 +7,7 @@ GODOT="${1:-godot}"
 cd "$(dirname "$0")/.."
 "$GODOT" --headless --path . --import > export_web.log 2>&1 || true
 mkdir -p export/web
+touch export/.gdignore   # keep Godot from importing the exported files
 rm -f export/web/*
 "$GODOT" --headless --path . --export-release "Web" export/web/index.html >> export_web.log 2>&1 || true
 if [ ! -f export/web/index.html ] || [ ! -f export/web/index.wasm ]; then

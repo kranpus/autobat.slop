@@ -26,6 +26,7 @@ exit /b 1
 echo Importing the project...
 "%GODOT%" --headless --path "%CD%" --import > export_web.log 2>&1
 if not exist export\web mkdir export\web
+type nul > export\.gdignore
 del /q export\web\* >nul 2>&1
 echo Exporting the Web build...
 "%GODOT%" --headless --path "%CD%" --export-release "Web" export/web/index.html >> export_web.log 2>&1

@@ -33,6 +33,15 @@ The first time it opens, the editor imports the assets, which takes a few second
 **macOS** (plus Android, iOS and Web). Install Godot 4.3's export templates once (Editor → Manage
 Export Templates).
 
+**Everything at once:** `tools/export_all.sh /path/to/godot` builds the web, Windows, Linux and
+Android versions into `export/<version>/`, with ready-to-share zips and the APK.
+- **Templates:** fetch only the export templates you need with
+  `python3 tools/fetch_export_templates.py web windows linux android`.
+- **Android** also needs Java and the Android SDK (`ANDROID_HOME`).
+- **The Android release key:** set `GODOT_ANDROID_KEYSTORE_RELEASE_PATH` / `_USER` /
+  `_PASSWORD` to sign with it. **Keep that key safe:** Android only installs updates signed with
+  the same key.
+
 **Phones and tablets:** the game also runs on Android and iOS, with scaled-up text and buttons,
 touch controls and pinch-to-zoom. See **[MOBILE.md](MOBILE.md)** for how to build it.
 
