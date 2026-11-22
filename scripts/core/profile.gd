@@ -25,7 +25,7 @@ const SAVE_PATH := "user://profile.json"
 const SETTINGS_PATH := "user://settings.json"
 const MAP_REGEN_SECONDS := ProfileLogic.MAP_REGEN_SECONDS
 const MAX_MAPS := ProfileLogic.MAX_MAPS
-const SETTING_KEYS := ["music_volume", "sfx_volume", "ui_scale", "server_address", "unit_locks", "region_locks", "server_rewards"]
+const SETTING_KEYS := ["music_volume", "sfx_volume", "ui_scale", "server_address", "unit_locks", "region_locks", "server_rewards", "drop_rates"]
 
 var logic := ProfileLogic.new()
 var settings: Dictionary = {"music_volume": 0.6, "sfx_volume": 0.8}
@@ -51,6 +51,8 @@ func _init() -> void:
 		UnitLocks.set_locked_list(settings["unit_locks"])
 	if typeof(settings.get("region_locks")) == TYPE_ARRAY:
 		UnitLocks.set_locked_regions(settings["region_locks"])
+	if typeof(settings.get("drop_rates")) == TYPE_DICTIONARY:
+		DropRates.apply(settings["drop_rates"])
 	logic.gold_mult = battle_gold_mult()
 
 

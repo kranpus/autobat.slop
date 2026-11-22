@@ -535,24 +535,24 @@ const CHOICE_SHARD_MULT := 2      # shards per pick are doubled since only one o
 ## Pity: an expedition is guaranteed to offer a unit of at least this rarity
 ## once this many expeditions in a row have gone without one.
 ## Legendary pity only fires in regions that have legendary units.
-const PITY := [
-	{"rarity": "rare", "every": 5},
-	{"rarity": "epic", "every": 15},
-	{"rarity": "legendary", "every": 40},
-]
+## Guaranteed pulls ("pity") are set in DropRates (the server can change them).
 
 const ROWS := ["front", "middle", "back"]
 
 const STARTER_UNITS := ["goblin", "kobold_slinger", "rat_swarm"]
 
 
-## A region's drop table without locked units.
+## A region's drop table: weights after the server's drop multipliers
+## (DropRates), without locked units or units whose rarity is switched off.
 static func region_drops(region_id: String) -> Dictionary:
 	var out := {}
 	var drops: Dictionary = REGIONS[region_id]["drops"]
 	for id in drops:
-		if not UnitLocks.is_locked(id):
-			out[id] = drops[id]
+		if UnitLocks.is_locked(id):
+			continue
+		var w := DropRates.unit_weight(id, float(drops[id]))
+		if w > 0.0:
+			out[id] = w
 	return out
 
 

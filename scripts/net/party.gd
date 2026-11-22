@@ -26,7 +26,7 @@ signal left_match(reason: String)
 ## similar rating). Empty when the server can't be reached.
 signal ranked_opponents(list: Array)
 
-const GAME_VERSION := "legion-draft-8"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-9"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server (ENet/UDP)
 const WS_PORT := 24704                   # same server for browsers (WebSocket/TCP)
@@ -330,6 +330,11 @@ func run_command(line: String) -> String:
   ranked                          how many player armies are saved for ranked matchmaking
   ranked clear                    delete all saved ranked armies
   say <message>                   show a message to every connected player
+  drops                           show drop chance settings
+  drops unit <rarity> <mult>      scale unit drop chances, e.g. 'drops unit legendary 0.25'
+  drops trinket <rarity> <mult>   scale trinket hunt chances, e.g. 'drops trinket epic 2'
+  drops pity <rarity> <n>         guarantee rare/epic/legendary every n expeditions (0 = off)
+  drops reset                     back to the defaults
   accounts                        number of accounts and who is signed in
   accounts reset-password <user>  give a player who forgot their password a new
                                   temporary one (shown once) and sign them out"""
@@ -402,6 +407,8 @@ func run_command(line: String) -> String:
 			out = "Sent: " + msg
 		"accounts":
 			out = _account_command(a)
+		"drops":
+			out = _drops_command(a)
 		_:
 			out = "Unknown command '%s'. Type 'help'." % a[0]
 	_log(out)
@@ -517,6 +524,40 @@ func _locks_changed() -> void:
 		_deliver(id, "locks", [UnitLocks.locked_list(), UnitLocks.locked_regions()])
 
 
+func _drops_command(a: PackedStringArray) -> String:
+	var usage := "Usage: drops | drops unit <rarity> <multiplier> | drops trinket <rarity> <multiplier> | drops pity <rare|epic|legendary> <expeditions, 0 = off> | drops reset"
+	if a.size() == 1:
+		return DropRates.describe()
+	var what := a[1].to_lower()
+	if what == "reset" and a.size() == 2:
+		DropRates.reset()
+	elif what in ["unit", "units", "trinket", "trinkets"] and a.size() == 4:
+		var r := a[2].to_lower()
+		if r not in DropRates.RARITIES or not a[3].is_valid_float():
+			return usage
+		var v := clampf(float(a[3]), 0.0, DropRates.MAX_MULT)
+		if what.begins_with("unit"):
+			DropRates.unit_mult[r] = v
+		else:
+			DropRates.trinket_mult[r] = v
+	elif what == "pity" and a.size() == 4:
+		var r := a[2].to_lower()
+		if r not in DropRates.PITY_RARITIES or not a[3].is_valid_int():
+			return usage
+		DropRates.pity[r] = clampi(int(a[3]), 0, DropRates.MAX_PITY)
+	else:
+		return usage
+	_drops_changed()
+	return "Drop chances updated. " + DropRates.describe()
+
+
+## Save the drop settings and push them to every connected player.
+func _drops_changed() -> void:
+	_save_config()
+	for id in _names:
+		_deliver(id, "drops", [DropRates.to_dict()])
+
+
 func _gold_text() -> String:
 	return "Gold: battles x%s, draft x%s, draft payouts %s." % [rewards["battle_mult"], rewards["draft_mult"], rewards["draft_table"]]
 
@@ -541,6 +582,7 @@ func _load_config() -> void:
 		UnitLocks.set_locked_list(parsed["locked"])
 	if typeof(parsed.get("locked_regions")) == TYPE_ARRAY:
 		UnitLocks.set_locked_regions(parsed["locked_regions"])
+	DropRates.apply(parsed.get("drops", {}))
 	var r: Dictionary = parsed.get("rewards", {})
 	rewards["battle_mult"] = clampf(float(r.get("battle_mult", 1.0)), 0.0, 100.0)
 	rewards["draft_mult"] = clampf(float(r.get("draft_mult", 1.0)), 0.0, 100.0)
@@ -554,7 +596,7 @@ func _load_config() -> void:
 func _save_config() -> void:
 	var f := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions()}, "\t"))
+		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict()}, "\t"))
 
 
 func _log(text: String) -> void:
@@ -825,7 +867,7 @@ func _rq_sync(version: String) -> void:
 	if version != GAME_VERSION:
 		_deliver(id, "error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), GAME_VERSION]])
 		return
-	_deliver(id, "synced", [{"rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(),
+	_deliver(id, "synced", [{"rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(),
 		"leaderboard": accounts.leaderboard(LEADERBOARD_SIZE) if accounts else []}])
 
 
@@ -835,6 +877,8 @@ func _rc_synced(info: Dictionary) -> void:
 		_rc_leaderboard(info["leaderboard"], {})
 	_rc_rewards(info.get("rewards", {}))
 	_rc_locks(info.get("locked", []), info.get("locked_regions", []))
+	if typeof(info.get("drops")) == TYPE_DICTIONARY:
+		_rc_drops(info["drops"])
 	if _sync_only:
 		_hang_up_later()
 
@@ -939,7 +983,7 @@ func _rq_hello(pname: String, version: String) -> void:
 			_deliver(id, "kicked", [err])
 		return
 	_log("%s connected (%d online)" % [_names[id], _names.size()])
-	_deliver(id, "welcome", [{"rooms": _rooms.size(), "players": _names.size(), "rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions()}])
+	_deliver(id, "welcome", [{"rooms": _rooms.size(), "players": _names.size(), "rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict()}])
 
 
 @rpc("any_peer", "reliable")
@@ -1170,6 +1214,8 @@ func _rc_welcome(info: Dictionary) -> void:
 	_rc_rewards(info.get("rewards", {}))
 	if typeof(info.get("locked")) == TYPE_ARRAY:
 		_rc_locks(info["locked"], info.get("locked_regions", UnitLocks.locked_regions()))
+	if typeof(info.get("drops")) == TYPE_DICTIONARY:
+		_rc_drops(info["drops"])
 	status.emit("Connected to the server (%d players online, %d matches)." % [int(info.get("players", 0)), int(info.get("rooms", 0))])
 	online_changed.emit()
 	lobby_changed.emit()
@@ -1192,6 +1238,16 @@ func _rc_rewards(r: Dictionary) -> void:
 
 ## The server's unit locks. Remembered in the device settings so they also
 ## apply to expeditions, ranked battles and army codes while offline.
+## The server's drop chance settings, remembered like the unit locks so
+## offline expeditions and hunts follow them too.
+@rpc("authority", "reliable")
+func _rc_drops(d: Dictionary) -> void:
+	DropRates.apply(d)
+	Profile.settings["drop_rates"] = DropRates.to_dict()
+	Profile.save_settings()
+	Profile.changed.emit()
+
+
 @rpc("authority", "reliable")
 func _rc_locks(list: Array, regions: Array) -> void:
 	UnitLocks.set_locked_list(list)
@@ -1969,6 +2025,8 @@ func _rc_login_ok(info: Dictionary) -> void:
 	phase = "online"
 	_rc_rewards(info.get("rewards", {}))
 	_rc_locks(info.get("locked", []), info.get("locked_regions", []))
+	if typeof(info.get("drops")) == TYPE_DICTIONARY:
+		_rc_drops(info["drops"])
 	Profile.enter_online(_session_user, info.get("profile", {}))
 	status.emit("Signed in as %s." % _session_user)
 	login_result.emit(true, "Signed in as %s." % _session_user)
@@ -2245,7 +2303,7 @@ func _finish_login(id: int, username: String) -> void:
 	_deliver(id, "login_ok", [{
 		"username": display, "token": accounts.issue_token(username), "profile": pl.data,
 		"rewards": {"battle_mult": rewards["battle_mult"]},
-		"locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(),
+		"locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(),
 	}])
 	_log("%s signed in (%d online)" % [display, _sessions.size()])
 

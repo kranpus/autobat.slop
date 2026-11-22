@@ -222,7 +222,7 @@ journalctl -u legion-draft -f
 
 ---
 
-## Admin commands (gold rewards)
+## Admin commands (gold rewards, drop chances)
 
 Type these into the server window (the console that `start_server_windows.bat` or
 `run_local.sh` opens). For Docker, run `docker attach legion-draft-server` to type them; press
@@ -234,6 +234,11 @@ Ctrl+P then Ctrl+Q to detach again.
 | `status` | Players online, open rooms, current gold settings. |
 | `rooms` | List rooms with their phase and player count. |
 | `gold` | Show the gold settings. |
+| `drops` | Show the drop chance settings. |
+| `drops unit legendary 0.25` | Scale how often units of a rarity are offered on expeditions, in every region. 1 = the normal table, 2 = twice as likely, 0 = never. Default: legendary 0.5, everything else 1. |
+| `drops trinket epic 2` | Same for trinket hunts, at every site. Default: legendary 0.5. |
+| `drops pity legendary 80` | Guarantee a rare / epic / legendary (or better) every N expeditions without one; 0 turns that guarantee off. Defaults: rare 5, epic 15, legendary 60. |
+| `drops reset` | Back to the default drop chances. |
 | `gold battle 1.5` | Multiply the gold players earn at the end of every battle (1 = normal, 2 = double). |
 | `gold draft 2` | Multiply the gold paid when a Legion Draft match ends. |
 | `gold draft-table 500 300 200 100` | Base Legion Draft payout for 1st, 2nd, 3rd…; the last number applies to every lower place. |
@@ -251,6 +256,9 @@ Ctrl+P then Ctrl+Q to detach again.
 | `lock reset` | Back to the defaults: the 40 new units and 8 new regions locked, everything else open. |
 
 Notes:
+- **Drop chances** are saved with the other settings and sent to players like the unit locks.
+  - **Online:** they reach signed-in players immediately, and the odds shown in the game update.
+  - **Offline:** guests' games pick them up at the next background check-in.
 - **Settings persist:** they're saved to `server_config.json` in the server's Godot user data
   folder and survive restarts.
 - **Draft payouts** are calculated by the server and apply to matches still in progress.

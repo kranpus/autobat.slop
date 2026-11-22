@@ -289,7 +289,7 @@ func pity_count(rarity: String) -> int:
 
 ## How many more expeditions until `rarity`+ is guaranteed (1 = the next one).
 func pity_remaining(rarity: String) -> int:
-	for p in GameData.PITY:
+	for p in DropRates.pity_rules():
 		if p["rarity"] == rarity:
 			return maxi(1, int(p["every"]) - pity_count(rarity))
 	return -1
@@ -302,8 +302,9 @@ func _apply_pity(region_id: String, picks: Array, rng: RandomNumberGenerator) ->
 	var pity: Dictionary = data.get("pity", {})
 	var guaranteed := ""
 	# Highest tier first, so one forced legendary also satisfies rare/epic.
-	for k in range(GameData.PITY.size() - 1, -1, -1):
-		var rule: Dictionary = GameData.PITY[k]
+	var rules := DropRates.pity_rules()
+	for k in range(rules.size() - 1, -1, -1):
+		var rule: Dictionary = rules[k]
 		var need := int(GameData.RARITIES[rule["rarity"]]["order"])
 		if int(pity.get(rule["rarity"], 0)) + 1 < int(rule["every"]):
 			continue
@@ -330,7 +331,7 @@ func _apply_pity(region_id: String, picks: Array, rng: RandomNumberGenerator) ->
 	var best := 0
 	for u in picks:
 		best = maxi(best, _rarity_order(u))
-	for rule in GameData.PITY:
+	for rule in rules:
 		var r: String = rule["rarity"]
 		var region_has := false
 		for u in drops:
@@ -362,15 +363,15 @@ func choose_recruit(index: int) -> Dictionary:
 
 
 func _weighted_pick(weights: Dictionary, rng: RandomNumberGenerator) -> String:
-	var total := 0
+	var total := 0.0
 	for id in weights:
-		total += int(weights[id])
-	var roll := rng.randi_range(1, total)
+		total += float(weights[id])
+	var roll := rng.randf() * total
 	for id in weights:
-		roll -= int(weights[id])
-		if roll <= 0:
+		roll -= float(weights[id])
+		if roll < 0.0:
 			return id
-	return weights.keys()[0]
+	return weights.keys()[weights.size() - 1]
 
 
 ## Probability that a unit is among the offered choices in a region.

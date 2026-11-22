@@ -217,8 +217,16 @@ static func count_mult(ids: Array) -> float:
 ## Roll the three trinkets offered by a hunt at `site_id`. Trinkets the
 ## player doesn't own are preferred; owned ones only come up when a rarity is
 ## complete (and then pay gold instead).
+## A site's rarity weights after the server's trinket drop multipliers.
+static func site_weights(site_id: String) -> Dictionary:
+	var out := {}
+	for r in RARITY_ORDER:
+		out[r] = DropRates.trinket_weight(r, float(SITES[site_id]["weights"].get(r, 0)))
+	return out
+
+
 static func roll_hunt(site_id: String, owned: Dictionary, rng: RandomNumberGenerator) -> Array:
-	var weights: Dictionary = SITES[site_id]["weights"]
+	var weights := site_weights(site_id)
 	var out: Array = []
 	for _i in 3:
 		var rarity := _pick_rarity(weights, rng)
@@ -237,20 +245,22 @@ static func roll_hunt(site_id: String, owned: Dictionary, rng: RandomNumberGener
 
 
 static func _pick_rarity(weights: Dictionary, rng: RandomNumberGenerator) -> String:
-	var total := 0
+	var total := 0.0
 	for r in RARITY_ORDER:
-		total += int(weights.get(r, 0))
-	var roll := rng.randi_range(1, maxi(1, total))
+		total += float(weights.get(r, 0))
+	if total <= 0.0:
+		return "common"
+	var roll := rng.randf() * total
 	for r in RARITY_ORDER:
-		roll -= int(weights.get(r, 0))
-		if roll <= 0:
+		roll -= float(weights.get(r, 0))
+		if roll < 0.0:
 			return r
-	return "common"
+	return RARITY_ORDER[RARITY_ORDER.size() - 1]
 
 
 ## Chance of each rarity per offered trinket at a site, e.g. {"rare": 0.06}.
 static func site_odds(site_id: String) -> Dictionary:
-	var weights: Dictionary = SITES[site_id]["weights"]
+	var weights := site_weights(site_id)
 	var total := 0.0
 	for r in RARITY_ORDER:
 		total += float(weights.get(r, 0))

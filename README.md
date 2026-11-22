@@ -41,10 +41,14 @@ accounts, password hashing and encryption work.
    specific unit you pick where to look (e.g. Golden Dragons only appear in Dragon Peaks); the
    region card shows each unit's chance to be offered. The choice is saved, so closing the game
    doesn't reroll it. Maps refill (1 per 10 minutes, max 10) and ranked wins award more.
-   **Guaranteed pulls:** if 4 expeditions in a row offered nothing Rare or better, the 5th
-   is guaranteed to include one. Epic or better is guaranteed every 15 expeditions, and
-   Legendary every 40 (counting only regions that have legendaries). The tab shows the
-   countdowns, and the guaranteed unit is marked on its card.
+   **Legendaries are rare:** their drop weight is halved, and in Dragon Peaks a Golden Dragon
+   is offered about 7% of the time.
+   **Guaranteed pulls:** if 4 expeditions in a row offered nothing Rare or better, the 5th is
+   guaranteed to include one. Epic or better is guaranteed every 15 expeditions, and Legendary
+   every 60 (counting only regions that have legendaries). The tab shows the countdowns, and the
+   guaranteed unit is marked on its card.
+   - **Server settings:** the server admin can change all of these, and trinket odds, with the
+     `drops` command (see [HOSTING.md](HOSTING.md)).
    **Trinket hunts: Expeditions → Trinkets.**
    - **Hunting:** spend maps at one of three sites to turn up **3 trinkets** and keep **one**:
      - **Abandoned War Camp:** 1 map, mostly common.

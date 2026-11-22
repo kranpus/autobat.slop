@@ -70,7 +70,7 @@ func refresh() -> void:
 		return
 	_banner.visible = Profile.has_pending_choice()
 	var parts: Array = []
-	for rule in GameData.PITY:
+	for rule in DropRates.pity_rules():
 		var r: String = rule["rarity"]
 		var left := Profile.pity_remaining(r)
 		var when := "on your NEXT expedition" if left <= 1 else "within %d expeditions" % left

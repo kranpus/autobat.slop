@@ -27,6 +27,7 @@ func _initialize() -> void:
 	test_trinkets()
 	test_harder_ghosts()
 	test_leaderboard()
+	test_drop_rates()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -259,7 +260,7 @@ func test_expedition_pity() -> void:
 			continue
 		profile.data["pity"] = {}
 		var since := {}
-		for rule in GameData.PITY:
+		for rule in DropRates.pity_rules():
 			since[rule["rarity"]] = 0
 		for i in 300:
 			profile.data["maps"] = 99
@@ -269,12 +270,12 @@ func test_expedition_pity() -> void:
 			var best := 0
 			for o in res["options"]:
 				best = maxi(best, int(GameData.RARITIES[GameData.UNITS[o["unit"]]["rarity"]]["order"]))
-			for rule in GameData.PITY:
+			for rule in DropRates.pity_rules():
 				var r: String = rule["rarity"]
 				since[r] = 0 if best >= int(GameData.RARITIES[r]["order"]) else int(since[r]) + 1
 				worst[r] = maxi(int(worst.get(r, 0)), int(since[r]))
 			profile.data["pending_choice"] = {}
-	for rule in GameData.PITY:
+	for rule in DropRates.pity_rules():
 		var r: String = rule["rarity"]
 		if r == "legendary":
 			continue  # not every region has legendaries
@@ -753,3 +754,51 @@ func test_leaderboard() -> void:
 	for f in DirAccess.get_files_at(dir):
 		DirAccess.remove_absolute(dir + "/" + f)
 	DirAccess.remove_absolute(dir)
+
+
+func test_drop_rates() -> void:
+	print("drop chances")
+	DropRates.reset()
+	check(is_equal_approx(DropRates.unit_mult["legendary"], 0.5) and DropRates.pity["legendary"] == 60 and is_equal_approx(DropRates.trinket_mult["legendary"], 0.5), "legendaries are rarer by default (half weight, guaranteed every 60)")
+	var pl := ProfileLogic.new()
+	var rarer := pl.drop_chance("peaks", "golden_dragon")
+	DropRates.apply({"unit": {"legendary": 1.0}})
+	var before := pl.drop_chance("peaks", "golden_dragon")
+	check(rarer < before * 0.6, "Golden Dragon in Dragon Peaks: %.1f%% now, %.1f%% at the old weight" % [rarer * 100.0, before * 100.0])
+	DropRates.apply({"unit": {"legendary": 0}, "pity": {"legendary": 0}})
+	check(not GameData.region_drops("peaks").has("golden_dragon") and pl.drop_chance("peaks", "golden_dragon") == 0.0, "a multiplier of 0 switches a rarity off")
+	pl.data["rating"] = 5000
+	var saw_legendary := false
+	for i in 200:
+		pl.data["maps"] = 10
+		pl.data["pending_choice"] = {}
+		for o in pl.explore("peaks")["options"]:
+			if GameData.UNITS[o["unit"]]["rarity"] == "legendary":
+				saw_legendary = true
+	check(not saw_legendary, "no legendary units in 200 expeditions with legendaries switched off")
+	check(pl.pity_remaining("legendary") == -1 and DropRates.pity_rules().size() == 2, "a guarantee set to 0 is off")
+	DropRates.apply({"trinket": {"legendary": 0}})
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 3
+	var t_leg := false
+	for i in 200:
+		for t in Trinkets.roll_hunt("trove", {}, rng):
+			if Trinkets.rarity_of(t) == "legendary":
+				t_leg = true
+	check(not t_leg and Trinkets.site_odds("trove")["legendary"] == 0.0, "trinket rarities can be switched off too")
+	DropRates.apply({"unit": {"rare": -5, "epic": 1e9}, "pity": {"rare": -1}})
+	check(DropRates.unit_mult["rare"] == 0.0 and DropRates.unit_mult["epic"] == DropRates.MAX_MULT and DropRates.pity["rare"] == 0, "bad values are clamped")
+	DropRates.reset()
+	check(is_equal_approx(Trinkets.site_odds("trove")["legendary"], 5.0 / 95.0), "Dragon's Trove legendary odds %.1f%% (was 10%%)" % (Trinkets.site_odds("trove")["legendary"] * 100.0))
+
+	var party := root.get_node("Party")
+	check(party.run_command("drops").begins_with("Unit drops:"), "'drops' shows the settings")
+	party.run_command("drops unit legendary 0.25")
+	party.run_command("drops trinket epic 2")
+	party.run_command("drops pity legendary 80")
+	check(is_equal_approx(DropRates.unit_mult["legendary"], 0.25) and is_equal_approx(DropRates.trinket_mult["epic"], 2.0) and DropRates.pity["legendary"] == 80, "the console sets unit, trinket and guarantee settings")
+	var saved = JSON.parse_string(FileAccess.get_file_as_string(party.CONFIG_PATH))
+	check(typeof(saved) == TYPE_DICTIONARY and is_equal_approx(float(saved["drops"]["unit"]["legendary"]), 0.25), "drop settings are saved with the server config")
+	check(party.run_command("drops unit mythic 2").begins_with("Usage") and party.run_command("drops pity common 3").begins_with("Usage"), "bad drop commands show usage")
+	party.run_command("drops reset")
+	check(DropRates.to_dict() == {"unit": DropRates.DEFAULT_UNIT, "trinket": DropRates.DEFAULT_TRINKET, "pity": DropRates.DEFAULT_PITY}, "'drops reset' restores the defaults")

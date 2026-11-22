@@ -43,9 +43,9 @@ func setup_trinkets(site_id: String, ids: Array, compact: bool = false) -> void:
 	_trinkets = true
 	var pool: Array = []
 	if Trinkets.SITES.has(site_id):
-		var weights: Dictionary = Trinkets.SITES[site_id]["weights"]
+		var weights := Trinkets.site_weights(site_id)
 		for t in Trinkets.ALL:
-			if int(weights.get(Trinkets.rarity_of(t), 0)) > 0:
+			if float(weights.get(Trinkets.rarity_of(t), 0.0)) > 0.0:
 				pool.append(t)
 	var opts: Array = []
 	for t in ids:
