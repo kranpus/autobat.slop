@@ -114,7 +114,15 @@ All of these run on the VPS, in the `autobat.slop` folder:
 The console commands are listed in [HOSTING.md](HOSTING.md#admin-commands-gold-rewards-drop-chances).
 
 **After updating the game code,** players need the matching version of the downloadable game.
-The browser version updates by itself when you run the update command.
+Out-of-date games show an **Update required** prompt when they connect:
+- **Browser players** just press it to reload; the browser version updates when you run the
+  update command.
+- **Downloadable games:** to give their prompt a download button, add the page where players get
+  the game to `server/.env`, then run the update command once:
+  ```bash
+  echo "UPDATE_URL=https://yourname.itch.io/autobat-legions" >> server/.env
+  ```
+  Or type `update-url https://...` in the admin console.
 
 ## Troubleshooting
 

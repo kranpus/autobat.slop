@@ -180,6 +180,17 @@ final standings. If they can't connect, check the firewall rules from step 3.
 
 ## 5. Updating
 
+**Out-of-date games are told to update.**
+- **The check:** when a game connects, it and the server (or LAN host) first compare versions,
+  before anything else is sent. On a mismatch the game shows an **Update required** prompt with
+  both version numbers.
+- **The Update button:**
+  - **Browser:** it reloads the page, which loads the new build.
+  - **Downloadable game:** it opens the download page set with `update-url` on the server.
+- **The other way round:** a game newer than the server is told the server needs updating.
+- **The server log** records each game it turns away.
+
+
 When you change the game rules or networking code, bump `GAME_VERSION` in
 `scripts/net/party.gd`. The server rejects clients on a different version, because shop replay
 only works when both sides run identical rules. Then:
@@ -237,6 +248,7 @@ Ctrl+P then Ctrl+Q to detach again.
 | `status` | Players online, open rooms, current gold settings. |
 | `rooms` | List rooms with their phase and player count. |
 | `gold` | Show the gold settings. |
+| `update-url https://yourname.itch.io/game` | Where out-of-date games download the new version. Their **Update required** prompt gets a **Download update** button that opens this link (browser players just reload). `update-url none` removes it. Can also be set with the `UPDATE_URL` environment variable. |
 | `drops` | Show the drop chance settings. |
 | `drops unit legendary 0.25` | Scale how often units of a rarity are offered on expeditions, in every region. 1 = the normal table, 2 = twice as likely, 0 = never. Default: legendary 0.5, everything else 1. |
 | `drops trinket epic 2` | Same for trinket hunts, at every site. Default: legendary 0.5. |

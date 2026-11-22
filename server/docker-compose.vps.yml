@@ -25,6 +25,9 @@ services:
       - WS_PORT=24714       # browsers: reached through Caddy (wss://DOMAIN:24704)
       - WEB_PORT=0          # Caddy serves the web page instead
       - WS_BEHIND_TLS_PROXY=1
+      # Where out-of-date desktop/phone games are sent to download the new
+      # version (browser players just reload). Or use 'update-url' in the console.
+      - UPDATE_URL=${UPDATE_URL:-}
     volumes:
       - legion-data:/home/godot/.local/share/godot
     logging:

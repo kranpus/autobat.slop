@@ -12,9 +12,9 @@ https://{$DOMAIN} {
 	root * /srv
 	encode zstd gzip
 	file_server
-	# Always check for a new build of the page itself.
-	@page path / /index.html
-	header @page Cache-Control "no-cache"
+	# Browsers always check for a newer build (cheap: unchanged files answer
+	# "not modified"), so reloading after an update gets the new version.
+	header Cache-Control "no-cache"
 }
 
 # The browser game's encrypted connection: wss://DOMAIN:24704, passed on to

@@ -26,7 +26,7 @@ signal left_match(reason: String)
 ## similar rating). Empty when the server can't be reached.
 signal ranked_opponents(list: Array)
 
-const GAME_VERSION := "legion-draft-10"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-11"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server (ENet/UDP)
 const WS_PORT := 24704                   # same server for browsers (WebSocket/TCP)
@@ -88,6 +88,16 @@ var _rng := RandomNumberGenerator.new()
 ## Gold economy set by the server admin (see console commands). Rooms share
 ## this dictionary, so changes apply to matches already in progress.
 var rewards := DEFAULT_REWARDS.duplicate(true)
+## This build's protocol version (tests can pretend to be another version
+## with --fake-version=...).
+var game_version := GAME_VERSION
+## Where players get the new version (set with the 'update-url' console
+## command or the UPDATE_URL environment variable). Sent to out-of-date games.
+var update_url := ""
+
+## The server or host runs a different version: {mine, theirs, older, url, host}.
+## "older" is true when this game is the out-of-date one.
+signal update_required(info: Dictionary)
 ## Ranked: only saved player armies within this many rating points of yours.
 const DEFAULT_RANKED_RANGE := 200
 var ranked_range := DEFAULT_RANKED_RANGE
@@ -113,6 +123,16 @@ func _ready() -> void:
 	# Clients never talk to each other directly, so don't relay peer
 	# join/leave notices to every client (that would be O(n^2) on a big server).
 	mp.server_relay = false
+	# Version handshake: before any RPC, both sides exchange a small JSON
+	# message that never changes between versions, so an out-of-date game is
+	# told clearly (RPC numbering differs between versions, so RPC error
+	# messages can't be trusted for this).
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--fake-version="):
+			game_version = arg.get_slice("=", 1)
+	mp.auth_callback = _on_auth
+	mp.auth_timeout = 10.0
+	mp.peer_authenticating.connect(_on_peer_authenticating)
 	mp.peer_connected.connect(_on_peer_connected)
 	mp.peer_disconnected.connect(_on_peer_disconnected)
 	mp.connected_to_server.connect(_on_connected)
@@ -166,6 +186,74 @@ func is_in_match() -> bool:
 
 func me() -> Dictionary:
 	return players.get(my_id, {})
+
+
+# --- version handshake ---------------------------------------------------------
+
+const HANDSHAKE_PROTOCOL := 1
+
+
+## A connection is being set up: clients introduce themselves first.
+func _on_peer_authenticating(id: int) -> void:
+	if role == Role.CLIENT and id == 1:
+		mp.send_auth(1, JSON.stringify({"hs": HANDSHAKE_PROTOCOL, "version": game_version}).to_utf8_buffer())
+
+
+func _on_auth(id: int, data: PackedByteArray) -> void:
+	var msg = JSON.parse_string(data.get_string_from_utf8())
+	if typeof(msg) != TYPE_DICTIONARY:
+		mp.disconnect_peer(id)
+		return
+	if _authority():
+		# A client: let it in when the versions match, otherwise explain.
+		var theirs := str(msg.get("version", "")).left(40)
+		if theirs == game_version:
+			mp.send_auth(id, JSON.stringify({"hs": HANDSHAKE_PROTOCOL, "ok": true, "version": game_version}).to_utf8_buffer())
+			mp.complete_auth(id)
+		else:
+			mp.send_auth(id, JSON.stringify({"hs": HANDSHAKE_PROTOCOL, "ok": false, "version": game_version,
+				"update_url": update_url, "host": role == Role.HOST}).to_utf8_buffer())
+			if role == Role.SERVER:
+				_log("Turned away a game on version %s (this server runs %s)" % [theirs, game_version])
+			# The game hangs up once told; if it doesn't, the handshake times out.
+	elif id == 1:
+		if bool(msg.get("ok", false)):
+			mp.complete_auth(1)
+		else:
+			_version_rejected(str(msg.get("version", "?")).left(40), str(msg.get("update_url", "")).left(300), bool(msg.get("host", false)))
+
+
+## "legion-draft-11" -> 11 (0 if unknown).
+static func version_number(v: String) -> int:
+	var tail := v.get_slice("-", v.get_slice_count("-") - 1)
+	return int(tail) if tail.is_valid_int() else 0
+
+
+func _version_rejected(theirs: String, url: String, from_host: bool) -> void:
+	var older := version_number(game_version) < version_number(theirs)
+	var who := "The match host" if from_host else "The server"
+	var text := ("Update required: %s runs a newer version of the game (%s, you have %s)." % [who.to_lower(), theirs, game_version]) if older \
+		else ("%s runs an older version of the game (%s, you have %s). It needs updating first." % [who, theirs, game_version])
+	# Signed in: don't keep retrying every few seconds with the wrong version.
+	_reconnect_at = Time.get_ticks_msec() + 600000
+	update_required.emit({"mine": game_version, "theirs": theirs, "older": older, "url": url, "host": from_host})
+	if _auth_waiting:
+		_auth_failed(text)
+	elif _ranked_only or _awaiting_ranked:
+		_ranked_failed()
+	elif _sync_only:
+		_hang_up_later()
+	else:
+		_drop_connection(text)
+
+
+## "Update now": the browser reloads the page (which fetches the new build);
+## other platforms open the download page the server named.
+func open_update(url: String) -> void:
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.location.reload()")
+	elif url.begins_with("https://") or url.begins_with("http://"):
+		OS.shell_open(url)
 
 
 func server_address() -> String:
@@ -271,6 +359,8 @@ func start_server(port: int = SERVER_PORT) -> Error:
 	_start_cert_service(port + CERT_PORT_OFFSET)
 	_start_web_host()
 	_load_config()
+	if OS.get_environment("UPDATE_URL") != "":
+		update_url = OS.get_environment("UPDATE_URL").left(300)
 	accounts = AccountStore.new()
 	_log("Accounts: %d (passwords stored as salted PBKDF2-SHA256 hashes)" % accounts.count())
 	ranked_pool = RankedPool.new()
@@ -280,7 +370,7 @@ func start_server(port: int = SERVER_PORT) -> Error:
 			rewards["battle_mult"] = maxf(0.0, float(arg.get_slice("=", 1)))
 		elif arg.begins_with("--draft-gold="):
 			rewards["draft_mult"] = maxf(0.0, float(arg.get_slice("=", 1)))
-	_log("Legion Draft server %s listening on UDP port %d" % [GAME_VERSION, port])
+	_log("Legion Draft server %s listening on UDP port %d" % [game_version, port])
 	_log("Gold: battles x%s, draft x%s, draft payouts %s. Type 'help' for commands." % [rewards["battle_mult"], rewards["draft_mult"], rewards["draft_table"]])
 	_stdin_thread = Thread.new()
 	_stdin_thread.start(_read_stdin)
@@ -346,6 +436,7 @@ func run_command(line: String) -> String:
   drops trinket <rarity> <mult>   scale trinket hunt chances, e.g. 'drops trinket epic 2'
   drops pity <rarity> <n>         guarantee rare/epic/legendary every n expeditions (0 = off)
   drops reset                     back to the defaults
+  update-url <url>                where out-of-date games download the new version
   accounts                        number of accounts and who is signed in
   accounts reset-password <user>  give a player who forgot their password a new
                                   temporary one (shown once) and sign them out"""
@@ -425,6 +516,17 @@ func run_command(line: String) -> String:
 			out = "Sent: " + msg
 		"accounts":
 			out = _account_command(a)
+		"update-url":
+			if a.size() == 2 and (a[1].begins_with("https://") or a[1].begins_with("http://")):
+				update_url = a[1].left(300)
+				_save_config()
+				out = "Out-of-date games will be sent to %s" % update_url
+			elif a.size() == 2 and a[1].to_lower() in ["none", "off", "clear"]:
+				update_url = ""
+				_save_config()
+				out = "No download link: out-of-date games are just told to update."
+			else:
+				out = "Download link for out-of-date games: %s. Usage: update-url <https://...> | update-url none" % (update_url if update_url != "" else "(none)")
 		"drops":
 			out = _drops_command(a)
 		_:
@@ -602,6 +704,7 @@ func _load_config() -> void:
 		UnitLocks.set_locked_regions(parsed["locked_regions"])
 	DropRates.apply(parsed.get("drops", {}))
 	ranked_range = clampi(int(parsed.get("ranked_range", DEFAULT_RANKED_RANGE)), 10, 5000)
+	update_url = str(parsed.get("update_url", update_url)).left(300)
 	var r: Dictionary = parsed.get("rewards", {})
 	rewards["battle_mult"] = clampf(float(r.get("battle_mult", 1.0)), 0.0, 100.0)
 	rewards["draft_mult"] = clampf(float(r.get("draft_mult", 1.0)), 0.0, 100.0)
@@ -615,7 +718,7 @@ func _load_config() -> void:
 func _save_config() -> void:
 	var f := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(), "ranked_range": ranked_range}, "\t"))
+		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(), "ranked_range": ranked_range, "update_url": update_url}, "\t"))
 
 
 func _log(text: String) -> void:
@@ -773,9 +876,9 @@ func _on_connected() -> void:
 		_request("_rq_ranked", _ranked_request)
 		return
 	if _sync_only:
-		_request("_rq_sync", [GAME_VERSION])
+		_request("_rq_sync", [game_version])
 		return
-	_request("_rq_hello", [player_name, GAME_VERSION])
+	_request("_rq_hello", [player_name, game_version])
 
 
 # --- ranked opponents ---------------------------------------------------------
@@ -783,7 +886,7 @@ func _on_connected() -> void:
 ## Save this army on the server (with the current rating) and ask for armies
 ## other players saved at a similar rating. Answers with `ranked_opponents`.
 func request_ranked_opponents(pid: String, pname: String, rating: int, code: String) -> void:
-	var req: Array = [GAME_VERSION, pid, pname, rating, code]
+	var req: Array = [game_version, pid, pname, rating, code]
 	_awaiting_ranked = true
 	_ranked_deadline = Time.get_ticks_msec() + 6000
 	if role == Role.CLIENT and online and phase not in ["connecting", "syncing"] and not _sync_only and not _ranked_only:
@@ -832,8 +935,8 @@ func _rq_ranked(version: String, pid: String, pname: String, rating: int, code: 
 	var id := _sender()
 	if not _allow(id):
 		return
-	if version != GAME_VERSION:
-		_deliver(id, "error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), GAME_VERSION]])
+	if version != game_version:
+		_deliver(id, "error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), game_version]])
 		return
 	if _sessions.has(id):
 		# Signed in: the server uses the account's own army and rating.
@@ -883,8 +986,8 @@ func _rq_sync(version: String) -> void:
 	if role != Role.SERVER:
 		return
 	var id := _sender()
-	if version != GAME_VERSION:
-		_deliver(id, "error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), GAME_VERSION]])
+	if version != game_version:
+		_deliver(id, "error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), game_version]])
 		return
 	_deliver(id, "synced", [{"rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(),
 		"leaderboard": accounts.leaderboard(LEADERBOARD_SIZE) if accounts else []}])
@@ -991,8 +1094,8 @@ func _rq_hello(pname: String, version: String) -> void:
 	if not _authority():
 		return
 	var id := _sender()
-	if version != GAME_VERSION:
-		_deliver(id, "error", ["Version mismatch: you have %s, the host runs %s. Please update the game." % [version.left(32), GAME_VERSION]])
+	if version != game_version:
+		_deliver(id, "error", ["Version mismatch: you have %s, the host runs %s. Please update the game." % [version.left(32), game_version]])
 		return
 	var nm := pname.strip_edges().left(24)
 	_names[id] = nm if nm != "" else "Commander"
@@ -1948,16 +2051,16 @@ func _split_address() -> Array:
 # --- client: logging in -----------------------------------------------------------
 
 func login(username: String, password: String, remember: bool) -> void:
-	_start_auth(["_rq_login", GAME_VERSION, username.strip_edges(), password], remember)
+	_start_auth(["_rq_login", game_version, username.strip_edges(), password], remember)
 
 
 func register(username: String, password: String, remember: bool) -> void:
-	_start_auth(["_rq_register", GAME_VERSION, username.strip_edges(), password], remember)
+	_start_auth(["_rq_register", game_version, username.strip_edges(), password], remember)
 
 
 ## Sign in with a saved "remember me" token (no password needed).
 func login_with_token(username: String, token: String, remember: bool = true) -> void:
-	_start_auth(["_rq_login_token", GAME_VERSION, username, token], remember)
+	_start_auth(["_rq_login_token", game_version, username, token], remember)
 
 
 ## Try the token saved by "remember me", if any. Returns false if none.
@@ -2150,8 +2253,8 @@ func _client_session_tick() -> void:
 # --- server: authentication ---------------------------------------------------------
 
 func _auth_ok_version(id: int, version: String) -> bool:
-	if version != GAME_VERSION:
-		_deliver(id, "auth_error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), GAME_VERSION]])
+	if version != game_version:
+		_deliver(id, "auth_error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), game_version]])
 		return false
 	return true
 

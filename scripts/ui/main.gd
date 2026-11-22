@@ -28,6 +28,7 @@ var draft_screen: DraftScreenScript
 var login_layer: CanvasLayer
 var _account_label: Label
 var _fullscreen_button: Button
+var _update_dialog: AcceptDialog
 
 
 func _ready() -> void:
@@ -123,6 +124,7 @@ func _ready() -> void:
 	login_layer.layer = 5
 	add_child(login_layer)
 	Party.session_changed.connect(_refresh_top_bar)
+	Party.update_required.connect(_on_update_required)
 	if (Profile.settings.has("account") or not bool(Profile.settings.get("start_offline", false))):
 		var screen := show_login()
 		if not screen.auto_login() and bool(Profile.settings.get("start_offline", false)):
@@ -203,6 +205,39 @@ func _refresh_top_bar() -> void:
 	else:
 		_account_label.text = "Guest (offline)"
 		_account_label.add_theme_color_override("font_color", UIKit.TEXT_DIM)
+
+
+## The server (or LAN host) runs a different version of the game.
+func _on_update_required(info: Dictionary) -> void:
+	if _update_dialog and _update_dialog.visible:
+		return
+	if _update_dialog:
+		_update_dialog.queue_free()
+	var older := bool(info.get("older", true))
+	var where := "match host" if bool(info.get("host", false)) else "server"
+	var url := str(info.get("url", ""))
+	_update_dialog = AcceptDialog.new()
+	_update_dialog.theme = UIKit.make_theme()
+	_update_dialog.title = "Update required" if older else "The %s needs updating" % where
+	var text: String
+	if older:
+		text = "A new version of Autobat Legions is out.\n\nThe %s runs %s; your game is %s. Update to keep playing online (offline play still works)." % [where, info.get("theirs", "?"), info.get("mine", "?")]
+		if not OS.has_feature("web") and url == "":
+			text += "\n\nGet the new version from whoever runs the %s." % where
+	else:
+		text = "The %s runs an older version (%s) than your game (%s), so they can't play together until it's updated." % [where, info.get("theirs", "?"), info.get("mine", "?")]
+	_update_dialog.dialog_text = text
+	_update_dialog.dialog_autowrap = true
+	_update_dialog.min_size = Vector2i(460, 0)
+	if older and (OS.has_feature("web") or url != ""):
+		_update_dialog.ok_button_text = "Reload to update" if OS.has_feature("web") else "Download update"
+		_update_dialog.confirmed.connect(func(): Party.open_update(url))
+		_update_dialog.add_cancel_button("Later")
+	else:
+		_update_dialog.ok_button_text = "OK"
+	add_child(_update_dialog)
+	_update_dialog.popup_centered()
+	Audio.play_sfx("scroll")
 
 
 ## Open the sign-in screen (also used by Settings).
