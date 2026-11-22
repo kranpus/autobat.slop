@@ -35,6 +35,7 @@ func _initialize() -> void:
 	test_ranged_splash_nerf()
 	test_unit_stats()
 	test_rating_speed()
+	test_difficulty()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -1020,7 +1021,7 @@ func test_power_formula() -> void:
 
 
 func test_ranged_splash_nerf() -> void:
-	print("ranged splash (patch 0.9)")
+	print("ranged splash (patches 0.9, 0.9.1)")
 	# The same hit, once as a melee blow and once as a projectile: the units
 	# next to the target take less from the projectile's splash.
 	var lost := []
@@ -1045,7 +1046,7 @@ func test_ranged_splash_nerf() -> void:
 		lost.append(before - after)
 	check(lost[1] > 0.0 and absf(lost[1] / lost[0] - BattleSim.RANGED_SPLASH_MULT / BattleSim.AOE_SPLASH_MULT) < 0.001,
 		"projectile splash deals %.0f%% of melee splash (%.1f vs %.1f)" % [100.0 * lost[1] / lost[0], lost[1], lost[0]])
-	check(is_equal_approx(BattleSim.RANGED_SPLASH_MULT, 0.45) and is_equal_approx(BattleSim.AOE_SPLASH_MULT, 0.6), "ranged splash 45% of the hit, melee splash still 60%")
+	check(is_equal_approx(BattleSim.RANGED_SPLASH_MULT, 0.35) and is_equal_approx(BattleSim.AOE_SPLASH_MULT, 0.6), "ranged splash 35% of the hit (0.9.1), melee splash still 60%")
 	# Strength follows: a splash caster lost power, a melee splasher didn't.
 	var lich_full := Army.unit_power("lich", 1)
 	var ogre_full := Army.unit_power("ogre", 1)
@@ -1099,3 +1100,41 @@ func test_rating_speed() -> void:
 		var ev := p * Army.elo_delta(1500, 1500 + int(t[1]), 1.0) + (1.0 - p) * Army.elo_delta(1500, 1500 + int(t[1]), 0.0)
 		check(ev < 0.5, "%s opponents are no free climb (%.2f rating per battle on average)" % [t[2], ev])
 	check(Army.elo_delta(1000, 1000 + int(Army.GHOST_TIERS[2][1]), 1.0) > Army.elo_delta(1000, 1000 + int(Army.GHOST_TIERS[0][1]), 1.0) + 5, "beating Hard pays clearly more than beating Easy")
+
+
+func test_difficulty() -> void:
+	print("difficulty (server setting)")
+	var party := root.get_node("Party")
+	Difficulty.reset()
+	check(Difficulty.is_default() and Difficulty.tiers == Army.GHOST_TIERS, "defaults are the built-in ranked tiers")
+	var my := [{"unit": "orc_warrior", "level": 8, "tier": 3, "row": "front"}, {"unit": "elf_archer", "level": 8, "tier": 3, "row": "back"}]
+	var mine := Army.army_power(my)
+	var hard_power := func() -> float:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = 4
+		var total := 0.0
+		for i in 10:
+			var offers: Array = []
+			Army.fill_ghosts(offers, mine, 1100, rng)
+			total += Army.army_power(offers[2]["squads"]) / mine
+		return total / 10.0
+	var before: float = hard_power.call()
+	check(party.run_command("difficulty hard 2.0 200").begins_with("Difficulty updated"), "the console sets a tier")
+	var after: float = hard_power.call()
+	check(after > before * 1.2 and Difficulty.tiers[2][1] == 200, "Hard opponents follow it (%.2fx -> %.2fx your power)" % [before, after])
+	party.run_command("difficulty ranked 0.5")
+	check(is_equal_approx(Difficulty.tiers[0][0], 0.45) and is_equal_approx(Difficulty.tiers[2][0], 1.0), "'difficulty ranked' scales every tier")
+	var wyrm := Challenges.enemy_power("golden_wyrm")
+	var rec := Challenges.recommended("golden_wyrm")
+	party.run_command("difficulty challenges 1.5")
+	check(absf(Challenges.enemy_power("golden_wyrm") / wyrm - 1.5) < 0.01 and Challenges.recommended("golden_wyrm") == roundi(rec * 1.5), "challenge enemies and their recommended power scale")
+	check(Challenges.get_challenge("golden_wyrm")["enemy"][0]["mods"]["hp_mult"] == 90.0, "the challenge data itself is untouched")
+	var saved := Difficulty.to_dict()
+	Difficulty.reset()
+	Difficulty.apply(saved)
+	check(is_equal_approx(Difficulty.challenge_mult, 1.5) and Difficulty.tiers[2][1] == 200, "settings survive a save and reload (sent to players the same way)")
+	Difficulty.apply({"hard": [99, 99999], "challenges": -3, "even": "junk"})
+	check(Difficulty.tiers[2][0] == Difficulty.MAX_POWER and Difficulty.tiers[2][1] == Difficulty.MAX_RATING_OFFSET and Difficulty.challenge_mult == Difficulty.MIN_CHALLENGE and Difficulty.tiers[1] == Army.GHOST_TIERS[1], "bad values are clamped or ignored")
+	check(party.run_command("difficulty sideways 2").begins_with("Usage"), "bad commands show usage")
+	party.run_command("difficulty reset")
+	check(Difficulty.is_default(), "reset restores the defaults")

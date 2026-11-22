@@ -249,6 +249,11 @@ Ctrl+P then Ctrl+Q to detach again.
 | `rooms` | List rooms with their phase and player count. |
 | `gold` | Show the gold settings. |
 | `update-url https://yourname.itch.io/game` | Where out-of-date games download the new version. Their **Update required** prompt gets a **Download update** button that opens this link (browser players just reload). `update-url none` removes it. Can also be set with the `UPDATE_URL` environment variable. |
+| `difficulty` | Show how hard fights are: each ranked training tier's power and rating relative to the player, and the challenge multiplier. |
+| `difficulty hard 1.5 150` | Set a ranked tier (`easy`, `even` or `hard`): its power relative to the player's army, and optionally its rating offset. Defaults: easy 0.9 −40, even 1.1 +60, hard 1.5 +150. |
+| `difficulty ranked 1.2` | Scale the power of all three ranked tiers at once (1.2 = 20% stronger opponents). |
+| `difficulty challenges 1.3` | Multiply challenge enemies' HP and damage (1 = as designed, 0.25–5). The recommended power on each card scales with it. |
+| `difficulty reset` | Back to the default difficulty. |
 | `drops` | Show the drop chance settings. |
 | `drops unit legendary 0.25` | Scale how often units of a rarity are offered on expeditions, in every region. 1 = the normal table, 2 = twice as likely, 0 = never. Default: legendary 0.5, everything else 1. |
 | `drops trinket epic 2` | Same for trinket hunts, at every site. Default: legendary 0.5. |
@@ -296,6 +301,51 @@ Notes:
   until it's unlocked.
 - **Startup flags:** you can also set values when starting the server, e.g.
   `-- --server --battle-gold=1.5 --draft-gold=2`. These override the saved file for that run.
+
+### Difficulty
+
+`difficulty` settings are saved with the other server settings.
+- **Who gets them:** they're sent to players like the drop chances: signed-in players at once,
+  guests at their next check-in. Offline ranked and challenges follow them too.
+- **Signed-in players:** the server generates their ranked opponents and runs their challenges,
+  so changes apply to them straight away.
+- **What they don't change:** saved armies of real players (matched by rating) and Legion Draft
+  are unaffected.
+
+### Balance simulator
+
+`tools/balance_sim.gd` fights many battles with the real battle code and reports how each unit
+does. It complements the live `unitstats`, which need players to play first.
+
+- **On the Docker server:** run `server/balance.sh [options]` from the `autobat.slop` folder.
+  - **CPU:** it runs inside the server container at low priority on half the CPU cores, so
+    the live game keeps priority.
+  - **Results:** the report is printed, and copied with CSV spreadsheets to `balance-results/`.
+- **Anywhere with Godot 4.3:** run `godot --headless --path . -s res://tools/balance_sim.gd -- [options]`.
+
+| Mode | What it measures |
+|---|---|
+| `--mode=armies` (default) | Random armies of **equal power** fight, each pairing from both sides. Each unit's win rate is how armies containing it did. Above 50% means it's stronger than its Strength says. |
+| `--mode=duels` | Every unit against every other unit, one squad each at equal power: overall duel win rate, each unit's hardest counter, and a full matchup matrix (CSV). |
+| `--mode=calibrate` | Armies of different power: how often the stronger army wins at each power ratio. 1.0× should be about 50%. It's useful when setting `difficulty`. |
+
+Options:
+- `--battles=N`: pairings to fight (default 400). Each is fought twice, from both sides.
+- `--minutes=M`: stop after about M minutes instead.
+- `--power=1500` or `--power=200-3000`: army power as shown in the game.
+- `--rating=R`: unit pool by rarity, like ranked opponents. The default 3500 means every rarity.
+- `--trinkets`: give armies trinkets, like ranked opponents.
+- `--all-units`: include units the server has locked. By default it uses the server's unlocked
+  units.
+- `--units=goblin,elf_archer,...`: only these units.
+- `--map=ID`: a single battlefield.
+- `--threads=N`: how many battles to run at once.
+- `--seed=N`: repeat a run exactly.
+
+**Reading the results:** each win rate comes with a ±95% range. A unit only stands out if its
+range clearly excludes 50%. About 2000 pairings narrow the ranges to roughly ±5%.
+
+**Run time:** battles take about 0.3–1 s each per core, depending on army size.
 
 ### Unit stats
 

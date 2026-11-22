@@ -18,7 +18,7 @@ const SEARCH_RINGS := 4
 const FALLBACK_SAMPLES := 24
 const SEPARATION_CHECKS := 10
 const AOE_SPLASH_MULT := 0.6        # splash damage of melee attacks, as a share of the hit
-const RANGED_SPLASH_MULT := 0.45    # ...and of projectiles (patch 0.9: was 0.6)
+const RANGED_SPLASH_MULT := 0.35    # ...and of projectiles (0.6 before patch 0.9, 0.45 in 0.9)
 const MAX_SPLASH_TARGETS := 6     # keeps splash damage from scaling with crowd density
 const HALF_NEIGHBOURS := [Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1)]
 
@@ -86,6 +86,14 @@ var pr_free: Array[int] = []
 
 # --- map & obstacles --------------------------------------------------------
 var map_id := BattleMaps.DEFAULT_MAP
+# Private copies of shared tables, made in setup(). Battles run on worker
+# threads (server, balance simulator), and reading the shared constant arrays
+# from several threads at once crashes Godot 4.3 (their reference counts race).
+var _dmg_mult := PackedFloat64Array()     # damage type * armor count + armor
+var _armor_count := 0
+var _proj_speed := PackedFloat64Array()
+var _flying_mult := 1.0
+var _half_neighbours: Array = []
 var map_w := 2400.0
 var map_h := 1400.0
 var ob_x := PackedFloat32Array()
@@ -119,6 +127,14 @@ var rng := RandomNumberGenerator.new()
 ## map: an id from BattleMaps.MAPS.
 func setup(squads_a: Array, squads_b: Array, seed_value: int, map: String = BattleMaps.DEFAULT_MAP) -> void:
 	rng.seed = seed_value
+	_armor_count = GameData.ARMOR_TYPES.size()
+	_dmg_mult.clear()
+	for row in GameData.DAMAGE_MULT:
+		for v in row:
+			_dmg_mult.append(float(v))
+	_proj_speed = PackedFloat64Array(GameData.PROJECTILE_SPEED)
+	_flying_mult = GameData.MELEE_VS_FLYING_MULT
+	_half_neighbours = HALF_NEIGHBOURS.duplicate()
 	map_id = map if BattleMaps.MAPS.has(map) else BattleMaps.DEFAULT_MAP
 	var size := BattleMaps.map_size(map_id)
 	map_w = size.x
@@ -527,10 +543,9 @@ func _deal_damage(src: int, src_team: int, dt_idx: int, amount: float, primary: 
 
 
 func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1) -> void:
-	var row: Array = GameData.DAMAGE_MULT[dt_idx]
-	var m: float = row[armor[j]]
+	var m: float = _dmg_mult[dt_idx * _armor_count + armor[j]]
 	if melee and flying[j] == 1:
-		m *= GameData.MELEE_VS_FLYING_MULT
+		m *= _flying_mult
 	var dealt := amount * m * rng.randf_range(0.9, 1.1)
 	hp[j] -= dealt
 	hit_tick[j] = tick
@@ -589,7 +604,7 @@ func _spawn_projectile(i: int, t: int) -> void:
 	pr_ty[p] = py[t]
 	pr_dmg[p] = dmg[i]
 	pr_aoe[p] = aoe[i]
-	pr_speed[p] = GameData.PROJECTILE_SPEED[proj[i]]
+	pr_speed[p] = _proj_speed[proj[i]]
 	pr_ang[p] = atan2(py[t] - py[i], px[t] - px[i])
 
 
@@ -778,7 +793,7 @@ func _separate() -> void:
 			_push_pair(i, j)
 			j = cell_next[j]
 		# half neighbourhood: right, down-left, down, down-right
-		for off in HALF_NEIGHBOURS:
+		for off in _half_neighbours:
 			var gx: int = cx + off.x
 			var gy: int = cy + off.y
 			if gx < 0 or gx >= gw or gy >= gh:

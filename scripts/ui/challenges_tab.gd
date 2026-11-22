@@ -89,7 +89,7 @@ func _make_card(c: Dictionary, my_power: float) -> Control:
 		if not bosses.is_empty():
 			row.add_child(UIKit.label("Boss: " + ", ".join(PackedStringArray(bosses)), 13, UIKit.BAD))
 		v.add_child(row)
-		var rec := int(c["recommended"])
+		var rec := Challenges.recommended(id)
 		var mine := roundi(my_power / 10.0)
 		var info := UIKit.label("Battlefield: %s   ·   Recommended power %d   ·   Your army %d" % [map_def["name"], rec, mine], 12,
 			UIKit.GOOD if mine >= rec else (UIKit.ACCENT if mine >= rec * 0.75 else UIKit.BAD))

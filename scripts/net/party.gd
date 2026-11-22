@@ -26,7 +26,7 @@ signal left_match(reason: String)
 ## similar rating). Empty when the server can't be reached.
 signal ranked_opponents(list: Array)
 
-const GAME_VERSION := "legion-draft-14"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-15"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server (ENet/UDP)
 const WS_PORT := 24704                   # same server for browsers (WebSocket/TCP)
@@ -487,6 +487,12 @@ func run_command(line: String) -> String:
   drops trinket <rarity> <mult>   scale trinket hunt chances, e.g. 'drops trinket epic 2'
   drops pity <rarity> <n>         guarantee rare/epic/legendary every n expeditions (0 = off)
   drops reset                     back to the defaults
+  difficulty                      show ranked opponent and challenge difficulty
+  difficulty hard 1.5 [150]       a ranked tier's power vs yours [and rating offset];
+                                  tiers: easy, even, hard
+  difficulty ranked 1.2           scale all three ranked tiers' power
+  difficulty challenges 1.3       challenge enemies' HP and damage (1 = as designed)
+  difficulty reset                back to the defaults
   update-url <url>                where out-of-date games download the new version
   unitstats                       unit use and win rates in ranked and Legion Draft
                                   (this patch); options: ranked|draft, use|win|games|name,
@@ -588,6 +594,8 @@ func run_command(line: String) -> String:
 				out = "Download link for out-of-date games: %s. Usage: update-url <https://...> | update-url none" % (update_url if update_url != "" else "(none)")
 		"drops":
 			out = _drops_command(a)
+		"difficulty":
+			out = _difficulty_command(a)
 		_:
 			out = "Unknown command '%s'. Type 'help'." % a[0]
 	_log(out)
@@ -761,6 +769,29 @@ func _drops_changed() -> void:
 		_deliver(id, "drops", [DropRates.to_dict()])
 
 
+func _difficulty_command(a: PackedStringArray) -> String:
+	var usage := "Usage: difficulty | difficulty easy|even|hard <power x> [rating offset] | difficulty ranked <factor> | difficulty challenges <x> | difficulty reset"
+	if a.size() == 1:
+		return Difficulty.describe()
+	var what := a[1].to_lower()
+	var i := Difficulty.tier_index(what)
+	if what == "reset" and a.size() == 2:
+		Difficulty.reset()
+	elif i >= 0 and a.size() in [3, 4] and a[2].is_valid_float() and (a.size() == 3 or a[3].is_valid_int()):
+		Difficulty.set_tier(i, float(a[2]), int(a[3]) if a.size() == 4 else int(Difficulty.tiers[i][1]))
+	elif what == "ranked" and a.size() == 3 and a[2].is_valid_float() and float(a[2]) > 0.0:
+		for k in Difficulty.tiers.size():
+			Difficulty.set_tier(k, float(Difficulty.tiers[k][0]) * float(a[2]), int(Difficulty.tiers[k][1]))
+	elif what in ["challenge", "challenges"] and a.size() == 3 and a[2].is_valid_float():
+		Difficulty.challenge_mult = clampf(float(a[2]), Difficulty.MIN_CHALLENGE, Difficulty.MAX_CHALLENGE)
+	else:
+		return usage
+	_save_config()
+	for id in _names:
+		_deliver(id, "difficulty", [Difficulty.to_dict()])
+	return "Difficulty updated. " + Difficulty.describe()
+
+
 func _gold_text() -> String:
 	return "Gold: battles x%s, draft x%s, draft payouts %s." % [rewards["battle_mult"], rewards["draft_mult"], rewards["draft_table"]]
 
@@ -786,6 +817,7 @@ func _load_config() -> void:
 	if typeof(parsed.get("locked_regions")) == TYPE_ARRAY:
 		UnitLocks.set_locked_regions(parsed["locked_regions"])
 	DropRates.apply(parsed.get("drops", {}))
+	Difficulty.apply(parsed.get("difficulty", {}))
 	ranked_range = clampi(int(parsed.get("ranked_range", DEFAULT_RANKED_RANGE)), 10, 5000)
 	update_url = str(parsed.get("update_url", update_url)).left(300)
 	var r: Dictionary = parsed.get("rewards", {})
@@ -801,7 +833,7 @@ func _load_config() -> void:
 func _save_config() -> void:
 	var f := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(), "ranked_range": ranked_range, "update_url": update_url}, "\t"))
+		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(), "difficulty": Difficulty.to_dict(), "ranked_range": ranked_range, "update_url": update_url}, "\t"))
 
 
 func _log(text: String) -> void:
@@ -1072,7 +1104,7 @@ func _rq_sync(version: String) -> void:
 	if version != game_version:
 		_deliver(id, "error", ["Your game is out of date (you have %s, the server runs %s). Please update." % [version.left(32), game_version]])
 		return
-	_deliver(id, "synced", [{"rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(),
+	_deliver(id, "synced", [{"rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(), "difficulty": Difficulty.to_dict(),
 		"leaderboard": accounts.leaderboard(LEADERBOARD_SIZE) if accounts else []}])
 
 
@@ -1084,6 +1116,8 @@ func _rc_synced(info: Dictionary) -> void:
 	_rc_locks(info.get("locked", []), info.get("locked_regions", []))
 	if typeof(info.get("drops")) == TYPE_DICTIONARY:
 		_rc_drops(info["drops"])
+	if typeof(info.get("difficulty")) == TYPE_DICTIONARY:
+		_rc_difficulty(info["difficulty"])
 	if _sync_only:
 		_hang_up_later()
 
@@ -1188,7 +1222,7 @@ func _rq_hello(pname: String, version: String) -> void:
 			_deliver(id, "kicked", [err])
 		return
 	_log("%s connected (%d online)" % [_names[id], _names.size()])
-	_deliver(id, "welcome", [{"rooms": _rooms.size(), "players": _names.size(), "rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict()}])
+	_deliver(id, "welcome", [{"rooms": _rooms.size(), "players": _names.size(), "rewards": {"battle_mult": rewards["battle_mult"]}, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(), "difficulty": Difficulty.to_dict()}])
 
 
 @rpc("any_peer", "reliable")
@@ -1422,6 +1456,8 @@ func _rc_welcome(info: Dictionary) -> void:
 		_rc_locks(info["locked"], info.get("locked_regions", UnitLocks.locked_regions()))
 	if typeof(info.get("drops")) == TYPE_DICTIONARY:
 		_rc_drops(info["drops"])
+	if typeof(info.get("difficulty")) == TYPE_DICTIONARY:
+		_rc_difficulty(info["difficulty"])
 	status.emit("Connected to the server (%d players online, %d matches)." % [int(info.get("players", 0)), int(info.get("rooms", 0))])
 	online_changed.emit()
 	lobby_changed.emit()
@@ -1450,6 +1486,16 @@ func _rc_rewards(r: Dictionary) -> void:
 func _rc_drops(d: Dictionary) -> void:
 	DropRates.apply(d)
 	Profile.settings["drop_rates"] = DropRates.to_dict()
+	Profile.save_settings()
+	Profile.changed.emit()
+
+
+## The server's fight difficulty, remembered like the drop chances so offline
+## ranked opponents and challenges follow it too.
+@rpc("authority", "reliable")
+func _rc_difficulty(d: Dictionary) -> void:
+	Difficulty.apply(d)
+	Profile.settings["difficulty"] = Difficulty.to_dict()
 	Profile.save_settings()
 	Profile.changed.emit()
 
@@ -2253,6 +2299,8 @@ func _rc_login_ok(info: Dictionary) -> void:
 	_rc_locks(info.get("locked", []), info.get("locked_regions", []))
 	if typeof(info.get("drops")) == TYPE_DICTIONARY:
 		_rc_drops(info["drops"])
+	if typeof(info.get("difficulty")) == TYPE_DICTIONARY:
+		_rc_difficulty(info["difficulty"])
 	Profile.enter_online(_session_user, info.get("profile", {}))
 	status.emit("Signed in as %s." % _session_user)
 	login_result.emit(true, "Signed in as %s." % _session_user)
@@ -2530,6 +2578,7 @@ func _finish_login(id: int, username: String) -> void:
 		"username": display, "token": accounts.issue_token(username), "profile": pl.data,
 		"rewards": {"battle_mult": rewards["battle_mult"]},
 		"locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(),
+		"difficulty": Difficulty.to_dict(),
 	}])
 	_log("%s signed in (%d online)" % [display, _sessions.size()])
 

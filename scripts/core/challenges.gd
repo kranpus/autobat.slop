@@ -78,7 +78,7 @@ const LIST := [
 			{"unit": "griffon", "level": 12, "count": 10, "row": "middle"},
 			{"unit": "naga_sharpshooter", "level": 12, "count": 40, "row": "back"}],
 		"reward": {"gold": 2500, "maps": 3, "trinket": "dragonscale_cloak"}},
-	{"id": "phoenix", "chapter": 2, "name": "Rise of the Phoenix", "map": "infernal_gate", "recommended": 2250,
+	{"id": "phoenix", "chapter": 2, "name": "Rise of the Phoenix", "map": "infernal_gate", "recommended": 2200,
 		"desc": "Ashwing the Phoenix burns at the gate, orc sorcerers chanting in its fire.",
 		"enemy": [{"unit": "phoenix", "level": 10, "count": 1, "row": "middle", "title": "Ashwing",
 				"mods": {"hp_mult": 28.0, "dmg_mult": 2.5, "regen_pct": 0.005}},
@@ -117,8 +117,14 @@ static func enemy_squads(id: String) -> Array:
 		var s: Dictionary = (sq as Dictionary).duplicate(true)
 		s["tier"] = 0
 		s.erase("title")
-		out.append(s)
+		out.append(Difficulty.scale_challenge_squad(s))
 	return out
+
+
+## The recommended power shown in the game, scaled by the server's challenge
+## difficulty.
+static func recommended(id: String) -> int:
+	return roundi(float(get_challenge(id).get("recommended", 0)) * Difficulty.challenge_mult)
 
 
 static func enemy_power(id: String) -> float:

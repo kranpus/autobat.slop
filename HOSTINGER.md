@@ -107,7 +107,8 @@ All of these run on the VPS, in the `autobat.slop` folder:
 
 | Task | Command |
 |---|---|
-| Admin console (gold, drops, locks, accounts...) | `server/admin.sh` (see below) |
+| Admin console (gold, drops, difficulty, locks, accounts, unit stats...) | `server/admin.sh` (see below) |
+| Balance simulation (thousands of test battles) | `server/balance.sh --battles=2000` (see [HOSTING.md](HOSTING.md#balance-simulator)) |
 | Server log | `docker compose -f server/docker-compose.vps.yml logs -f legion-draft` |
 | Update to new code | `git pull && docker compose -f server/docker-compose.vps.yml up -d --build` |
 | Restart | `docker compose -f server/docker-compose.vps.yml restart` |

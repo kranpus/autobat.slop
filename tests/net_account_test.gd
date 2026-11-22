@@ -138,6 +138,14 @@ func _run() -> void:
 	check(table.contains(unit_name), "the server counted the ranked battle for %s" % unit_name)
 	check((await _admin("unitstats patches")).contains(ProjectSettings.get_setting("application/config/version")), "stats are kept under this patch")
 
+	print("difficulty from the server")
+	check((await _admin("difficulty challenges 1.2")).begins_with("Difficulty updated"), "the admin changed challenge difficulty")
+	await _wait_ms(500)
+	check(is_equal_approx(Difficulty.challenge_mult, 1.2) and Challenges.recommended("titan") == roundi(2150 * 1.2), "signed-in players get it straight away")
+	await _admin("difficulty reset")
+	await _wait_ms(500)
+	check(Difficulty.is_default(), "and the reset")
+
 	print("challenges on the server")
 	var gold_c: int = profile.gold()
 	party.request_challenge_battle("rat_problem")

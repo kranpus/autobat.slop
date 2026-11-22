@@ -6,6 +6,20 @@ extends RefCounted
 ## kept under. Note kinds: "nerf", "buff", "change", "note".
 
 const LIST := [
+	{"version": "0.9.1", "date": "2026-11-22", "title": "Splash Down, Again",
+		"summary": "Ranged splash takes a second nerf, and the server can now tune how hard ranked opponents and challenges are.",
+		"sections": [
+			{"name": "Balance", "notes": [
+				{"kind": "nerf", "text": "Ranged splash damage again: projectiles now splash nearby enemies for 35% of the attack's damage, down from 45% in 0.9 (60% before that). The main target still takes full damage, and melee splash is unchanged at 60%."},
+				{"kind": "note", "text": "Affects the same units as in 0.9: Orc Sorcerer, Lich, Elven Mage, Cyclops, Salamander Firebrand, Stone Giant, Fire Giant, Sphinx, Phoenix, the Golden, Ice, Shadow and Storm Dragons, and ranged units given splash by trinkets or Blast Powder."},
+			]},
+			{"name": "Difficulty", "notes": [
+				{"kind": "change", "text": "The server can now adjust ranked training opponents (how strong Easy, Even and Hard are, and their rating) and the strength of challenge enemies. Any change applies to your game straight away, offline play included; challenge cards show the adjusted recommended power."},
+			]},
+			{"name": "Challenges", "notes": [
+				{"kind": "change", "text": "Rise of the Phoenix's recommended power re-measured: 2200."},
+			]},
+		]},
 	{"version": "0.9", "date": "2026-11-22", "title": "Splash Down",
 		"summary": "The first balance patch: an across-the-board nerf to ranged splash damage, a fairer army Strength, harder ranked opponents and a slower climb up the ranks.",
 		"sections": [

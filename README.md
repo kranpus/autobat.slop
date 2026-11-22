@@ -165,7 +165,7 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
        theme.
      - **Screen shake** can be turned off in Settings.
    - **Training opponents:** a hard ladder.
-     - **Strength:** Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× your power. Against an ordinary
+     - **Strength:** Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× your power by default (the server can change this with `difficulty`). Against an ordinary
        army of your power, the simulator measures roughly 55% / 21% / 5% to win; a well-built
        army does better.
      - **Rating:** they are rated 40 below, 60 above and 150 above you. Harder wins pay more
@@ -306,7 +306,8 @@ obstacles (x/y as fractions of the map; anything left of centre is mirrored auto
 - Splash damage (capped at 6 targets per hit), healers, regeneration, and flying units (melee hits
   them for only 60%).
   - **Melee splash** hits nearby enemies for 60% of the blow.
-  - **Projectile splash** (stones, magic, fire) hits them for 45% (patch 0.9; was 60%).
+  - **Projectile splash** (stones, magic, fire) hits them for 35% (60% before patch 0.9, 45% in
+    0.9).
 - Battle controls: mouse wheel to zoom, drag to pan, 1x/2x/4x speed, skip to result.
 
 ## How the 1000+ unit battles work
@@ -360,6 +361,8 @@ scripts/net/web_host.gd       Server: tiny HTTP host for the browser build
 scripts/net/passwords.gd      PBKDF2-SHA256 password hashing, login tokens
 scripts/net/account_store.gd  Server-side accounts (one JSON file each, no passwords stored)
 scripts/net/unit_stats.gd     Server-only unit use / win rates per patch (console: unitstats)
+scripts/core/difficulty.gd    Ranked opponent / challenge difficulty set by the server (console: difficulty)
+tools/balance_sim.gd          Balance simulator: thousands of test battles, unit win rates, counters
 server/                       Dockerfile, docker-compose and run script for the online server
 scripts/draft/draft_data.gd   Draft rules, unit abilities, trinkets
 scripts/draft/draft_run.gd    A player's draft run: shop, merging, abilities, bot AI

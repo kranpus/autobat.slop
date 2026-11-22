@@ -191,6 +191,7 @@ const GHOST_NAMES := [
 ## The rating offsets pay more for the harder fights but less than those
 ## odds would (Easy is about fair, Even and Hard lose rating on average for
 ## an ordinary army), so none of them is a free climb.
+## These are the defaults; the server can change them (Difficulty).
 const GHOST_TIERS := [[0.9, -40, "Easy"], [1.1, 60, "Even"], [1.5, 150, "Hard"]]
 ## Saved player armies are searched around your rating plus this.
 const RANKED_SEARCH_BIAS := 0
@@ -202,7 +203,7 @@ const RANKED_LABEL_GAP := 40
 ## missing difficulty. Each gets "difficulty" and "player": false.
 static func fill_ghosts(offers: Array, my_power: float, rating: int, rng: RandomNumberGenerator) -> void:
 	for pass_i in 2:
-		for t in GHOST_TIERS:
+		for t in Difficulty.tiers:   # GHOST_TIERS unless the server admin changed them
 			if offers.size() >= 3:
 				return
 			var taken := false
@@ -218,7 +219,8 @@ static func fill_ghosts(offers: Array, my_power: float, rating: int, rng: Random
 			offers.append(opp)
 
 
-static func generate_opponent(target_power: float, rating: int, seed_value: int) -> Dictionary:
+## trinkets: false leaves them out (the balance simulator measures bare units).
+static func generate_opponent(target_power: float, rating: int, seed_value: int, trinkets: bool = true) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	# Higher ratings unlock rarer units for ghosts.
@@ -243,7 +245,8 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int)
 			continue
 		used[id] = true
 		squads.append({"unit": id, "level": 1, "tier": 0, "row": GameData.default_row_for(id)})
-	_give_ghost_trinkets(squads, rating, rng)
+	if trinkets:
+		_give_ghost_trinkets(squads, rating, rng)
 	# Upgrade random squads until we reach the target power.
 	var guard := 0
 	while army_power(squads) < target_power and guard < 2000:
