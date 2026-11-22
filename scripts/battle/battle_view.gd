@@ -27,7 +27,7 @@ var _fx: Array = []                  # [type, x, y, radius, age, life, angle]
 var _shake := 0.0                    # camera shake strength (pixels), decays
 var _hit_seed := 0
 ## FX types (purely visual: the simulation never sees them).
-enum Fx { BLAST, HEAL, PUFF, SPARK, SLASH, SHOCKWAVE, GLOW, BOLT, STARS, RAISE }
+enum Fx { BLAST, HEAL, PUFF, SPARK, SLASH, SHOCKWAVE, GLOW, BOLT, STARS, RAISE, RING }
 const MAX_FX := 450                  # keeps huge battles smooth
 const MAX_NEW_FX_PER_STEP := 40
 var _camera: Camera2D
@@ -331,6 +331,18 @@ func _handle_events(evs: Array) -> void:
 			BattleSim.Ev.RAISE:
 				_add_fx(Fx.RAISE, e[1], e[2], 16.0, 0.8)
 				raises += 1
+			BattleSim.Ev.RESURRECT:
+				_add_fx(Fx.GLOW, e[1], e[2], 30.0, 0.8)
+				_add_fx(Fx.RAISE, e[1], e[2], 18.0, 0.8)
+				raises += 1
+			BattleSim.Ev.QUAKE:
+				_add_fx(Fx.SHOCKWAVE, e[1], e[2], float(e[3]) * 1.3, 0.5)
+				_add_fx(Fx.STARS, e[1], e[2] - 14.0, 14.0, 0.6)
+				big_blast = maxf(big_blast, 30.0)
+			BattleSim.Ev.AURA:
+				# A faint ring: purple for Dread, gold for Divine Aegis.
+				var dread := sim.ab_id[int(e[3])] == BattleSim.Ab.DREAD
+				_add_fx(Fx.RING, e[1], e[2], BattleSim.AURA_RADIUS, 1.2, 0.0 if dread else 1.0)
 			BattleSim.Ev.DIE:
 				deaths += 1
 				var j := int(e[3])
@@ -565,6 +577,10 @@ func _draw_overlay() -> void:
 					var ang := float(f[6]) + float(s_i) * TAU / 3.0 + k * 6.0
 					var p := pos + Vector2(cos(ang) * r0, sin(ang) * r0 * 0.4)
 					_overlay.draw_circle(p, 2.2, Color(1.0, 0.92, 0.3, fade))
+			Fx.RING:
+				var col := Color(0.75, 0.45, 1.0) if float(f[6]) < 0.5 else Color(1.0, 0.85, 0.35)
+				col.a = 0.35 * sin(k * PI)
+				_overlay.draw_arc(pos, r0 * (0.85 + 0.15 * k), 0.0, TAU, 48, col, 3.0)
 			Fx.RAISE:
 				# A sickly green glow rising from the grave.
 				_overlay.draw_circle(pos + Vector2(0, -10.0 * k), r0 * (0.5 + 0.6 * k), Color(0.45, 1.0, 0.55, 0.4 * fade))

@@ -100,6 +100,16 @@ const ABILITY_TUNING := {
 	"unstoppable": 1.1,   # x projectile resistance, on toughness
 	"devour": 0.25,        # x lifesteal share, on toughness
 	"raise_dead": 0.25,    # on toughness and damage
+	"quake": 0.15,        # x (stun seconds / cooldown, up to 1), on toughness and damage
+	"predator": 0.3,      # x bonus (share of targets that are ranged), on damage
+	"knockback": 0.1,     # on toughness
+	"death_blast": 0.4,   # x health share, on damage
+	"heads": 0.8,         # x attack speed per head (about 1.5 heads on average), on damage
+	"soul_harvest": 0.6,  # x heal share, on toughness; kills also add damage
+	"dread": 0.2,         # on toughness
+	"rising_storm": 0.5,  # on damage (the cap is reached after ~20 blows)
+	"resurrect": 0.35,    # on toughness and damage
+	"aegis": 0.25,        # on toughness
 }
 const CHAIN_POWER_CAP := 1.2
 
@@ -141,6 +151,27 @@ static func ability_power(s: Dictionary) -> Vector2:
 			return Vector2(1.0 + ABILITY_TUNING["devour"] * v, 1.0)
 		"raise_dead":
 			return Vector2(1.0 + ABILITY_TUNING["raise_dead"], 1.0 + ABILITY_TUNING["raise_dead"])
+		"quake":
+			var q := 1.0 + ABILITY_TUNING["quake"] * minf(v / cd, 1.0)
+			return Vector2(q, q)
+		"predator":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["predator"] * v)
+		"knockback":
+			return Vector2(1.0 + ABILITY_TUNING["knockback"], 1.0)
+		"death_blast":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["death_blast"] * v)
+		"heads":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["heads"] * v)
+		"soul_harvest":
+			return Vector2(1.0 + ABILITY_TUNING["soul_harvest"] * v, 1.1)
+		"dread":
+			return Vector2(1.0 + ABILITY_TUNING["dread"], 1.0)
+		"rising_storm":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["rising_storm"])
+		"resurrect":
+			return Vector2(1.0 + ABILITY_TUNING["resurrect"], 1.0 + ABILITY_TUNING["resurrect"])
+		"aegis":
+			return Vector2(1.0 + ABILITY_TUNING["aegis"], 1.0)
 	return Vector2.ONE
 
 

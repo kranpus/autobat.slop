@@ -214,7 +214,8 @@ func tier_up_cost(id: String) -> Dictionary:
 	var tier := int(unit(id).get("tier", 0))
 	var r: Dictionary = GameData.RARITIES[GameData.UNITS[id]["rarity"]]
 	return {
-		"shards": ceili(float(r["shard_base"]) * float(tier + 1) * 0.75),
+		# Epic and legendary squads grow more slowly (tier_shard_mult, patch 0.9.2).
+		"shards": ceili(float(r["shard_base"]) * float(tier + 1) * 0.75 * float(r.get("tier_shard_mult", 1.0))),
 		"gold": roundi(100.0 * float(tier + 1) * float(r["cost_mult"])),
 	}
 

@@ -12,8 +12,8 @@ const RARITIES := {
 	"common":    {"name": "Common",    "color": "b8b8b8", "order": 0, "power_mult": 1.0, "squad_base": 30, "squad_step": 15, "cost_mult": 1.0, "shard_base": 10, "find_shards": [3, 6]},
 	"uncommon":  {"name": "Uncommon",  "color": "5fd35f", "order": 1, "power_mult": 1.0, "squad_base": 15, "squad_step": 8,  "cost_mult": 1.5, "shard_base": 8,  "find_shards": [2, 4]},
 	"rare":      {"name": "Rare",      "color": "4f9dff", "order": 2, "power_mult": 1.1, "squad_base": 6,  "squad_step": 3,  "cost_mult": 2.5, "shard_base": 5,  "find_shards": [1, 3]},
-	"epic":      {"name": "Epic",      "color": "c065ff", "order": 3, "power_mult": 1.3, "squad_base": 2,  "squad_step": 1,  "cost_mult": 4.0, "shard_base": 3,  "find_shards": [1, 2]},
-	"legendary": {"name": "Legendary", "color": "ffb43c", "order": 4, "power_mult": 1.8, "squad_base": 1,  "squad_step": 1,  "cost_mult": 6.0, "shard_base": 2,  "find_shards": [1, 1]},
+	"epic":      {"name": "Epic",      "color": "c065ff", "order": 3, "power_mult": 1.05, "squad_base": 2,  "squad_step": 1,  "cost_mult": 4.0, "shard_base": 3,  "find_shards": [1, 2], "tier_shard_mult": 1.75},
+	"legendary": {"name": "Legendary", "color": "ffb43c", "order": 4, "power_mult": 1.25, "squad_base": 1,  "squad_step": 1,  "cost_mult": 6.0, "shard_base": 2,  "find_shards": [1, 1], "tier_shard_mult": 2.0},
 }
 
 # Damage types and armor classes. DAMAGE_MULT[damage][armor].
@@ -139,7 +139,8 @@ const UNITS := {
 		"hp": 1200.0, "dmg": 73.0, "cooldown": 2.0, "range": 10.0, "speed": 40.0,
 		"damage": "physical", "armor": "beast", "aoe": 50.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
-		"desc": "Stomps whole squads flat.",
+		"desc": "Stomps whole squads flat, and the ground shakes.",
+		"ability": {"id": "quake", "value": 0.8},
 	},
 	"lich": {
 		"name": "Lich", "rarity": "epic", "role": "caster",
@@ -155,21 +156,23 @@ const UNITS := {
 		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 14.0, "scale": 1.6, "flying": true, "targets": "ranged",
 		"desc": "Flies over the melee to hunt casters.",
+		"ability": {"id": "predator", "value": 1.0},
 	},
 	"golden_dragon": {
 		"name": "Golden Dragon", "rarity": "legendary", "role": "caster",
 		"hp": 3000.0, "dmg": 80.0, "cooldown": 2.0, "range": 170.0, "speed": 70.0,
 		"damage": "fire", "armor": "beast", "aoe": 80.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "fire", "radius": 22.0, "scale": 2.4, "flying": true,
-		"desc": "Breathes fire over entire regiments.",
+		"desc": "Breathes fire over entire regiments; its presence alone breaks courage.",
+		"ability": {"id": "dread", "value": 0.0},
 	},
 	"titan": {
 		"name": "Storm Titan", "rarity": "legendary", "role": "tank",
 		"hp": 1750.0, "dmg": 55.0, "cooldown": 1.8, "range": 12.0, "speed": 45.0,
 		"damage": "magic", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 22.0, "scale": 2.4, "flying": false,
-		"desc": "Its fists crackle with chain lightning.",
-		"ability": {"id": "chain", "value": 3.0},
+		"desc": "The longer it fights, the harder its storm-charged fists hit.",
+		"ability": {"id": "rising_storm", "value": 0.05},
 	},
 	"phoenix": {
 		"name": "Phoenix", "rarity": "legendary", "role": "caster",
@@ -385,8 +388,8 @@ const UNITS := {
 		"hp": 1300.0, "dmg": 80.0, "cooldown": 2.4, "range": 240.0, "speed": 38.0,
 		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "stone", "radius": 16.0, "scale": 1.8, "flying": false,
-		"desc": "Boulders the size of houses knock enemies flat.",
-		"ability": {"id": "stun", "value": 1.0},
+		"desc": "Boulders the size of houses send enemies flying.",
+		"ability": {"id": "knockback", "value": 60.0},
 	},
 	"frost_giant": {
 		"name": "Frost Giant", "rarity": "epic", "role": "tank", "locked": true,
@@ -401,7 +404,8 @@ const UNITS := {
 		"hp": 1200.0, "dmg": 75.0, "cooldown": 2.0, "range": 180.0, "speed": 40.0,
 		"damage": "fire", "armor": "beast", "aoe": 55.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "fire", "radius": 16.0, "scale": 1.8, "flying": false,
-		"desc": "Hurls molten iron from its forge.",
+		"desc": "Hurls molten iron, and erupts when it falls.",
+		"ability": {"id": "death_blast", "value": 0.35},
 	},
 	"sphinx": {
 		"name": "Sphinx", "rarity": "epic", "role": "caster", "locked": true,
@@ -425,14 +429,15 @@ const UNITS := {
 		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 25.0,
 		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
 		"desc": "Cut off one head and two grow back.",
+		"ability": {"id": "heads", "value": 0.3},
 	},
 	"bone_dragon": {
 		"name": "Bone Dragon", "rarity": "epic", "role": "melee", "locked": true,
 		"hp": 1100.0, "dmg": 65.0, "cooldown": 1.2, "range": 10.0, "speed": 85.0,
 		"damage": "physical", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": true, "targets": "backline",
-		"desc": "A dragon that refused to stay dead.",
-		"ability": {"id": "rebirth", "value": 0.4},
+		"desc": "A dragon that refused to stay dead, fed by every soul it takes.",
+		"ability": {"id": "soul_harvest", "value": 0.2},
 	},
 	"juggernaut": {
 		"name": "Juggernaut", "rarity": "epic", "role": "tank", "locked": true,
@@ -463,14 +468,16 @@ const UNITS := {
 		"hp": 2000.0, "dmg": 40.0, "cooldown": 1.2, "range": 180.0, "speed": 90.0,
 		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 120.0, "regen": 0.0,
 		"projectile": "magic", "radius": 18.0, "scale": 2.0, "flying": true,
-		"desc": "Heals whole squads with radiant light.",
+		"desc": "Heals whole squads with radiant light, and calls the fallen back.",
+		"ability": {"id": "resurrect", "value": 6.0},
 	},
 	"grand_avatar": {
 		"name": "Grand Avatar", "rarity": "legendary", "role": "tank", "locked": true,
 		"hp": 4000.0, "dmg": 100.0, "cooldown": 1.8, "range": 12.0, "speed": 45.0,
 		"damage": "magic", "armor": "heavy", "aoe": 60.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 22.0, "scale": 2.4, "flying": false,
-		"desc": "A god's will in physical form.",
+		"desc": "A god's will in physical form, shielding all around it.",
+		"ability": {"id": "aegis", "value": 0.0},
 	},
 }
 
@@ -606,9 +613,21 @@ const ABILITIES := {
 	"unstoppable": {"name": "Unstoppable", "text": "Immune to stun and chill, and takes %s%% less damage from arrows, stones and spells."},
 	"devour": {"name": "Devour", "text": "Heals itself for %s%% of the damage it deals."},
 	"raise_dead": {"name": "Raise Dead", "text": "Enemies it kills rise as skeletons on its side (up to %s per Lich)."},
+	"quake": {"name": "Quake", "text": "Every third blow shakes the ground, stunning every enemy around its target for %ss."},
+	"predator": {"name": "Predator", "text": "Deals +%s%% damage to ranged units, casters and healers."},
+	"knockback": {"name": "Knockback", "text": "Its boulders hurl the target backwards and knock it down for a moment.%s"},
+	"death_blast": {"name": "Molten Core", "text": "When it dies it erupts, dealing %s%% of its health as fire damage to every enemy nearby."},
+	"heads": {"name": "Many Heads", "text": "For every quarter of its health lost it grows another head: +%s%% attack speed each, up to 3 times."},
+	"soul_harvest": {"name": "Soul Harvest", "text": "Every kill heals it for %s%% of its health and adds +10%% damage (up to +50%%)."},
+	"dread": {"name": "Dread", "text": "Enemies near it lose their nerve and deal 35%% less damage.%s"},
+	"rising_storm": {"name": "Rising Storm", "text": "Each blow adds +%s%% damage to the next, up to +100%%."},
+	"resurrect": {"name": "Resurrection", "text": "Every %ss it brings the most recently fallen ally nearby back with half its health (once each)."},
+	"aegis": {"name": "Divine Aegis", "text": "Allies near it take 25%% less damage.%s"},
 }
 ## Values shown as percentages in the text.
-const ABILITY_PERCENT := ["burn", "rebirth", "unstoppable", "devour"]
+const ABILITY_PERCENT := ["burn", "rebirth", "unstoppable", "devour", "predator", "death_blast", "heads", "soul_harvest", "rising_storm"]
+## Abilities whose text has no number in it.
+const ABILITY_NO_VALUE := ["dread", "aegis", "knockback"]
 
 
 static func ability_of(unit_id: String) -> Dictionary:
@@ -624,6 +643,8 @@ static func ability_text(unit_id: String) -> String:
 	var info: Dictionary = ABILITIES[a["id"]]
 	var v := float(a.get("value", 0.0))
 	var shown := str(roundi(v * 100.0)) if a["id"] in ABILITY_PERCENT else (str(roundi(v)) if is_equal_approx(v, roundf(v)) else str(snappedf(v, 0.1)))
+	if a["id"] in ABILITY_NO_VALUE:
+		shown = ""
 	return "%s: %s" % [info["name"], str(info["text"]) % shown]
 
 

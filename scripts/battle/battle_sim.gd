@@ -22,12 +22,26 @@ const RANGED_SPLASH_MULT := 0.35    # ...and of projectiles (0.6 before patch 0.
 const MAX_SPLASH_TARGETS := 6     # keeps splash damage from scaling with crowd density
 const HALF_NEIGHBOURS := [Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1)]
 
-enum Ev { MELEE_HIT, SHOT, IMPACT, BLAST, HEAL, DIE, CHAIN, STUN, REBIRTH, RAISE, CHARGE }
+enum Ev { MELEE_HIT, SHOT, IMPACT, BLAST, HEAL, DIE, CHAIN, STUN, REBIRTH, RAISE, CHARGE, QUAKE, RESURRECT, AURA }
 ## Battle abilities (GameData "ability": {"id", "value"}); see GameData.ABILITIES.
-enum Ab { NONE, STUN, CHILL, BURN, CHAIN, REBIRTH, CHARGE, DOUBLE_STRIKE, CURSE, WEAKEN, UNSTOPPABLE, DEVOUR, RAISE_DEAD }
+enum Ab { NONE, STUN, CHILL, BURN, CHAIN, REBIRTH, CHARGE, DOUBLE_STRIKE, CURSE, WEAKEN, UNSTOPPABLE, DEVOUR, RAISE_DEAD,
+	QUAKE, PREDATOR, KNOCKBACK, DEATH_BLAST, HEADS, SOUL_HARVEST, DREAD, RISING_STORM, RESURRECT, AEGIS }
 const AB_IDS := {"stun": Ab.STUN, "chill": Ab.CHILL, "burn": Ab.BURN, "chain": Ab.CHAIN, "rebirth": Ab.REBIRTH,
 	"charge": Ab.CHARGE, "double_strike": Ab.DOUBLE_STRIKE, "curse": Ab.CURSE, "weaken": Ab.WEAKEN,
-	"unstoppable": Ab.UNSTOPPABLE, "devour": Ab.DEVOUR, "raise_dead": Ab.RAISE_DEAD}
+	"unstoppable": Ab.UNSTOPPABLE, "devour": Ab.DEVOUR, "raise_dead": Ab.RAISE_DEAD,
+	"quake": Ab.QUAKE, "predator": Ab.PREDATOR, "knockback": Ab.KNOCKBACK, "death_blast": Ab.DEATH_BLAST,
+	"heads": Ab.HEADS, "soul_harvest": Ab.SOUL_HARVEST, "dread": Ab.DREAD, "rising_storm": Ab.RISING_STORM,
+	"resurrect": Ab.RESURRECT, "aegis": Ab.AEGIS}
+const QUAKE_EVERY := 3            # every 3rd blow shakes the ground
+const QUAKE_RADIUS := 70.0
+const DEATH_BLAST_RADIUS := 90.0
+const AURA_RADIUS := 150.0        # dread and divine aegis
+const AURA_TICKS := 10            # auras refresh twice a second
+const AEGIS_MULT := 0.75          # allies under divine aegis take 25% less damage
+const HARVEST_MAX_STACKS := 5     # soul harvest: +10% damage per kill, up to +50%
+const STORM_MAX_STACKS := 20      # rising storm: up to 20 stacks
+const RESURRECT_RANGE := 300.0
+const MAX_AREA_TARGETS := 10
 const CHILL_MULT := 0.5           # chilled units move and attack at half speed
 const CURSE_MULT := 1.3           # cursed units take 30% more damage
 const WEAKEN_MULT := 0.65         # weakened units deal 35% less damage
@@ -87,6 +101,10 @@ var burn_until := PackedInt32Array()
 var burn_dps := PackedFloat32Array()
 var curse_until := PackedInt32Array()
 var weaken_until := PackedInt32Array()
+var aegis_until := PackedInt32Array()
+var ab_base := PackedFloat32Array()   # base damage/cooldown for abilities that change them
+var _aura_units: Array = []           # units with dread / divine aegis
+var _resurrectors: Array = []         # units with resurrection
 var ab_used := PackedInt32Array()     # rebirth used / dead raised / charge spent
 var raised := PackedInt32Array()      # 1 for units raised from the dead mid-battle
 var _raise_templates: Array = []      # resolved stats of the units raise dead creates
@@ -333,6 +351,12 @@ func _add_resolved(r: Dictionary, t: int, x: float, y: float) -> void:
 	burn_until.append(0)
 	curse_until.append(0)
 	weaken_until.append(0)
+	aegis_until.append(0)
+	ab_base.append(r["cooldown"] if r["ab"] == Ab.HEADS else r["dmg"])
+	if r["ab"] == Ab.DREAD or r["ab"] == Ab.AEGIS:
+		_aura_units.append(i)
+	if r["ab"] == Ab.RESURRECT:
+		_resurrectors.append(i)
 	ab_used.append(0)
 	raised.append(0)
 	burn_dps.append(0.0)
@@ -354,6 +378,11 @@ func step() -> void:
 	_rebuild_grid()
 	if tick % 5 == 0:
 		_rebuild_team_lists()
+	if not _aura_units.is_empty() and tick % AURA_TICKS == 1:
+		_apply_auras()
+	for i in _resurrectors:
+		if alive[i] == 1 and tick >= ab_used[i]:
+			_try_resurrect(i)
 	for i in n:
 		prev_x[i] = px[i]
 		prev_y[i] = py[i]
@@ -447,6 +476,10 @@ func _approach_and_act(i: int, t: int, healing: bool) -> void:
 	if proj[i] == 0:
 		events.append([Ev.MELEE_HIT, px[t], py[t], i])
 		var amount := dmg[i]
+		if ab_id[i] == Ab.RISING_STORM:
+			# Each blow builds the storm: more damage, up to a cap.
+			amount *= 1.0 + ab_val[i] * float(ab_used[i])
+			ab_used[i] = mini(ab_used[i] + 1, STORM_MAX_STACKS)
 		if ab_id[i] == Ab.CHARGE and ab_used[i] == 0:
 			# Charge: the first blow against each new target hits much harder.
 			amount *= ab_val[i]
@@ -455,6 +488,10 @@ func _approach_and_act(i: int, t: int, healing: bool) -> void:
 		_deal_damage(i, team[i], dtype[i], amount, t, px[t], py[t], aoe[i], true)
 		if ab_id[i] == Ab.DOUBLE_STRIKE:
 			_double_strike(i, t)
+		elif ab_id[i] == Ab.QUAKE:
+			ab_used[i] += 1
+			if ab_used[i] % QUAKE_EVERY == 0:
+				_quake(i, px[t], py[t])
 	else:
 		_spawn_projectile(i, t)
 		events.append([Ev.SHOT, px[i], py[i], proj[i]])
@@ -636,11 +673,21 @@ func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1
 		m *= WEAKEN_MULT
 	if curse_until[j] > tick:
 		m *= CURSE_MULT
+	if aegis_until[j] > tick:
+		m *= AEGIS_MULT
+	if src >= 0 and ab_id[src] == Ab.PREDATOR and (role[j] == Role.RANGED or role[j] == Role.CASTER or role[j] == Role.HEALER):
+		m *= 1.0 + ab_val[src]
 	if not melee and ab_id[j] == Ab.UNSTOPPABLE:
 		m *= 1.0 - ab_val[j]
 	var dealt := amount * m * rng.randf_range(0.9, 1.1)
 	hp[j] -= dealt
 	hit_tick[j] = tick
+	if ab_id[j] == Ab.HEADS and hp[j] > 0.0:
+		# Every quarter of its health lost grows another head: faster attacks.
+		var heads := clampi(int((1.0 - hp[j] / max_hp[j]) * 4.0), 0, 3)
+		if heads > ab_used[j]:
+			ab_used[j] = heads
+			cooldown[j] = ab_base[j] / (1.0 + ab_val[j] * float(heads))
 	if src >= 0 and alive[src] == 1:
 		if lifesteal[src] > 0.0:
 			hp[src] = minf(max_hp[src], hp[src] + dealt * lifesteal[src])
@@ -675,6 +722,14 @@ func _on_hit(src: int, src_team: int, j: int, dealt: float, amount: float, dt_id
 				var dps := dealt * ab_val[src] / BURN_SECONDS
 				burn_dps[j] = maxf(burn_dps[j] if burn_until[j] > tick else 0.0, dps)
 				burn_until[j] = tick + int(BURN_SECONDS / DT)
+		Ab.KNOCKBACK:
+			if alive[j] == 1 and ab_id[j] != Ab.UNSTOPPABLE:
+				var dx := px[j] - px[src]
+				var dy := py[j] - py[src]
+				var d := maxf(0.001, sqrt(dx * dx + dy * dy))
+				px[j] = clampf(px[j] + dx / d * ab_val[src], 8.0, map_w - 8.0)
+				py[j] = clampf(py[j] + dy / d * ab_val[src], 8.0, map_h - 8.0)
+				stun_until[j] = maxi(stun_until[j], tick + 4)   # a moment to get back up
 		Ab.CHAIN:
 			var hit := {j: true}
 			var last := j
@@ -700,6 +755,78 @@ func _double_strike(i: int, primary: int) -> void:
 		hit[other] = true
 		events.append([Ev.MELEE_HIT, px[other], py[other], i])
 		_damage_unit(other, dmg[i], dtype[i], true, i)
+
+
+## Living units within r of (x, y): enemies of my_team (or allies when
+## allies is true), nearest first is not guaranteed; at most MAX_AREA_TARGETS.
+func _enemies_near(x: float, y: float, r: float, my_team: int, allies: bool = false, limit: int = MAX_AREA_TARGETS) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	var rings := ceili(r / CELL)
+	var cx := clampi(int(x / CELL), 0, gw - 1)
+	var cy := clampi(int(y / CELL), 0, gh - 1)
+	for gy in range(maxi(0, cy - rings), mini(gh, cy + rings + 1)):
+		for gx in range(maxi(0, cx - rings), mini(gw, cx + rings + 1)):
+			var j := cell_head[gy * gw + gx]
+			while j != -1:
+				if alive[j] == 1 and ((team[j] == my_team) == allies):
+					var dx := px[j] - x
+					var dy := py[j] - y
+					var rr := r + radius[j]
+					if dx * dx + dy * dy <= rr * rr:
+						out.append(j)
+						if out.size() >= limit:
+							return out
+				j = cell_next[j]
+	return out
+
+
+## Hill Giant: the ground shakes and everything around the target is stunned.
+func _quake(i: int, x: float, y: float) -> void:
+	events.append([Ev.QUAKE, x, y, QUAKE_RADIUS])
+	for k in _enemies_near(x, y, QUAKE_RADIUS, team[i]):
+		if ab_id[k] != Ab.UNSTOPPABLE:
+			stun_until[k] = maxi(stun_until[k], tick + int(ab_val[i] / DT))
+
+
+## Dread (enemies nearby deal less damage) and divine aegis (allies nearby
+## take less), refreshed every AURA_TICKS.
+func _apply_auras() -> void:
+	for i in _aura_units:
+		if alive[i] == 0:
+			continue
+		var until := tick + AURA_TICKS + 1
+		if ab_id[i] == Ab.DREAD:
+			for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], false, 40):
+				weaken_until[k] = maxi(weaken_until[k], until)
+		else:
+			for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], true, 40):
+				aegis_until[k] = maxi(aegis_until[k], until)
+		if tick % (AURA_TICKS * 4) == 1:
+			events.append([Ev.AURA, px[i], py[i], i])
+
+
+## Seraph: brings back the most recently fallen ally nearby, every few seconds.
+func _try_resurrect(i: int) -> void:
+	if ab_used[i] == 0:
+		ab_used[i] = int(ab_val[i] / DT)   # the first one comes after a full wait
+		return
+	var best := -1
+	for k in n:
+		if alive[k] == 0 and team[k] == team[i] and raised[k] != 2 and death_tick[k] >= 0:
+			var dx := px[k] - px[i]
+			var dy := py[k] - py[i]
+			if dx * dx + dy * dy <= RESURRECT_RANGE * RESURRECT_RANGE and (best == -1 or death_tick[k] > death_tick[best]):
+				best = k
+	if best == -1:
+		return   # nobody to bring back yet: try again next tick
+	alive[best] = 1
+	hp[best] = max_hp[best] * 0.5
+	raised[best] = 2      # brought back once already
+	burn_until[best] = 0
+	stun_until[best] = 0
+	alive_count[team[best]] += 1
+	ab_used[i] = tick + int(ab_val[i] / DT)
+	events.append([Ev.RESURRECT, px[best], py[best], best])
 
 
 ## The nearest living enemy of `my_team` within r of (x, y), skipping `skip`.
@@ -740,6 +867,18 @@ func _kill(j: int, killer: int = -1) -> void:
 	death_tick[j] = tick
 	alive_count[team[j]] -= 1
 	events.append([Ev.DIE, px[j], py[j], j])
+	if ab_id[j] == Ab.DEATH_BLAST:
+		# Explodes on death, burning everything around it.
+		events.append([Ev.BLAST, px[j], py[j], DEATH_BLAST_RADIUS])
+		var blast := max_hp[j] * ab_val[j]
+		for k in _enemies_near(px[j], py[j], DEATH_BLAST_RADIUS, team[j]):
+			if alive[k] == 1:
+				_damage_unit(k, blast, dtype[j], false, -1)
+	if killer >= 0 and ab_id[killer] == Ab.SOUL_HARVEST and alive[killer] == 1:
+		hp[killer] = minf(max_hp[killer], hp[killer] + max_hp[killer] * ab_val[killer])
+		ab_used[killer] = mini(ab_used[killer] + 1, HARVEST_MAX_STACKS)
+		dmg[killer] = ab_base[killer] * (1.0 + 0.1 * float(ab_used[killer]))
+		events.append([Ev.HEAL, px[killer], py[killer], killer])
 	if killer >= 0 and ab_id[killer] == Ab.RAISE_DEAD and alive[killer] == 1 and raised[j] == 0 \
 			and ab_used[killer] < int(ab_val[killer]) and ab_tpl[killer] >= 0:
 		# The necromancer raises its victim as a skeleton on its own side.
