@@ -305,9 +305,31 @@ obstacles (x/y as fractions of the map; anything left of centre is mirrored auto
   undead and treants, magic melts heavy armor.
 - Splash damage (capped at 6 targets per hit), healers, regeneration, and flying units (melee hits
   them for only 60%).
-  - **Melee splash** hits nearby enemies for 60% of the blow.
+  - **Who splashes:** only six units splash (patch 0.9.2): Orc Sorcerer, Hill Giant, Cyclops, Fire
+    Giant, Golden Dragon and Grand Avatar.
+  - **Melee splash** hits nearby enemies for 45% of the blow (60% before 0.9.2).
   - **Projectile splash** (stones, magic, fire) hits them for 35% (60% before patch 0.9, 45% in
     0.9).
+- **Battle abilities** (patch 0.9.2) replace splash on the other former splashers. They're shown
+  on each unit's card and simulated in `BattleSim` (`Ab`); see `GameData.ABILITIES`.
+
+  | Ability | Units | Effect |
+  |---|---|---|
+  | Stun | Ogre Brute (0.6s), Stone Giant (1s) | The target can't move or attack. |
+  | Chill | Ice Dragon (3s) | Half speed, moving and attacking. |
+  | Burn | Salamander Firebrand | 120% of the hit again as burn damage over 4s. |
+  | Chain Lightning | Elven Mage (2), Storm Titan (3), Storm Dragon (5) | Jumps to more enemies nearby, each jump 30% weaker. |
+  | Shatter | Frost Giant (4s) | The target takes 30% more damage from everyone. |
+  | Wither | Sphinx (4s) | The target deals 35% less damage. |
+  | Charge | Minotaur | The first blow against each new target deals 3x damage. |
+  | Double Strike | Ettin | Each blow also hits a second enemy in reach. |
+  | Rebirth | Phoenix (60%), Bone Dragon (40%) | Rises again once with that much health. |
+  | Unstoppable | Juggernaut | Immune to stun and chill, 35% less damage from projectiles. |
+  | Devour | Shadow Dragon | Heals for 40% of the damage it deals. |
+  | Raise Dead | Lich | Its victims rise as skeletons on its side (up to 6 per Lich). |
+
+  - **Strength:** each ability's worth in Strength (`Army.ABILITY_TUNING`) is calibrated with
+    `tools/balance_sim.gd`.
 - Battle controls: mouse wheel to zoom, drag to pan, 1x/2x/4x speed, skip to result.
 
 ## How the 1000+ unit battles work

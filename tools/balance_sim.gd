@@ -145,7 +145,7 @@ func _worker(sims: Array, state: Dictionary, mutex: Mutex) -> void:
 
 
 static func _score(sim: BattleSim, team: int) -> float:
-	return 0.5 if sim.winner == -1 else (1.0 if sim.winner == team else 0.0)
+	return 1.0 if sim.winner == team else (0.0 if sim.winner == 1 - team else 0.5)
 
 
 # --- armies / calibrate ---------------------------------------------------------

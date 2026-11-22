@@ -400,7 +400,8 @@ func _build_shop(shopping: bool) -> void:
 
 func _unit_tooltip(uid: String, lvl: int) -> String:
 	var ab: Dictionary = DraftData.ABILITIES[uid]
-	return "%s\n%s\nAbility (%s): %s  (x%d at this level)" % [GameData.UNITS[uid]["name"], GameData.UNITS[uid]["desc"], ab["name"], ab["text"], lvl]
+	var battle := GameData.ability_text(uid)
+	return "%s\n%s%s\nAbility (%s): %s  (x%d at this level)" % [GameData.UNITS[uid]["name"], GameData.UNITS[uid]["desc"], ("\nIn battle: " + battle) if battle != "" else "", ab["name"], ab["text"], lvl]
 
 
 func _build_info() -> void:

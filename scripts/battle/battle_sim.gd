@@ -17,12 +17,24 @@ const RETARGET_TICKS := 12
 const SEARCH_RINGS := 4
 const FALLBACK_SAMPLES := 24
 const SEPARATION_CHECKS := 10
-const AOE_SPLASH_MULT := 0.6        # splash damage of melee attacks, as a share of the hit
+const AOE_SPLASH_MULT := 0.45       # splash damage of melee attacks, as a share of the hit (0.6 before 0.9.2)
 const RANGED_SPLASH_MULT := 0.35    # ...and of projectiles (0.6 before patch 0.9, 0.45 in 0.9)
 const MAX_SPLASH_TARGETS := 6     # keeps splash damage from scaling with crowd density
 const HALF_NEIGHBOURS := [Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1)]
 
-enum Ev { MELEE_HIT, SHOT, IMPACT, BLAST, HEAL, DIE }
+enum Ev { MELEE_HIT, SHOT, IMPACT, BLAST, HEAL, DIE, CHAIN, STUN, REBIRTH, RAISE, CHARGE }
+## Battle abilities (GameData "ability": {"id", "value"}); see GameData.ABILITIES.
+enum Ab { NONE, STUN, CHILL, BURN, CHAIN, REBIRTH, CHARGE, DOUBLE_STRIKE, CURSE, WEAKEN, UNSTOPPABLE, DEVOUR, RAISE_DEAD }
+const AB_IDS := {"stun": Ab.STUN, "chill": Ab.CHILL, "burn": Ab.BURN, "chain": Ab.CHAIN, "rebirth": Ab.REBIRTH,
+	"charge": Ab.CHARGE, "double_strike": Ab.DOUBLE_STRIKE, "curse": Ab.CURSE, "weaken": Ab.WEAKEN,
+	"unstoppable": Ab.UNSTOPPABLE, "devour": Ab.DEVOUR, "raise_dead": Ab.RAISE_DEAD}
+const CHILL_MULT := 0.5           # chilled units move and attack at half speed
+const CURSE_MULT := 1.3           # cursed units take 30% more damage
+const WEAKEN_MULT := 0.65         # weakened units deal 35% less damage
+const BURN_SECONDS := 4.0         # burn deals its damage over this long
+const CHAIN_RANGE := 110.0        # how far chain lightning jumps
+const CHAIN_FALLOFF := 0.7        # each jump deals 70% of the previous one
+const RAISE_UNIT := "skeleton"
 enum Role { MELEE, RANGED, CASTER, HEALER, TANK }
 ## Who a unit attacks first (GameData "targets"): the nearest enemy, or the
 ## nearest of a preferred kind anywhere on the field (flyers hunting the
@@ -65,6 +77,19 @@ var radius := PackedFloat32Array()
 var lifesteal := PackedFloat32Array()
 var thorns := PackedFloat32Array()
 var tmode := PackedInt32Array()      # Target mode per unit
+var ab_id := PackedInt32Array()      # Ab per unit
+var ab_val := PackedFloat32Array()   # its strength (seconds, jumps, share...)
+var ab_tpl := PackedInt32Array()     # raise dead: index into _raise_templates
+# Status effects: the tick each one runs out (0 = none).
+var stun_until := PackedInt32Array()
+var chill_until := PackedInt32Array()
+var burn_until := PackedInt32Array()
+var burn_dps := PackedFloat32Array()
+var curse_until := PackedInt32Array()
+var weaken_until := PackedInt32Array()
+var ab_used := PackedInt32Array()     # rebirth used / dead raised / charge spent
+var raised := PackedInt32Array()      # 1 for units raised from the dead mid-battle
+var _raise_templates: Array = []      # resolved stats of the units raise dead creates
 
 # --- projectiles (pooled) ---------------------------------------------------
 var pr_count := 0
@@ -219,6 +244,7 @@ func _spawn_army(squads: Array, t: int) -> void:
 			var cols: int = depth_cols[m]
 			var spacing := _spacing(sq["unit"])
 			var stats := Army.unit_stats(sq["unit"], int(sq["level"]), Army.squad_mods(sq))
+			stats["level"] = int(sq["level"])
 			var front_x := map_w * 0.5 - float(row_x[row])
 			for u in int(counts[i]):
 				var c := u % cols
@@ -237,16 +263,41 @@ func _spacing(uid: String) -> float:
 
 
 func _add_unit(uid: String, s: Dictionary, t: int, x: float, y: float) -> void:
+	_add_resolved(_resolve(uid, s), t, x, y)
+
+
+## Unit stats turned into plain numbers, so units can also be added during
+## the battle (raise dead) without touching shared game data from a worker
+## thread. Called on the thread that runs setup().
+func _resolve(uid: String, s: Dictionary) -> Dictionary:
+	var ab: Dictionary = s.get("ability", {}) if typeof(s.get("ability")) == TYPE_DICTIONARY else {}
+	var r := {
+		"kind": _kind_index(uid), "role": GameData.ROLES.find(s["role"]), "dtype": GameData.DAMAGE_TYPES.find(s["damage"]),
+		"armor": GameData.ARMOR_TYPES.find(s["armor"]), "flying": 1 if s["flying"] else 0, "proj": GameData.PROJECTILES.find(s["projectile"]),
+		"hp": float(s["hp"]), "dmg": float(s["dmg"]), "range": float(s["range"]), "speed": float(s["speed"]), "cooldown": float(s["cooldown"]),
+		"aoe": float(s["aoe"]), "heal": float(s["heal"]), "regen": float(s["regen"]), "radius": float(s["radius"]),
+		"lifesteal": float(s.get("lifesteal", 0.0)), "thorns": float(s.get("thorns", 0.0)),
+		"tmode": int(TARGET_MODES.get(str(s.get("targets", "")), Target.NEAREST)),
+		"ab": int(AB_IDS.get(str(ab.get("id", "")), Ab.NONE)), "ab_val": float(ab.get("value", 0.0)), "tpl": -1,
+	}
+	if r["ab"] == Ab.RAISE_DEAD:
+		# The raised dead fight at the necromancer's level.
+		r["tpl"] = _raise_templates.size()
+		_raise_templates.append(_resolve(RAISE_UNIT, Army.unit_stats(RAISE_UNIT, int(s.get("level", 1)))))
+	return r
+
+
+func _add_resolved(r: Dictionary, t: int, x: float, y: float) -> void:
 	var i := n
 	n += 1
-	kind.append(_kind_index(uid))
+	kind.append(r["kind"])
 	team.append(t)
 	alive.append(1)
-	role.append(GameData.ROLES.find(s["role"]))
-	dtype.append(GameData.DAMAGE_TYPES.find(s["damage"]))
-	armor.append(GameData.ARMOR_TYPES.find(s["armor"]))
-	flying.append(1 if s["flying"] else 0)
-	proj.append(GameData.PROJECTILES.find(s["projectile"]))
+	role.append(r["role"])
+	dtype.append(r["dtype"])
+	armor.append(r["armor"])
+	flying.append(r["flying"])
+	proj.append(r["proj"])
 	target.append(-1)
 	target_ally.append(0)
 	hit_tick.append(-100)
@@ -259,23 +310,37 @@ func _add_unit(uid: String, s: Dictionary, t: int, x: float, y: float) -> void:
 	py.append(y)
 	prev_x.append(x)
 	prev_y.append(y)
-	hp.append(s["hp"])
-	max_hp.append(s["hp"])
-	dmg.append(s["dmg"])
-	reach.append(s["range"])
-	speed.append(s["speed"])
-	cooldown.append(s["cooldown"])
-	cd_t.append(rng.randf_range(0.0, float(s["cooldown"])))
-	aoe.append(s["aoe"])
-	heal.append(s["heal"])
-	regen.append(s["regen"])
-	radius.append(s["radius"])
-	lifesteal.append(float(s.get("lifesteal", 0.0)))
-	thorns.append(float(s.get("thorns", 0.0)))
-	tmode.append(int(TARGET_MODES.get(str(s.get("targets", "")), Target.NEAREST)))
+	hp.append(r["hp"])
+	max_hp.append(r["hp"])
+	dmg.append(r["dmg"])
+	reach.append(r["range"])
+	speed.append(r["speed"])
+	cooldown.append(r["cooldown"])
+	cd_t.append(rng.randf_range(0.0, float(r["cooldown"])))
+	aoe.append(r["aoe"])
+	heal.append(r["heal"])
+	regen.append(r["regen"])
+	radius.append(r["radius"])
+	lifesteal.append(r["lifesteal"])
+	thorns.append(r["thorns"])
+	tmode.append(r["tmode"])
+	ab_id.append(r["ab"])
+	ab_val.append(r["ab_val"])
+	ab_tpl.append(r["tpl"])
+	# (Packed arrays are values: append to each member directly.)
+	stun_until.append(0)
+	chill_until.append(0)
+	burn_until.append(0)
+	curse_until.append(0)
+	weaken_until.append(0)
+	ab_used.append(0)
+	raised.append(0)
+	burn_dps.append(0.0)
 	alive_count[t] += 1
 	start_count[t] += 1
-	start_hp[t] += float(s["hp"])
+	start_hp[t] += float(r["hp"])
+	if cell_next.size() < n:
+		cell_next.resize(n)
 	assert(i == n - 1)
 
 
@@ -296,7 +361,14 @@ func step() -> void:
 			continue
 		if regen[i] > 0.0 and hp[i] < max_hp[i]:
 			hp[i] = minf(max_hp[i], hp[i] + regen[i] * DT)
-		cd_t[i] -= DT
+		if burn_until[i] > tick:
+			hp[i] -= burn_dps[i] * DT
+			if hp[i] <= 0.0:
+				_kill(i, -1)
+				continue
+		if stun_until[i] > tick:
+			continue   # stunned: no moving, no attacking, cooldown paused
+		cd_t[i] -= DT * (CHILL_MULT if chill_until[i] > tick else 1.0)
 		if role[i] == Role.HEALER:
 			_healer_ai(i)
 		else:
@@ -327,6 +399,8 @@ func _combat_ai(i: int) -> void:
 	var t := target[i]
 	if t < 0 or alive[t] == 0 or target_ally[i] == 1 or (tick + i) % RETARGET_TICKS == 0:
 		t = _find_enemy(i)
+		if t != target[i] and ab_id[i] == Ab.CHARGE:
+			ab_used[i] = 0   # a new target: charge again
 		target[i] = t
 		target_ally[i] = 0
 	if t < 0:
@@ -359,7 +433,8 @@ func _approach_and_act(i: int, t: int, healing: bool) -> void:
 	var r := reach[i] + radius[i] + radius[t]
 	if d2 > r * r:
 		var d := sqrt(d2)
-		_move(i, dx / d, dy / d, minf(speed[i] * DT, d - r + 0.5))
+		var spd := speed[i] * (CHILL_MULT if chill_until[i] > tick else 1.0)
+		_move(i, dx / d, dy / d, minf(spd * DT, d - r + 0.5))
 		return
 	if cd_t[i] > 0.0:
 		return
@@ -371,7 +446,15 @@ func _approach_and_act(i: int, t: int, healing: bool) -> void:
 		return
 	if proj[i] == 0:
 		events.append([Ev.MELEE_HIT, px[t], py[t], i])
-		_deal_damage(i, team[i], dtype[i], dmg[i], t, px[t], py[t], aoe[i], true)
+		var amount := dmg[i]
+		if ab_id[i] == Ab.CHARGE and ab_used[i] == 0:
+			# Charge: the first blow against each new target hits much harder.
+			amount *= ab_val[i]
+			ab_used[i] = 1
+			events.append([Ev.CHARGE, px[t], py[t], i])
+		_deal_damage(i, team[i], dtype[i], amount, t, px[t], py[t], aoe[i], true)
+		if ab_id[i] == Ab.DOUBLE_STRIKE:
+			_double_strike(i, t)
 	else:
 		_spawn_projectile(i, t)
 		events.append([Ev.SHOT, px[i], py[i], proj[i]])
@@ -517,7 +600,9 @@ func _find_wounded_ally(i: int) -> int:
 ## src: attacking unit index (or -1), used for lifesteal and thorns.
 func _deal_damage(src: int, src_team: int, dt_idx: int, amount: float, primary: int, x: float, y: float, radius_aoe: float, melee: bool) -> void:
 	if primary >= 0 and alive[primary] == 1:
-		_damage_unit(primary, amount, dt_idx, melee, src)
+		var dealt := _damage_unit(primary, amount, dt_idx, melee, src)
+		if src >= 0 and ab_id[src] != Ab.NONE:
+			_on_hit(src, src_team, primary, dealt, amount, dt_idx)
 	if radius_aoe <= 0.0:
 		return
 	events.append([Ev.BLAST, x, y, radius_aoe])
@@ -542,10 +627,17 @@ func _deal_damage(src: int, src_team: int, dt_idx: int, amount: float, primary: 
 				j = cell_next[j]
 
 
-func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1) -> void:
+## Returns the damage dealt.
+func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1) -> float:
 	var m: float = _dmg_mult[dt_idx * _armor_count + armor[j]]
 	if melee and flying[j] == 1:
 		m *= _flying_mult
+	if src >= 0 and weaken_until[src] > tick:
+		m *= WEAKEN_MULT
+	if curse_until[j] > tick:
+		m *= CURSE_MULT
+	if not melee and ab_id[j] == Ab.UNSTOPPABLE:
+		m *= 1.0 - ab_val[j]
 	var dealt := amount * m * rng.randf_range(0.9, 1.1)
 	hp[j] -= dealt
 	hit_tick[j] = tick
@@ -556,17 +648,107 @@ func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1
 			hp[src] -= dealt * thorns[j]
 			hit_tick[src] = tick
 			if hp[src] <= 0.0:
-				_kill(src)
+				_kill(src, j)
 	if hp[j] <= 0.0 and alive[j] == 1:
-		_kill(j)
+		_kill(j, src)
+	return dealt
 
 
-func _kill(j: int) -> void:
+## Effects of an ability on the unit a src's attack hit (not on splash).
+## amount: the attack's damage before armour, for chain lightning.
+func _on_hit(src: int, src_team: int, j: int, dealt: float, amount: float, dt_idx: int) -> void:
+	var secs_ticks := int(ab_val[src] / DT)
+	match ab_id[src]:
+		Ab.STUN:
+			if alive[j] == 1 and ab_id[j] != Ab.UNSTOPPABLE:
+				stun_until[j] = maxi(stun_until[j], tick + secs_ticks)
+				events.append([Ev.STUN, px[j], py[j], j])
+		Ab.CHILL:
+			if alive[j] == 1 and ab_id[j] != Ab.UNSTOPPABLE:
+				chill_until[j] = maxi(chill_until[j], tick + secs_ticks)
+		Ab.CURSE:
+			curse_until[j] = maxi(curse_until[j], tick + secs_ticks)
+		Ab.WEAKEN:
+			weaken_until[j] = maxi(weaken_until[j], tick + secs_ticks)
+		Ab.BURN:
+			if alive[j] == 1:
+				var dps := dealt * ab_val[src] / BURN_SECONDS
+				burn_dps[j] = maxf(burn_dps[j] if burn_until[j] > tick else 0.0, dps)
+				burn_until[j] = tick + int(BURN_SECONDS / DT)
+		Ab.CHAIN:
+			var hit := {j: true}
+			var last := j
+			var a := amount
+			for _k in int(ab_val[src]):
+				var nxt := _nearest_enemy_near(px[last], py[last], CHAIN_RANGE, src_team, hit)
+				if nxt < 0:
+					break
+				a *= CHAIN_FALLOFF
+				events.append([Ev.CHAIN, px[last], py[last], px[nxt], py[nxt]])
+				hit[nxt] = true
+				_damage_unit(nxt, a, dt_idx, false, src)
+				last = nxt
+
+
+## Ettin-style second blow: another enemy within reach takes a full hit.
+func _double_strike(i: int, primary: int) -> void:
+	var hit := {primary: true}
+	for _k in int(ab_val[i]):
+		var other := _nearest_enemy_near(px[i], py[i], reach[i] + radius[i] + 14.0, team[i], hit)
+		if other < 0:
+			return
+		hit[other] = true
+		events.append([Ev.MELEE_HIT, px[other], py[other], i])
+		_damage_unit(other, dmg[i], dtype[i], true, i)
+
+
+## The nearest living enemy of `my_team` within r of (x, y), skipping `skip`.
+func _nearest_enemy_near(x: float, y: float, r: float, my_team: int, skip: Dictionary) -> int:
+	var best := -1
+	var best_d2 := INF
+	var rings := ceili(r / CELL)
+	var cx := clampi(int(x / CELL), 0, gw - 1)
+	var cy := clampi(int(y / CELL), 0, gh - 1)
+	for gy in range(maxi(0, cy - rings), mini(gh, cy + rings + 1)):
+		for gx in range(maxi(0, cx - rings), mini(gw, cx + rings + 1)):
+			var j := cell_head[gy * gw + gx]
+			while j != -1:
+				if team[j] != my_team and alive[j] == 1 and not skip.has(j):
+					var dx := px[j] - x
+					var dy := py[j] - y
+					var d2 := dx * dx + dy * dy
+					var rr := r + radius[j]
+					if d2 <= rr * rr and d2 < best_d2:
+						best_d2 = d2
+						best = j
+				j = cell_next[j]
+	return best
+
+
+## killer: the unit that dealt the blow, or -1.
+func _kill(j: int, killer: int = -1) -> void:
+	if ab_id[j] == Ab.REBIRTH and ab_used[j] == 0:
+		# Rises from the ashes once, with part of its health.
+		ab_used[j] = 1
+		hp[j] = max_hp[j] * ab_val[j]
+		burn_until[j] = 0
+		stun_until[j] = 0
+		events.append([Ev.REBIRTH, px[j], py[j], j])
+		return
 	hp[j] = 0.0
 	alive[j] = 0
 	death_tick[j] = tick
 	alive_count[team[j]] -= 1
 	events.append([Ev.DIE, px[j], py[j], j])
+	if killer >= 0 and ab_id[killer] == Ab.RAISE_DEAD and alive[killer] == 1 and raised[j] == 0 \
+			and ab_used[killer] < int(ab_val[killer]) and ab_tpl[killer] >= 0:
+		# The necromancer raises its victim as a skeleton on its own side.
+		ab_used[killer] += 1
+		var k := n
+		_add_resolved(_raise_templates[ab_tpl[killer]], team[killer], px[j], py[j])
+		raised[k] = 1
+		cd_t[k] = cooldown[k]
+		events.append([Ev.RAISE, px[k], py[k], k])
 
 
 # --- projectiles ------------------------------------------------------------

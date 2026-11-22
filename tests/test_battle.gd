@@ -36,6 +36,7 @@ func _initialize() -> void:
 	test_unit_stats()
 	test_rating_speed()
 	test_difficulty()
+	test_abilities()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -1138,3 +1139,90 @@ func test_difficulty() -> void:
 	check(party.run_command("difficulty sideways 2").begins_with("Usage"), "bad commands show usage")
 	party.run_command("difficulty reset")
 	check(Difficulty.is_default(), "reset restores the defaults")
+
+
+## Runs a battle step by step, counting events and status-effect ticks.
+func _ability_battle(squads_a: Array, squads_b: Array, seed_v: int = 3) -> Dictionary:
+	var sim := BattleSim.new()
+	sim.setup(squads_a, squads_b, seed_v, "open_arena")
+	var out := {"sim": sim, "ev": {}, "stun": 0, "chill": 0, "burn": 0, "curse": 0, "weaken": 0}
+	while not sim.finished and sim.tick < 3000:
+		sim.step()
+		for e in sim.drain_events():
+			out["ev"][e[0]] = int(out["ev"].get(e[0], 0)) + 1
+		for i in sim.n:
+			for k in ["stun", "chill", "burn", "curse", "weaken"]:
+				if (sim.get(k + "_until") as PackedInt32Array)[i] > sim.tick:
+					out[k] += 1
+	return out
+
+
+func test_abilities() -> void:
+	print("battle abilities (patch 0.9.2)")
+	var splashers: Array = GameData.UNITS.keys().filter(func(u): return float(GameData.UNITS[u]["aoe"]) > 0.0)
+	var with_ability: Array = GameData.UNITS.keys().filter(func(u): return not GameData.ability_of(u).is_empty())
+	check(splashers.size() == 6 and with_ability.size() == 16, "splash is rare now: %d units splash, %d have abilities" % [splashers.size(), with_ability.size()])
+	check(with_ability.all(func(u): return BattleSim.AB_IDS.has(GameData.ability_of(u)["id"]) and GameData.ability_text(u) != ""), "every ability is simulated and described")
+	check(is_equal_approx(BattleSim.AOE_SPLASH_MULT, 0.45), "melee splash nerfed to 45% of the blow")
+	UnitLocks.set_locked_list([])
+	var foes := [{"unit": "orc_warrior", "level": 6, "tier": 6, "row": "front"}, {"unit": "elf_archer", "level": 6, "tier": 4, "row": "back"}]
+	var one := func(u: String) -> Array: return [{"unit": u, "level": 10, "tier": 3, "row": GameData.default_row_for(u)}]
+	var r: Dictionary = _ability_battle(one.call("ogre"), foes)
+	check(int(r["ev"].get(BattleSim.Ev.STUN, 0)) > 0 and r["stun"] > 0, "Ogre stuns")
+	r = _ability_battle(one.call("ice_dragon"), foes)
+	check(r["chill"] > 0, "Ice Dragon chills")
+	r = _ability_battle(one.call("salamander_firebrand"), foes)
+	check(r["burn"] > 0, "Salamander Firebrand burns")
+	r = _ability_battle(one.call("frost_giant"), foes)
+	check(r["curse"] > 0, "Frost Giant shatters armour")
+	r = _ability_battle(one.call("sphinx"), foes)
+	check(r["weaken"] > 0, "Sphinx withers")
+	r = _ability_battle(one.call("storm_dragon"), foes)
+	check(int(r["ev"].get(BattleSim.Ev.CHAIN, 0)) > 0, "Storm Dragon's lightning chains")
+	r = _ability_battle(one.call("minotaur"), foes)
+	check(int(r["ev"].get(BattleSim.Ev.CHARGE, 0)) > 1, "Minotaur charges each new target")
+	r = _ability_battle(one.call("phoenix"), foes)
+	var sim: BattleSim = r["sim"]
+	check(int(r["ev"].get(BattleSim.Ev.REBIRTH, 0)) > 0, "Phoenix is reborn")
+	check(range(sim.n).all(func(i): return sim.ab_id[i] != BattleSim.Ab.REBIRTH or sim.ab_used[i] <= 1), "...only once each")
+	r = _ability_battle(one.call("lich"), [{"unit": "goblin", "level": 3, "tier": 6, "row": "front"}])
+	sim = r["sim"]
+	var raised: Array = range(sim.n).filter(func(i): return sim.raised[i] == 1)
+	check(raised.size() > 0 and raised.all(func(i): return sim.team[i] == 0 and sim.unit_ids[sim.kind[i]] == "skeleton"), "the Lich raises its victims as skeletons on its side (%d)" % raised.size())
+	var liches: Array = range(sim.n).filter(func(i): return sim.ab_id[i] == BattleSim.Ab.RAISE_DEAD)
+	check(liches.all(func(i): return sim.ab_used[i] <= 6), "up to 6 per Lich")
+	var again: Dictionary = _ability_battle(one.call("lich"), [{"unit": "goblin", "level": 3, "tier": 6, "row": "front"}])
+	check((again["sim"] as BattleSim).checksum() == sim.checksum(), "battles with raised units stay deterministic")
+	# Direct checks: double strike, unstoppable, devour.
+	var s2 := BattleSim.new()
+	s2.setup([{"unit": "ettin", "level": 5, "tier": 0, "row": "front"}], [{"unit": "goblin", "level": 1, "tier": 0, "row": "front"}], 1, "open_arena")
+	var ettin := 0
+	var gobs: Array = range(s2.n).filter(func(i): return s2.team[i] == 1).slice(0, 2)
+	for k in gobs.size():
+		s2.px[gobs[k]] = s2.px[ettin] + 12.0
+		s2.py[gobs[k]] = s2.py[ettin] + (-6.0 if k == 0 else 6.0)
+	s2._rebuild_grid()
+	var before := [s2.hp[gobs[0]], s2.hp[gobs[1]]]
+	s2.cd_t[ettin] = 0.0
+	s2._approach_and_act(ettin, gobs[0], false)
+	check(s2.hp[gobs[0]] < before[0] and s2.hp[gobs[1]] < before[1], "Ettin's double strike hits two enemies")
+	var s3 := BattleSim.new()
+	s3.setup([{"unit": "juggernaut", "level": 1, "tier": 0, "row": "front"}], [{"unit": "hill_giant", "level": 1, "tier": 0, "row": "front"}], 1, "open_arena")
+	var jug := 0
+	var giant: int = range(s3.n).filter(func(i): return s3.team[i] == 1)[0]
+	var h0 := s3.hp[jug]
+	s3.rng.seed = 9
+	s3._damage_unit(jug, 100.0, 0, true)
+	var melee_loss := h0 - s3.hp[jug]
+	h0 = s3.hp[jug]
+	s3.rng.seed = 9
+	s3._damage_unit(jug, 100.0, 0, false)
+	var ranged_loss := h0 - s3.hp[jug]
+	check(absf(ranged_loss / melee_loss - 0.65) < 0.01, "Juggernaut takes 35% less from projectiles")
+	s3.ab_id[giant] = BattleSim.Ab.STUN
+	s3.ab_val[giant] = 2.0
+	s3._on_hit(giant, 1, jug, 10.0, 10.0, 0)
+	check(s3.stun_until[jug] == 0, "...and can't be stunned")
+	check(is_equal_approx(float(Army.unit_stats("shadow_dragon", 1)["lifesteal"]), 0.4), "Shadow Dragon devours (40% lifesteal)")
+	check(Army.unit_power("lich", 5) > Army.unit_power("lich", 5) / Army.ability_power(Army.unit_stats("lich", 5)).x, "abilities count toward Strength")
+	UnitLocks.set_locked_list(UnitLocks.defaults())

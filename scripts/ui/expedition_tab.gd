@@ -252,6 +252,8 @@ func _role_text(id: String) -> String:
 	var text := "Best placed in the %s row." % GameData.default_row_for(id)
 	if GameData.target_text(id) != "":
 		text = GameData.target_text(id) + ". " + text
+	if GameData.ability_text(id) != "":
+		text = GameData.ability_text(id) + " " + text
 	if not strong.is_empty():
 		text += " Strong vs %s armor." % ", ".join(PackedStringArray(strong))
 	if not weak.is_empty():

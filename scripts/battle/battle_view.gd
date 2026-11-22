@@ -27,7 +27,7 @@ var _fx: Array = []                  # [type, x, y, radius, age, life, angle]
 var _shake := 0.0                    # camera shake strength (pixels), decays
 var _hit_seed := 0
 ## FX types (purely visual: the simulation never sees them).
-enum Fx { BLAST, HEAL, PUFF, SPARK, SLASH, SHOCKWAVE, GLOW }
+enum Fx { BLAST, HEAL, PUFF, SPARK, SLASH, SHOCKWAVE, GLOW, BOLT, STARS, RAISE }
 const MAX_FX := 450                  # keeps huge battles smooth
 const MAX_NEW_FX_PER_STEP := 40
 var _camera: Camera2D
@@ -35,6 +35,7 @@ var _dragging := false
 var _finished_emitted := false
 var _big_units := PackedInt32Array()
 var _overlay: Node2D                 # draws FX and health bars above the sprites
+var _units_shown := 0                # units with sprites (raise dead adds units mid-battle)
 var _touches := {}                   # touch index -> position (pinch zoom on phones)
 
 
@@ -188,6 +189,7 @@ func _build_team_bases() -> void:
 
 
 func _build_unit_meshes() -> void:
+	_units_shown = sim.n
 	_kind_units.resize(sim.unit_ids.size())
 	for k in sim.unit_ids.size():
 		_kind_units[k] = PackedInt32Array()
@@ -256,9 +258,9 @@ func skip_to_end() -> void:
 	_acc = 0.0
 
 
-func _add_fx(type: int, x: float, y: float, r: float, life: float, angle: float = 0.0) -> void:
+func _add_fx(type: int, x: float, y: float, r: float, life: float, angle: float = 0.0, x2: float = 0.0, y2: float = 0.0) -> void:
 	if _fx.size() < MAX_FX:
-		_fx.append([type, x, y, r, 0.0, life, angle])
+		_fx.append([type, x, y, r, 0.0, life, angle, x2, y2])
 
 
 func shake(amount: float) -> void:
@@ -275,6 +277,10 @@ func _handle_events(evs: Array) -> void:
 	var big_blast := 0.0
 	var big_death := false
 	var spawned := 0
+	var zaps := 0
+	var charges := 0
+	var rebirths := 0
+	var raises := 0
 	for e in evs:
 		var room := spawned < MAX_NEW_FX_PER_STEP
 		match int(e[0]):
@@ -303,6 +309,28 @@ func _handle_events(evs: Array) -> void:
 					big_blast = maxf(big_blast, r)
 			BattleSim.Ev.HEAL:
 				_add_fx(Fx.HEAL, e[1], e[2], 10.0, 0.5)
+			BattleSim.Ev.CHAIN:
+				if room:
+					_hit_seed += 1
+					_add_fx(Fx.BOLT, e[1], e[2], 0.0, 0.25, float(_hit_seed), e[3], e[4])
+					spawned += 1
+					zaps += 1
+			BattleSim.Ev.STUN:
+				if room:
+					_add_fx(Fx.STARS, e[1], e[2] - 18.0, 8.0, 0.6, float(int(e[3]) % 7))
+					spawned += 1
+			BattleSim.Ev.CHARGE:
+				if room:
+					_add_fx(Fx.SHOCKWAVE, e[1], e[2], 34.0, 0.3)
+					spawned += 1
+					charges += 1
+			BattleSim.Ev.REBIRTH:
+				_add_fx(Fx.GLOW, e[1], e[2], 80.0, 0.9)
+				_add_fx(Fx.SHOCKWAVE, e[1], e[2], 160.0, 0.7)
+				rebirths += 1
+			BattleSim.Ev.RAISE:
+				_add_fx(Fx.RAISE, e[1], e[2], 16.0, 0.8)
+				raises += 1
 			BattleSim.Ev.DIE:
 				deaths += 1
 				var j := int(e[3])
@@ -314,6 +342,15 @@ func _handle_events(evs: Array) -> void:
 				elif room:
 					_add_fx(Fx.PUFF, e[1], e[2], 13.0, 0.5)
 					spawned += 1
+	if rebirths > 0:
+		shake(6.0)
+		Audio.play_sfx("spell", -4.0)
+	if raises > 0:
+		Audio.play_sfx("spell", -12.0)
+	if zaps > 0 and randf() < 0.5:
+		Audio.play_sfx("spell", -16.0)
+	if charges > 0:
+		Audio.play_sfx("impact", -10.0)
 	if big_death:
 		shake(10.0)
 	elif big_blast > 0.0:
@@ -338,8 +375,35 @@ func _handle_events(evs: Array) -> void:
 		Audio.play_sfx("big_roar", -2.0)
 
 
+## Units raised mid-battle get sprites: add them to their kind's mesh (making
+## a mesh for a kind that wasn't in the battle yet) and grow the shadow mesh.
+func _add_new_units() -> void:
+	for i in range(_units_shown, sim.n):
+		var k := sim.kind[i]
+		while k >= _unit_mm.size():
+			var kk := _unit_mm.size()
+			var uid: String = sim.unit_ids[kk]
+			var node := MultiMeshInstance2D.new()
+			node.texture = GameData.unit_texture(uid)
+			var mm := _new_multimesh(0, 32.0)
+			node.multimesh = mm
+			_unit_mm.append(mm)
+			_kind_units.append(PackedInt32Array())
+			_kind_scale.append(float(GameData.UNITS[uid]["scale"]))
+			add_child(node)
+			move_child(node, _overlay.get_index())
+		var list: PackedInt32Array = _kind_units[k]
+		list.append(i)
+		_kind_units[k] = list
+		_unit_mm[k].instance_count = list.size()
+	_base_mm.instance_count = sim.n
+	_units_shown = sim.n
+
+
 func _sync_visuals(alpha: float) -> void:
 	var t := sim.tick
+	if sim.n > _units_shown:
+		_add_new_units()
 	for k in _unit_mm.size():
 		var mm: MultiMesh = _unit_mm[k]
 		var list: PackedInt32Array = _kind_units[k]
@@ -364,6 +428,19 @@ func _sync_visuals(alpha: float) -> void:
 				var xf := Transform2D(0.0, Vector2(base_scale * face, base_scale), 0.0, Vector2(x + lunge * toward, y + bob + fly - 6.0 * base_scale))
 				mm.set_instance_transform_2d(idx, xf)
 				var c: Color = TEAM_TINT[sim.team[i]]
+				# Status effects tint the unit.
+				if sim.stun_until[i] > t:
+					c = Color(1.0, 0.95, 0.45)
+				elif sim.burn_until[i] > t:
+					c = Color(1.0, 0.62 + 0.12 * sin(_time * 20.0 + float(i)), 0.3)
+				elif sim.chill_until[i] > t:
+					c = Color(0.55, 0.8, 1.0)
+				elif sim.curse_until[i] > t:
+					c = Color(0.78, 0.55, 1.0)
+				elif sim.weaken_until[i] > t:
+					c = Color(0.62, 0.62, 0.66)
+				elif sim.raised[i] == 1:
+					c = c * Color(0.7, 1.0, 0.7)
 				var since_hit := t - sim.hit_tick[i]
 				if since_hit < 1:
 					c = Color(1.0, 1.0, 1.0)          # white flash on the hit tick
@@ -470,6 +547,28 @@ func _draw_overlay() -> void:
 			Fx.GLOW:
 				_overlay.draw_circle(pos, r0 * (0.5 + 0.5 * k), Color(1.0, 0.9, 0.6, 0.45 * fade))
 				_overlay.draw_circle(pos, r0 * 0.3, Color(1.0, 1.0, 1.0, 0.6 * fade))
+			Fx.BOLT:
+				# A jagged lightning bolt between two units.
+				var to := Vector2(float(f[7]), float(f[8])) + Vector2(0, -8)
+				var from := pos + Vector2(0, -8)
+				var pts := PackedVector2Array([from])
+				var normal := (to - from).orthogonal().normalized()
+				for seg in range(1, 4):
+					var wob := sin(float(f[6]) * 3.7 + float(seg) * 2.1) * 7.0
+					pts.append(from.lerp(to, float(seg) / 4.0) + normal * wob)
+				pts.append(to)
+				_overlay.draw_polyline(pts, Color(0.55, 0.8, 1.0, 0.5 * fade), 5.0)
+				_overlay.draw_polyline(pts, Color(0.95, 0.98, 1.0, fade), 2.0)
+			Fx.STARS:
+				# Dizzy stars circling a stunned unit's head.
+				for s_i in 3:
+					var ang := float(f[6]) + float(s_i) * TAU / 3.0 + k * 6.0
+					var p := pos + Vector2(cos(ang) * r0, sin(ang) * r0 * 0.4)
+					_overlay.draw_circle(p, 2.2, Color(1.0, 0.92, 0.3, fade))
+			Fx.RAISE:
+				# A sickly green glow rising from the grave.
+				_overlay.draw_circle(pos + Vector2(0, -10.0 * k), r0 * (0.5 + 0.6 * k), Color(0.45, 1.0, 0.55, 0.4 * fade))
+				_overlay.draw_arc(pos, r0 * (0.6 + k), 0.0, TAU, 20, Color(0.6, 1.0, 0.6, 0.7 * fade), 2.0)
 	# Health bars for big units
 	for i in _big_units:
 		if sim.alive[i] == 0:

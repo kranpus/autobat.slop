@@ -101,9 +101,10 @@ const UNITS := {
 	"ogre": {
 		"name": "Ogre Brute", "rarity": "rare", "role": "tank",
 		"hp": 520.0, "dmg": 45.0, "cooldown": 1.6, "range": 8.0, "speed": 45.0,
-		"damage": "physical", "armor": "beast", "aoe": 30.0, "heal": 0.0, "regen": 0.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 12.0, "scale": 1.3, "flying": false,
-		"desc": "Club swings hit everything nearby.",
+		"desc": "Club blows leave enemies reeling.",
+		"ability": {"id": "stun", "value": 0.6},
 	},
 	"centaur": {
 		"name": "Centaur Warrior", "rarity": "rare", "role": "ranged",
@@ -143,9 +144,10 @@ const UNITS := {
 	"lich": {
 		"name": "Lich", "rarity": "epic", "role": "caster",
 		"hp": 460.0, "dmg": 46.0, "cooldown": 2.2, "range": 240.0, "speed": 40.0,
-		"damage": "magic", "armor": "undead", "aoe": 70.0, "heal": 0.0, "regen": 0.0,
+		"damage": "magic", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 10.0, "scale": 1.3, "flying": false,
-		"desc": "Arcane blasts melt heavy armour.",
+		"desc": "Raises the fallen to fight for it.",
+		"ability": {"id": "raise_dead", "value": 6.0},
 	},
 	"griffon": {
 		"name": "Griffon", "rarity": "epic", "role": "melee",
@@ -164,16 +166,18 @@ const UNITS := {
 	"titan": {
 		"name": "Storm Titan", "rarity": "legendary", "role": "tank",
 		"hp": 1750.0, "dmg": 55.0, "cooldown": 1.8, "range": 12.0, "speed": 45.0,
-		"damage": "magic", "armor": "heavy", "aoe": 70.0, "heal": 0.0, "regen": 0.0,
+		"damage": "magic", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 22.0, "scale": 2.4, "flying": false,
-		"desc": "An unstoppable colossus.",
+		"desc": "Its fists crackle with chain lightning.",
+		"ability": {"id": "chain", "value": 3.0},
 	},
 	"phoenix": {
 		"name": "Phoenix", "rarity": "legendary", "role": "caster",
 		"hp": 1750.0, "dmg": 55.0, "cooldown": 1.4, "range": 180.0, "speed": 110.0,
-		"damage": "fire", "armor": "beast", "aoe": 60.0, "heal": 0.0, "regen": 20.0,
+		"damage": "fire", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 20.0,
 		"projectile": "fire", "radius": 18.0, "scale": 2.0, "flying": true, "targets": "healers",
-		"desc": "Blazing, fast and self-healing.",
+		"desc": "Blazing, fast, and rises again from its ashes.",
+		"ability": {"id": "rebirth", "value": 0.6},
 	},
 	# --- Locked by default (enable with the server's `unlock` command) ---
 	"jackal": {
@@ -270,9 +274,10 @@ const UNITS := {
 	"elf_mage": {
 		"name": "Elven Mage", "rarity": "uncommon", "role": "caster", "locked": true,
 		"hp": 80.0, "dmg": 22.0, "cooldown": 1.8, "range": 190.0, "speed": 55.0,
-		"damage": "magic", "armor": "light", "aoe": 30.0, "heal": 0.0, "regen": 0.0,
+		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 7.0, "scale": 0.8, "flying": false,
-		"desc": "Arcane bolts that splash small groups.",
+		"desc": "Arcane bolts that arc between enemies.",
+		"ability": {"id": "chain", "value": 2.0},
 	},
 	"wight": {
 		"name": "Wight", "rarity": "uncommon", "role": "melee", "locked": true,
@@ -326,9 +331,10 @@ const UNITS := {
 	"minotaur": {
 		"name": "Minotaur", "rarity": "rare", "role": "melee", "locked": true,
 		"hp": 560.0, "dmg": 44.0, "cooldown": 1.2, "range": 8.0, "speed": 65.0,
-		"damage": "physical", "armor": "beast", "aoe": 20.0, "heal": 0.0, "regen": 0.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 12.0, "scale": 1.3, "flying": false,
-		"desc": "Charges through formations horns-first.",
+		"desc": "Charges each new foe horns-first.",
+		"ability": {"id": "charge", "value": 3.0},
 	},
 	"manticore": {
 		"name": "Manticore", "rarity": "rare", "role": "ranged", "locked": true,
@@ -340,16 +346,18 @@ const UNITS := {
 	"ettin": {
 		"name": "Ettin", "rarity": "rare", "role": "tank", "locked": true,
 		"hp": 760.0, "dmg": 40.0, "cooldown": 1.5, "range": 8.0, "speed": 45.0,
-		"damage": "physical", "armor": "beast", "aoe": 30.0, "heal": 0.0, "regen": 0.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 13.0, "scale": 1.4, "flying": false,
-		"desc": "Two heads, two clubs, no mercy.",
+		"desc": "Two heads, two clubs: strikes two enemies at once.",
+		"ability": {"id": "double_strike", "value": 1.0},
 	},
 	"salamander_firebrand": {
 		"name": "Salamander Firebrand", "rarity": "rare", "role": "caster", "locked": true,
 		"hp": 200.0, "dmg": 36.0, "cooldown": 1.8, "range": 180.0, "speed": 55.0,
-		"damage": "fire", "armor": "beast", "aoe": 40.0, "heal": 0.0, "regen": 0.0,
+		"damage": "fire", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "fire", "radius": 9.0, "scale": 1.0, "flying": false,
-		"desc": "Lobs blazing fireballs into the crowd.",
+		"desc": "Sets enemies ablaze.",
+		"ability": {"id": "burn", "value": 1.2},
 	},
 	"vampire_knight": {
 		"name": "Vampire Knight", "rarity": "rare", "role": "melee", "locked": true,
@@ -375,16 +383,18 @@ const UNITS := {
 	"stone_giant": {
 		"name": "Stone Giant", "rarity": "epic", "role": "ranged", "locked": true,
 		"hp": 1300.0, "dmg": 80.0, "cooldown": 2.4, "range": 240.0, "speed": 38.0,
-		"damage": "physical", "armor": "beast", "aoe": 45.0, "heal": 0.0, "regen": 0.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "stone", "radius": 16.0, "scale": 1.8, "flying": false,
-		"desc": "Throws boulders the size of houses.",
+		"desc": "Boulders the size of houses knock enemies flat.",
+		"ability": {"id": "stun", "value": 1.0},
 	},
 	"frost_giant": {
 		"name": "Frost Giant", "rarity": "epic", "role": "tank", "locked": true,
 		"hp": 1400.0, "dmg": 70.0, "cooldown": 2.0, "range": 10.0, "speed": 40.0,
-		"damage": "magic", "armor": "beast", "aoe": 45.0, "heal": 0.0, "regen": 0.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
 		"desc": "Ice-rimed fists shatter armour.",
+		"ability": {"id": "curse", "value": 4.0},
 	},
 	"fire_giant": {
 		"name": "Fire Giant", "rarity": "epic", "role": "caster", "locked": true,
@@ -396,16 +406,18 @@ const UNITS := {
 	"sphinx": {
 		"name": "Sphinx", "rarity": "epic", "role": "caster", "locked": true,
 		"hp": 900.0, "dmg": 55.0, "cooldown": 1.8, "range": 200.0, "speed": 90.0,
-		"damage": "magic", "armor": "beast", "aoe": 40.0, "heal": 0.0, "regen": 0.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 14.0, "scale": 1.6, "flying": true, "targets": "ranged",
 		"desc": "An ancient riddler with withering spells.",
+		"ability": {"id": "weaken", "value": 4.0},
 	},
 	"ice_dragon": {
 		"name": "Ice Dragon", "rarity": "epic", "role": "caster", "locked": true,
 		"hp": 1000.0, "dmg": 60.0, "cooldown": 1.9, "range": 170.0, "speed": 75.0,
-		"damage": "magic", "armor": "beast", "aoe": 60.0, "heal": 0.0, "regen": 0.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 16.0, "scale": 1.8, "flying": true,
-		"desc": "Freezing breath over whole regiments.",
+		"desc": "Freezing breath slows whole regiments.",
+		"ability": {"id": "chill", "value": 3.0},
 	},
 	"hydra": {
 		"name": "Hydra", "rarity": "epic", "role": "tank", "locked": true,
@@ -417,30 +429,34 @@ const UNITS := {
 	"bone_dragon": {
 		"name": "Bone Dragon", "rarity": "epic", "role": "melee", "locked": true,
 		"hp": 1100.0, "dmg": 65.0, "cooldown": 1.2, "range": 10.0, "speed": 85.0,
-		"damage": "physical", "armor": "undead", "aoe": 30.0, "heal": 0.0, "regen": 0.0,
+		"damage": "physical", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": true, "targets": "backline",
 		"desc": "A dragon that refused to stay dead.",
+		"ability": {"id": "rebirth", "value": 0.4},
 	},
 	"juggernaut": {
 		"name": "Juggernaut", "rarity": "epic", "role": "tank", "locked": true,
 		"hp": 1800.0, "dmg": 70.0, "cooldown": 1.6, "range": 10.0, "speed": 45.0,
-		"damage": "physical", "armor": "heavy", "aoe": 40.0, "heal": 0.0, "regen": 0.0,
+		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
 		"desc": "Nothing stops it. Nothing.",
+		"ability": {"id": "unstoppable", "value": 0.35},
 	},
 	"shadow_dragon": {
 		"name": "Shadow Dragon", "rarity": "legendary", "role": "caster", "locked": true,
 		"hp": 3000.0, "dmg": 85.0, "cooldown": 2.0, "range": 170.0, "speed": 75.0,
-		"damage": "magic", "armor": "beast", "aoe": 75.0, "heal": 0.0, "regen": 0.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 22.0, "scale": 2.4, "flying": true,
 		"desc": "Darkness given wings and hunger.",
+		"ability": {"id": "devour", "value": 0.4},
 	},
 	"storm_dragon": {
 		"name": "Storm Dragon", "rarity": "legendary", "role": "caster", "locked": true,
 		"hp": 2800.0, "dmg": 80.0, "cooldown": 1.6, "range": 190.0, "speed": 85.0,
-		"damage": "magic", "armor": "beast", "aoe": 65.0, "heal": 0.0, "regen": 0.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 22.0, "scale": 2.4, "flying": true,
 		"desc": "Calls lightning down on the enemy lines.",
+		"ability": {"id": "chain", "value": 5.0},
 	},
 	"seraph": {
 		"name": "Seraph", "rarity": "legendary", "role": "healer", "locked": true,
@@ -573,6 +589,42 @@ const TARGET_TEXT := {
 	"healers": "Hunts healers first",
 	"backline": "Dives for the enemy back line first",
 }
+
+
+## Battle abilities (unit "ability": {"id", "value"}); the battle simulator
+## implements them (BattleSim.Ab). "%s" in the text is the value.
+const ABILITIES := {
+	"stun": {"name": "Stun", "text": "Its hits stun the target for %ss: no moving or attacking."},
+	"chill": {"name": "Chill", "text": "Its hits chill the target for %ss: half speed, moving and attacking."},
+	"burn": {"name": "Burn", "text": "Sets the target on fire: %s%% of the hit again as burn damage over 4s."},
+	"chain": {"name": "Chain Lightning", "text": "Each attack jumps to %s more enemies nearby, 30%% weaker each jump."},
+	"rebirth": {"name": "Rebirth", "text": "The first time it dies, it rises again with %s%% of its health."},
+	"charge": {"name": "Charge", "text": "Its first blow against each new target deals %sx damage."},
+	"double_strike": {"name": "Double Strike", "text": "Each blow also hits %s more enemy in reach."},
+	"curse": {"name": "Shatter", "text": "Its hits make the target take 30%% more damage from everyone for %ss."},
+	"weaken": {"name": "Wither", "text": "Its hits make the target deal 35%% less damage for %ss."},
+	"unstoppable": {"name": "Unstoppable", "text": "Immune to stun and chill, and takes %s%% less damage from arrows, stones and spells."},
+	"devour": {"name": "Devour", "text": "Heals itself for %s%% of the damage it deals."},
+	"raise_dead": {"name": "Raise Dead", "text": "Enemies it kills rise as skeletons on its side (up to %s per Lich)."},
+}
+## Values shown as percentages in the text.
+const ABILITY_PERCENT := ["burn", "rebirth", "unstoppable", "devour"]
+
+
+static func ability_of(unit_id: String) -> Dictionary:
+	var a = UNITS[unit_id].get("ability", {})
+	return a if typeof(a) == TYPE_DICTIONARY else {}
+
+
+## "Chain Lightning: each attack jumps to 3 more enemies..." (or "").
+static func ability_text(unit_id: String) -> String:
+	var a := ability_of(unit_id)
+	if not ABILITIES.has(str(a.get("id", ""))):
+		return ""
+	var info: Dictionary = ABILITIES[a["id"]]
+	var v := float(a.get("value", 0.0))
+	var shown := str(roundi(v * 100.0)) if a["id"] in ABILITY_PERCENT else (str(roundi(v)) if is_equal_approx(v, roundf(v)) else str(snappedf(v, 0.1)))
+	return "%s: %s" % [info["name"], str(info["text"]) % shown]
 
 
 static func target_text(unit_id: String) -> String:

@@ -41,6 +41,9 @@ static func unit_stats(unit_id: String, level: int, mods: Dictionary = {}) -> Di
 		s["range"] = float(base["range"]) + float(mods.get("range_add", 0.0))
 	s["aoe"] = float(base["aoe"]) + float(mods.get("aoe_add", 0.0))
 	s["lifesteal"] = float(mods.get("lifesteal", 0.0))
+	var ab = base.get("ability", {})
+	if typeof(ab) == TYPE_DICTIONARY and str(ab.get("id", "")) == "devour":
+		s["lifesteal"] = float(s["lifesteal"]) + float(ab.get("value", 0.0))
 	s["thorns"] = float(mods.get("thorns", 0.0))
 	if bool(mods.get("flying", false)):
 		s["flying"] = true
@@ -65,13 +68,77 @@ static func unit_power(unit_id: String, level: int, mods: Dictionary = {}) -> fl
 	var s := unit_stats(unit_id, level, mods)
 	var cd: float = s["cooldown"]
 	var splash_share := BattleSim.AOE_SPLASH_MULT if str(s["projectile"]) == "none" else BattleSim.RANGED_SPLASH_MULT
-	var splash_bonus := minf(float(s["aoe"]), 60.0) / 40.0 * splash_share / BattleSim.AOE_SPLASH_MULT
+	var splash_bonus := minf(float(s["aoe"]), 60.0) / 40.0 * splash_share / SPLASH_POWER_REF
 	var dps: float = (float(s["dmg"]) * (1.0 + splash_bonus) + float(s["heal"]) * 1.5) / cd + float(s["regen"])
 	var reach_bonus := 1.0 + minf(float(s["range"]), 260.0) / 520.0
 	# Big units are worth more than raw stats suggest (they can't be swarmed
 	# as efficiently), so rarer units carry a calibrated multiplier.
 	var rarity_mult: float = GameData.RARITIES[s["rarity"]]["power_mult"]
-	return sqrt(float(s["hp"]) * dps * reach_bonus) * rarity_mult
+	var ab := ability_power(s)
+	return sqrt(float(s["hp"]) * ab.x * dps * ab.y * reach_bonus) * rarity_mult
+
+
+## The share of a hit that splash damage was worth when the power formula was
+## calibrated (splash used to deal 60% of the hit).
+const SPLASH_POWER_REF := 0.6
+## What each battle ability is worth in power: [toughness mult, damage mult]
+## as a function of its value, measured with the balance simulator
+## (tools/balance_sim.gd) so armies of equal power stay even fights.
+## Starting estimates, then tuned with the simulator.
+const ABILITY_TUNING := {
+	"stun": 0.3,          # x (stun seconds / cooldown, up to 1), on toughness and damage
+	"chill": 0.25,        # x (chill seconds / cooldown, up to 1), on toughness
+	"curse": 0.3,         # x (seconds / cooldown, up to 1), on damage
+	"weaken": 0.3,        # x (seconds / cooldown, up to 1), on toughness
+	"burn": 0.8,          # x burn share, on damage
+	"chain": 0.75,        # x total chain damage share, on damage
+	"double_strike": 0.7, # x extra targets, on damage
+	"charge": 0.15,       # x (multiplier - 1), on damage
+	"rebirth": 0.9,       # x health share revived, on toughness
+	"unstoppable": 0.6,   # x projectile resistance, on toughness
+	"devour": 0.6,        # x lifesteal share, on toughness
+	"raise_dead": 0.15,   # on toughness and damage
+}
+
+
+## [toughness multiplier, damage multiplier] for a unit's battle ability.
+static func ability_power(s: Dictionary) -> Vector2:
+	var ab = s.get("ability", {})
+	if typeof(ab) != TYPE_DICTIONARY or not ab.has("id"):
+		return Vector2.ONE
+	var v := float(ab.get("value", 0.0))
+	var cd := maxf(0.2, float(s["cooldown"]))
+	match str(ab["id"]):
+		"stun":
+			return Vector2(1.0 + ABILITY_TUNING["stun"] * minf(v / cd, 1.0), 1.0 + ABILITY_TUNING["stun"] * minf(v / cd, 1.0))
+		"chill":
+			return Vector2(1.0 + ABILITY_TUNING["chill"] * minf(v / cd, 1.0), 1.0)
+		"curse":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["curse"] * minf(v / cd, 1.0))
+		"weaken":
+			return Vector2(1.0 + ABILITY_TUNING["weaken"] * minf(v / cd, 1.0), 1.0)
+		"burn":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["burn"] * v)
+		"chain":
+			var sum := 0.0
+			var f := 1.0
+			for _k in int(v):
+				f *= BattleSim.CHAIN_FALLOFF
+				sum += f
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["chain"] * sum)
+		"double_strike":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["double_strike"] * v)
+		"charge":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["charge"] * (v - 1.0))
+		"rebirth":
+			return Vector2(1.0 + ABILITY_TUNING["rebirth"] * v, 1.0)
+		"unstoppable":
+			return Vector2(1.0 + ABILITY_TUNING["unstoppable"] * v, 1.0)
+		"devour":
+			return Vector2(1.0 + ABILITY_TUNING["devour"] * v, 1.0)
+		"raise_dead":
+			return Vector2(1.0 + ABILITY_TUNING["raise_dead"], 1.0 + ABILITY_TUNING["raise_dead"])
+	return Vector2.ONE
 
 
 ## How much a squad's size counts toward its power, by role. Measured in the
