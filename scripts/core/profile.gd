@@ -390,6 +390,29 @@ func unequip_trinket(unit_id: String, slot: int) -> bool:
 	return true
 
 
+# --- challenges ---------------------------------------------------------------------
+
+func challenge_cleared(id: String) -> bool:
+	return logic.challenge_cleared(id)
+
+
+func challenge_unlocked(id: String) -> bool:
+	return logic.challenge_unlocked(id)
+
+
+func challenges_cleared() -> int:
+	return logic.challenges_cleared()
+
+
+## Offline only; signed-in challenge battles are run and rewarded by the server.
+func complete_challenge(id: String, won: bool) -> Dictionary:
+	if online:
+		return {}
+	var res := logic.complete_challenge(id, won)
+	save()
+	return res
+
+
 ## Offline battles only; logged-in battle rewards are decided by the server.
 func apply_battle_result(mode: String, score: float, opp_rating: int, enemy_killed: int) -> Dictionary:
 	if online:

@@ -137,9 +137,20 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
    - **Only nearby players:** you're only matched against saved player armies within **±200
      rating** of yours (the server admin can change this). If nobody is that close, training
      opponents fill in.
-   - **Training opponents:** on average about 20% stronger than your army (Easy ≈ 0.95×,
-     Even ≈ 1.15×, Hard ≈ 1.4× your power). Above rating ~950 they carry trinkets too, more and
+   - **Training opponents:** on average a little stronger than your army, about 8% (Easy ≈ 0.9×,
+     Even ≈ 1.05×, Hard ≈ 1.3× your power). Above rating ~950 they carry trinkets too, more and
      rarer as rating rises.
+   - **Challenges tab:** 12 hand-made battles in three chapters (Border Skirmishes, The Wild
+     Frontier, Dragon Lands).
+     - **The fights:** set enemy armies on chosen battlefields, including three challenge-only
+       maps: the Narrow Bridge, the Fortress Gate and the Dragon's Lair. Some have named bosses:
+       single units with boosted stats, from Gruk the Unbreakable (an ogre) to Aurathrax the
+       Golden Wyrm.
+     - **Progression:** each card shows the enemy army, the boss and a **recommended power**
+       (measured by simulation). Clearing one unlocks the next.
+     - **Rewards:** a fixed reward for the first win: gold, maps, specific trinkets, and units
+       such as the Ogre Brute, Lich, Phoenix and Golden Dragon. Replays pay nothing.
+     - **Signed in:** the server runs the battle and pays the reward.
    - **Leaderboard tab:** the top 50 signed-in players by rating (players need at least one
      ranked battle), with your own rank. Guests can view it but aren't on it.
    - **Friend Challenge:** paste a friend's *army code* (Army tab → Copy) to fight their exact army.

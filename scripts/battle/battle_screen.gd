@@ -224,8 +224,10 @@ func _on_finished(winner: int) -> void:
 	# Draft battles are decided and rewarded by the match host, and signed-in
 	# ranked battles by the server, not here.
 	var summary := {"gold": 0, "maps": 0, "rating": 0}
-	if mode == "ranked_online":
+	if mode in ["ranked_online", "challenge_online"]:
 		summary = Party.last_ranked_summary
+	elif mode == "challenge":
+		summary = Profile.complete_challenge(str(config.get("challenge", "")), score >= 1.0)
 	elif mode != "draft":
 		summary = Profile.apply_battle_result(mode, score, opp_rating, killed)
 	if mode == "live":
@@ -256,7 +258,7 @@ func _on_finished(winner: int) -> void:
 	else:
 		_rewards_box = UIKit.vbox(6)
 		v.add_child(_rewards_box)
-		if mode == "ranked_online" and summary.is_empty():
+		if mode in ["ranked_online", "challenge_online"] and summary.is_empty():
 			_rewards_box.add_child(UIKit.label("Waiting for the server's result...", 14, UIKit.TEXT_DIM))
 			Party.ranked_result.connect(_show_rewards.bind(mode), CONNECT_ONE_SHOT)
 		else:
@@ -274,6 +276,9 @@ func _show_rewards(summary: Dictionary, mode: String) -> void:
 	if not is_instance_valid(_rewards_box):
 		return
 	UIKit.clear(_rewards_box)
+	if mode in ["challenge", "challenge_online"]:
+		_show_challenge_rewards(summary, mode)
+		return
 	if Profile.online and mode in ["practice", "live"]:
 		_rewards_box.add_child(UIKit.label("While signed in, only ranked battles and Legion Draft earn rewards.", 13, UIKit.TEXT_DIM))
 		return
@@ -287,6 +292,34 @@ func _show_rewards(summary: Dictionary, mode: String) -> void:
 		var d := int(summary.get("rating", 0))
 		_rewards_box.add_child(UIKit.label("Rating %s%d  (now %d)" % ["+" if d >= 0 else "", d, Profile.rating()], 16, UIKit.GOOD if d >= 0 else UIKit.BAD))
 	if mode == "ranked_online":
+		_rewards_box.add_child(UIKit.label("Battle checked and rewarded by the server.", 12, UIKit.TEXT_DIM))
+
+
+func _show_challenge_rewards(summary: Dictionary, mode: String) -> void:
+	if not bool(summary.get("won", false)):
+		_rewards_box.add_child(UIKit.label("Challenge failed. Strengthen your army and try again: the reward is still waiting.", 14, UIKit.TEXT_DIM))
+		return
+	if not bool(summary.get("first_clear", false)):
+		_rewards_box.add_child(UIKit.label("Challenge cleared again. Rewards are only given the first time.", 14, UIKit.TEXT_DIM))
+		return
+	_rewards_box.add_child(UIKit.label("Challenge complete! First-clear reward:", 15, UIKit.GOOD))
+	if int(summary.get("gold", 0)) > 0:
+		_rewards_box.add_child(UIKit.label("+%d gold" % int(summary["gold"]), 16, Color("ffd76a")))
+	if int(summary.get("maps", 0)) > 0:
+		_rewards_box.add_child(UIKit.label("+%d scouting map%s" % [int(summary["maps"]), "" if int(summary["maps"]) == 1 else "s"], 16, Color("9fd3ff")))
+	var t := str(summary.get("trinket", ""))
+	if Trinkets.exists(t):
+		var h := UIKit.hbox(8)
+		h.add_child(UIKit.icon(Trinkets.texture(t), 28))
+		h.add_child(UIKit.label(("New trinket: %s" if bool(summary.get("trinket_new", false)) else "%s (already owned, sold for gold)") % Trinkets.ALL[t]["name"], 15, GameData.rarity_color(Trinkets.rarity_of(t))))
+		_rewards_box.add_child(h)
+	var u := str(summary.get("unit", ""))
+	if GameData.UNITS.has(u):
+		var h2 := UIKit.hbox(8)
+		h2.add_child(UIKit.unit_icon(u, 28))
+		h2.add_child(UIKit.label(("New unit: %s joins your collection!" if bool(summary.get("unit_new", false)) else "%s: +" + str(int(summary.get("shards", 0))) + " shards") % GameData.UNITS[u]["name"], 15, GameData.rarity_color(GameData.UNITS[u]["rarity"])))
+		_rewards_box.add_child(h2)
+	if mode == "challenge_online":
 		_rewards_box.add_child(UIKit.label("Battle checked and rewarded by the server.", 12, UIKit.TEXT_DIM))
 
 

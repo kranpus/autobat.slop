@@ -29,6 +29,7 @@ func _initialize() -> void:
 	test_leaderboard()
 	test_drop_rates()
 	test_rank_progression()
+	test_challenges()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -70,10 +71,10 @@ func test_no_unit_cap() -> void:
 
 func test_maps() -> void:
 	print("maps")
-	check(BattleMaps.MAPS.size() == 20, "20 battlefields defined")
+	check(BattleMaps.map_ids().size() == 20, "20 battlefields for normal play (+%d challenge-only)" % (BattleMaps.MAPS.size() - 20))
 	var a := big_army(["goblin", "elf_archer", "ogre", "griffon"], 4, 8)
 	var b := big_army(["skeleton", "kobold_slinger", "orc_warrior", "lich"], 4, 8)
-	for id in BattleMaps.map_ids():
+	for id in BattleMaps.MAPS:
 		var tex := load("res://assets/sprites/tiles/%s.png" % BattleMaps.MAPS[id]["tile"])
 		check(tex != null, "%s floor texture loads" % id)
 		var sim := BattleSim.new()
@@ -720,7 +721,7 @@ func test_harder_ghosts() -> void:
 			total += Army.army_power(o["squads"]) / mine
 			n += 1
 	var avg := total / float(n)
-	check(avg > 1.12, "generated opponents average %.2fx your power (was ~1.02x)" % avg)
+	check(avg > 1.03 and avg < 1.13, "generated opponents average %.2fx your power (a little stronger than you)" % avg)
 	var low := Army.generate_opponent(5000.0, 900, 5)
 	var low_has: bool = low["squads"].any(func(sq): return sq.has("trinkets"))
 	var high_count := 0
@@ -851,3 +852,75 @@ func test_rank_progression() -> void:
 	var saved = JSON.parse_string(FileAccess.get_file_as_string(party.CONFIG_PATH))
 	check(typeof(saved) == TYPE_DICTIONARY and int(saved.get("ranked_range", 0)) == 150, "the range is saved with the server config")
 	party.run_command("ranked range 200")
+
+
+func test_challenges() -> void:
+	print("challenges")
+	var ids := {}
+	var bad: Array = []
+	var prev_rec := 0
+	var rec_ok := true
+	for c in Challenges.LIST:
+		ids[c["id"]] = true
+		if not BattleMaps.MAPS.has(c["map"]):
+			bad.append("%s: map %s" % [c["id"], c["map"]])
+		for sq in c["enemy"]:
+			if not GameData.UNITS.has(sq["unit"]) or int(sq.get("count", 0)) < 1:
+				bad.append("%s: squad %s" % [c["id"], sq])
+		var r: Dictionary = c["reward"]
+		if r.has("trinket") and not Trinkets.exists(r["trinket"]):
+			bad.append("%s: trinket %s" % [c["id"], r["trinket"]])
+		if r.has("unit") and not GameData.UNITS.has(r["unit"]):
+			bad.append("%s: unit %s" % [c["id"], r["unit"]])
+		if int(c["recommended"]) < prev_rec:
+			rec_ok = false
+		prev_rec = int(c["recommended"])
+	check(Challenges.LIST.size() == 12 and ids.size() == 12, "12 challenges with unique ids")
+	check(bad.is_empty(), "every challenge uses real maps, units, trinkets and rewards %s" % [bad])
+	check(rec_ok, "recommended power rises from the first challenge to the last")
+	check(BattleMaps.MAPS.has("narrow_bridge") and not BattleMaps.map_ids().has("narrow_bridge"), "challenge-only battlefields are never picked at random")
+	var boss: Array = Challenges.enemy_squads("gruk")
+	var gruk_hp: float = Army.unit_stats("ogre", 5, boss[0]["mods"])["hp"]
+	check(Army.deploy_counts(boss)[0] == 1 and gruk_hp > Army.unit_stats("ogre", 5)["hp"] * 20.0, "bosses are single units with boosted stats (Gruk: %d HP)" % roundi(gruk_hp))
+
+	# Clear the first one with the starting army.
+	var pl := ProfileLogic.new()
+	var sim := BattleSim.new()
+	sim.setup(pl.battle_squads(), Challenges.enemy_squads("rat_problem"), 5, "open_arena")
+	sim.run_to_end(200000)
+	check(sim.winner == 0, "a brand-new army beats the first challenge")
+	check(pl.challenge_unlocked("rat_problem") and not pl.challenge_unlocked("goblin_raid"), "only the first challenge is open at the start")
+	var gold0 := pl.gold()
+	var maps0 := int(pl.data["maps"])
+	var lost := pl.complete_challenge("rat_problem", false)
+	check(not lost["first_clear"] and pl.gold() == gold0 and not pl.challenge_cleared("rat_problem"), "losing gives nothing and keeps the reward waiting")
+	var won := pl.complete_challenge("rat_problem", true)
+	check(won["first_clear"] and pl.gold() == gold0 + 150 and int(pl.data["maps"]) == maps0 + 1, "the first win pays the set reward (150 gold, 1 map)")
+	check(pl.challenge_unlocked("goblin_raid"), "clearing a challenge opens the next")
+	var again := pl.complete_challenge("rat_problem", true)
+	check(not again["first_clear"] and pl.gold() == gold0 + 150, "replays don't pay again")
+	check(pl.complete_challenge("hold_bridge", true)["first_clear"] == false, "a locked challenge can't be claimed")
+	var tr := pl.complete_challenge("goblin_raid", true)
+	check(tr["trinket"] == "copper_band" and tr["trinket_new"] and pl.owns_trinket("copper_band"), "trinket rewards go into your collection")
+	pl.data["challenges"]["hold_bridge"] = true
+	var ur := pl.complete_challenge("gruk", true)
+	check(ur["unit_new"] and pl.owns("ogre"), "unit rewards join your collection (Ogre Brute)")
+	var pl2 := ProfileLogic.new()
+	pl2.data["units"]["ogre"] = {"level": 1, "tier": 0, "shards": 2}
+	for cid in ["rat_problem", "goblin_raid", "hold_bridge"]:
+		pl2.data["challenges"][cid] = true
+	var dup := pl2.complete_challenge("gruk", true)
+	check(not dup["unit_new"] and int(pl2.unit("ogre")["shards"]) == 2 + Challenges.DUPLICATE_UNIT_SHARDS, "a reward unit you already own gives shards")
+	var saved := ProfileLogic.new({"challenges": {"gruk": true, "made_up": true}})
+	check(saved.challenge_cleared("gruk") and not saved.challenge_cleared("made_up"), "saves keep only real challenges")
+
+	# Every challenge battle resolves on its battlefield.
+	var strong := big_army(["orc_warrior", "elf_archer", "ogre", "griffon", "lich", "dwarf_berserker"], 10, 30)
+	var stuck: Array = []
+	for c in Challenges.LIST:
+		var s2 := BattleSim.new()
+		s2.setup(strong, Challenges.enemy_squads(c["id"]), 9, c["map"])
+		s2.run_to_end(200000)
+		if not s2.finished:
+			stuck.append(c["id"])
+	check(stuck.is_empty(), "every challenge battle finishes %s" % [stuck])

@@ -26,7 +26,7 @@ signal left_match(reason: String)
 ## similar rating). Empty when the server can't be reached.
 signal ranked_opponents(list: Array)
 
-const GAME_VERSION := "legion-draft-11"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-12"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server (ENet/UDP)
 const WS_PORT := 24704                   # same server for browsers (WebSocket/TCP)
@@ -2169,6 +2169,15 @@ func request_ranked_battle(index: int) -> void:
 		_request("_rq_ranked_battle", [index])
 
 
+## Signed in: the server runs the challenge battle and pays the reward.
+## The battle opens with `battle_ready`; the result comes as `ranked_result`.
+func request_challenge_battle(challenge_id: String) -> void:
+	if session_active():
+		_request("_rq_challenge_battle", [challenge_id])
+	else:
+		status.emit("Not connected to the server; reconnecting...")
+
+
 @rpc("authority", "reliable")
 func _rc_login_ok(info: Dictionary) -> void:
 	_auth_waiting = false
@@ -2646,6 +2655,39 @@ func _rq_ranked_battle(index: int) -> void:
 	}])
 
 
+@rpc("any_peer", "reliable")
+func _rq_challenge_battle(challenge_id: String) -> void:
+	if role != Role.SERVER:
+		return
+	var id := _sender()
+	if not _sessions.has(id) or not _allow(id):
+		return
+	var user: String = _sessions[id]
+	var pl := accounts.logic(user)
+	var c := Challenges.get_challenge(challenge_id)
+	if c.is_empty() or not pl.challenge_unlocked(challenge_id):
+		_deliver(id, "notice", ["That challenge isn't open yet."])
+		return
+	for j in _ranked_jobs:
+		if int(j["peer"]) == id:
+			return  # one battle at a time
+	var mine := pl.battle_squads()
+	if mine.is_empty():
+		_deliver(id, "notice", ["Build an army first."])
+		return
+	var enemy := Challenges.enemy_squads(challenge_id)
+	var seed_value := _rng.randi()
+	var sim := BattleSim.new()
+	sim.setup(mine, enemy, seed_value, c["map"])
+	var task := WorkerThreadPool.add_task(sim.run_to_end.bind(200000), false, "challenge battle")
+	_ranked_jobs.append({"task": task, "sim": sim, "peer": id, "user": user, "challenge": challenge_id})
+	_deliver(id, "ranked_start", [{
+		"mode": "challenge_online", "challenge": challenge_id, "seed": seed_value, "map": c["map"],
+		"squads_a": mine, "squads_b": enemy, "name_a": str(pl.data.get("name", user)), "name_b": c["name"],
+		"rating_a": pl.rating(), "rating_b": 0, "local_team": 0,
+	}])
+
+
 func _poll_ranked_jobs() -> void:
 	var still: Array = []
 	for j in _ranked_jobs:
@@ -2659,7 +2701,11 @@ func _poll_ranked_jobs() -> void:
 		var user: String = j["user"]
 		var pl := accounts.logic(user)
 		pl.gold_mult = float(rewards["battle_mult"])
-		var summary := pl.apply_battle_result("ranked", score, int(j["opp"]["rating"]), killed)
+		var summary: Dictionary
+		if j.has("challenge"):
+			summary = pl.complete_challenge(str(j["challenge"]), score >= 1.0)
+		else:
+			summary = pl.apply_battle_result("ranked", score, int(j["opp"]["rating"]), killed)
 		summary["score"] = score
 		accounts.save(user)
 		var id := int(j["peer"])

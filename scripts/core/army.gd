@@ -169,11 +169,11 @@ const GHOST_NAMES := [
 
 
 ## Generated ("training") ranked opponents: power relative to yours, rating
-## offset, label. Tuned so the average opponent is a bit stronger than you.
-const GHOST_TIERS := [[0.95, -30, "Easy"], [1.15, 20, "Even"], [1.4, 90, "Hard"]]
+## offset, label. On average a little stronger than you (about 1.08x).
+const GHOST_TIERS := [[0.9, -30, "Easy"], [1.05, 20, "Even"], [1.3, 90, "Hard"]]
 ## Saved player armies are searched around your rating plus this, so real
 ## opponents also lean slightly stronger.
-const RANKED_SEARCH_BIAS := 40
+const RANKED_SEARCH_BIAS := 20
 
 
 ## Fill `offers` up to three opponents with generated ones, first covering any

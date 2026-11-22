@@ -12,6 +12,7 @@ const BattleScreen := preload("res://scripts/battle/battle_screen.gd")
 const LoginScreen := preload("res://scripts/ui/login_screen.gd")
 const TrinketTab := preload("res://scripts/ui/trinket_tab.gd")
 const LeaderboardTab := preload("res://scripts/ui/leaderboard_tab.gd")
+const ChallengesTab := preload("res://scripts/ui/challenges_tab.gd")
 
 var menu_layer: CanvasLayer
 var tabs: TabContainer
@@ -83,6 +84,10 @@ func _ready() -> void:
 	pvp_tab.name = "Battle"
 	pvp_tab.battle_requested.connect(start_battle)
 	tabs.add_child(pvp_tab)
+	var challenges_tab := ChallengesTab.new()
+	challenges_tab.name = "Challenges"
+	challenges_tab.battle_requested.connect(start_battle)
+	tabs.add_child(challenges_tab)
 	var board_tab := LeaderboardTab.new()
 	board_tab.name = "Leaderboard"
 	tabs.add_child(board_tab)

@@ -128,11 +128,32 @@ const MAPS := {
 		"desc": "Winding channels of poisoned water.",
 		"obstacles": [["swamp", 0.44, 0.22, 70], ["swamp", 0.5, 0.5, 75], ["swamp", 0.46, 0.78, 60], ["swamp", 0.4, 0.62, 40]],
 	},
+	# --- challenge-only battlefields (Challenges tab; never picked at random) ---
+	"narrow_bridge": {
+		"name": "The Narrow Bridge", "tile": "dirt", "size": [2400, 1400], "challenge": true,
+		"desc": "A river cuts the field in two. The only way across is the old stone bridge.",
+		"obstacles": [["water", 0.5, 0.04, 95], ["water", 0.5, 0.16, 95], ["water", 0.5, 0.28, 95],
+			["water", 0.5, 0.72, 95], ["water", 0.5, 0.84, 95], ["water", 0.5, 0.96, 95]],
+	},
+	"fortress_gate": {
+		"name": "Fortress Gate", "tile": "marble", "size": [2600, 1400], "challenge": true,
+		"desc": "The defenders hold a walled line with a single gate. Archers fire from behind the walls.",
+		"obstacles": [["wall", 0.6, 0.06, 80], ["wall", 0.6, 0.18, 80], ["wall", 0.6, 0.3, 80], ["wall", 0.6, 0.38, 60],
+			["wall", 0.6, 0.62, 60], ["wall", 0.6, 0.7, 80], ["wall", 0.6, 0.82, 80], ["wall", 0.6, 0.94, 80]],
+	},
+	"dragon_lair": {
+		"name": "The Dragon's Lair", "tile": "infernal", "size": [2600, 1500], "challenge": true,
+		"desc": "Lava rivers ring the wyrm's hoard. Only the bold cross the burning ground.",
+		"obstacles": [["lava", 0.4, 0.15, 90], ["lava", 0.4, 0.85, 90], ["lava", 0.6, 0.15, 90], ["lava", 0.6, 0.85, 90],
+			["lava", 0.5, 0.5, 70], ["statue", 0.75, 0.3, 30], ["statue", 0.75, 0.7, 30]],
+	},
 }
 
 
+## Battlefields for normal play (random picks, the map picker). Challenge-
+## only maps are left out; challenges name theirs directly.
 static func map_ids() -> Array:
-	return MAPS.keys()
+	return MAPS.keys().filter(func(id): return not bool(MAPS[id].get("challenge", false)))
 
 
 static func random_map_id(rng: RandomNumberGenerator) -> String:

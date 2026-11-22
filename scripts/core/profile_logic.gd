@@ -38,6 +38,7 @@ static func default_profile() -> Dictionary:
 		"units": units,
 		"army": army,
 		"trinkets": {},           # owned trinket id -> true
+		"challenges": {},         # cleared challenge id -> true
 		"pending_trinket": {},    # an open trinket hunt choice
 	}
 
@@ -93,6 +94,13 @@ func _sanitize() -> void:
 		if not opts.is_empty():
 			clean_pt = {"site": str(pt["site"]), "options": opts.slice(0, 3)}
 	data["pending_trinket"] = clean_pt
+	var cleared := {}
+	var raw_c = data.get("challenges", {})
+	if typeof(raw_c) == TYPE_DICTIONARY:
+		for c in raw_c:
+			if Challenges.index_of(str(c)) >= 0:
+				cleared[str(c)] = true
+	data["challenges"] = cleared
 	var army: Array = []
 	for sq in data.get("army", []):
 		if typeof(sq) == TYPE_DICTIONARY and units.has(str(sq.get("unit", ""))):
@@ -553,6 +561,59 @@ func choose_trinket(index: int) -> Dictionary:
 		return {"trinket": id, "new": false, "gold": g}
 	data["trinkets"][id] = true
 	return {"trinket": id, "new": true, "gold": 0}
+
+
+# --- challenges ------------------------------------------------------------------
+
+func challenge_cleared(id: String) -> bool:
+	return data.get("challenges", {}).has(id)
+
+
+func challenges_cleared() -> int:
+	return data.get("challenges", {}).size()
+
+
+## Challenges open one after another: the first, then each once the one
+## before it is cleared.
+func challenge_unlocked(id: String) -> bool:
+	var i := Challenges.index_of(id)
+	if i < 0:
+		return false
+	return i == 0 or challenge_cleared(Challenges.LIST[i - 1]["id"])
+
+
+## Record a challenge battle. The reward is paid on the first win only:
+## {won, first_clear, gold, maps, trinket, trinket_new, unit, unit_new, shards}.
+func complete_challenge(id: String, won: bool) -> Dictionary:
+	var out := {"challenge": id, "won": won, "first_clear": false, "gold": 0, "maps": 0,
+		"trinket": "", "trinket_new": false, "unit": "", "unit_new": false, "shards": 0}
+	if not won or not challenge_unlocked(id) or challenge_cleared(id):
+		return out
+	var reward: Dictionary = Challenges.get_challenge(id)["reward"]
+	data["challenges"][id] = true
+	out["first_clear"] = true
+	out["gold"] = int(reward.get("gold", 0))
+	out["maps"] = int(reward.get("maps", 0))
+	var t := str(reward.get("trinket", ""))
+	if Trinkets.exists(t):
+		out["trinket"] = t
+		if owns_trinket(t):
+			out["gold"] = int(out["gold"]) + int(Trinkets.DUPLICATE_GOLD[Trinkets.rarity_of(t)])
+		else:
+			data["trinkets"][t] = true
+			out["trinket_new"] = true
+	var u := str(reward.get("unit", ""))
+	if GameData.UNITS.has(u):
+		out["unit"] = u
+		if owns(u):
+			data["units"][u]["shards"] = int(data["units"][u]["shards"]) + Challenges.DUPLICATE_UNIT_SHARDS
+			out["shards"] = Challenges.DUPLICATE_UNIT_SHARDS
+		else:
+			data["units"][u] = {"level": 1, "tier": 0, "shards": 0, "trinkets": []}
+			out["unit_new"] = true
+	data["gold"] = gold() + int(out["gold"])
+	data["maps"] = int(data["maps"]) + int(out["maps"])
+	return out
 
 
 # --- battle results ---------------------------------------------------------

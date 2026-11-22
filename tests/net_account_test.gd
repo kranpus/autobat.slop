@@ -131,6 +131,25 @@ func _run() -> void:
 
 	check(cfg["squads_a"].any(func(sq): return sq.get("trinkets", []).has(trinket)), "the battle used the equipped trinket")
 
+	print("challenges on the server")
+	var gold_c: int = profile.gold()
+	party.request_challenge_battle("rat_problem")
+	var ccfg: Dictionary = await party.battle_ready
+	check(ccfg.get("mode", "") == "challenge_online" and ccfg.get("map", "") == "open_arena", "the server started the challenge on its battlefield")
+	var cres: Dictionary = await party.ranked_result
+	await _wait_ms(300)
+	if bool(cres.get("won", false)):
+		check(cres["first_clear"] and profile.gold() == gold_c + 150 and profile.challenge_cleared("rat_problem"), "the server paid the first-clear reward once")
+		party.request_challenge_battle("rat_problem")
+		await party.battle_ready
+		var again: Dictionary = await party.ranked_result
+		check(not again.get("first_clear", true), "a replay pays nothing")
+	else:
+		check(not profile.challenge_cleared("rat_problem"), "a lost challenge stays open (army too weak this run)")
+	party.request_challenge_battle("golden_wyrm")
+	await _wait_ms(800)
+	check(not profile.challenge_cleared("golden_wyrm") and party.last_ranked_summary.get("challenge", "") != "golden_wyrm", "a locked challenge is refused")
+
 	print("leaderboard")
 	party.request_leaderboard()
 	var got: Array = await party.leaderboard_received   # [top, me]

@@ -60,7 +60,7 @@ func _ready() -> void:
 	mrow.add_child(UIKit.label("Battlefield", 20, UIKit.ACCENT))
 	_map_picker = OptionButton.new()
 	_map_picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_map_picker.add_item("Random (%d maps)" % BattleMaps.MAPS.size())
+	_map_picker.add_item("Random (%d maps)" % BattleMaps.map_ids().size())
 	_map_picker.set_item_metadata(0, "")
 	for id in BattleMaps.map_ids():
 		_map_picker.add_item(BattleMaps.MAPS[id]["name"])
