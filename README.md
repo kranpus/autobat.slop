@@ -20,6 +20,19 @@ All art, sound and music are **CC0 open-source assets** (see [CREDITS.md](CREDIT
 
 The first time it opens, the editor imports the assets, which takes a few seconds.
 
+**Fullscreen:**
+- **Exported desktop builds** start fullscreen. Running from the editor stays windowed unless
+  you turn fullscreen on.
+- **Switching:** the **Fullscreen / Windowed** button in the top bar, **F11** (or Alt+Enter), or
+  **Settings → Display**. Your choice is remembered.
+- **In a browser,** the game fills the page and the button switches the browser to fullscreen.
+- **Scaling:** the interface scales with the screen size, and wider screens show more of the
+  layout.
+
+**Desktop builds:** **Project → Export** has presets for **Windows Desktop**, **Linux** and
+**macOS** (plus Android, iOS and Web). Install Godot 4.3's export templates once (Editor → Manage
+Export Templates).
+
 **Phones and tablets:** the game also runs on Android and iOS, with scaled-up text and buttons,
 touch controls and pinch-to-zoom. See **[MOBILE.md](MOBILE.md)** for how to build it.
 

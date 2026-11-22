@@ -167,6 +167,49 @@ static func auto_ui_scale() -> float:
 	return clampf(minf(factor, 720.0 * aspect / 960.0), 1.0, 2.0)
 
 
+# --- fullscreen ---------------------------------------------------------------
+
+## Phones and tablets are always fullscreen; desktop windows and browser
+## pages can switch.
+static func can_toggle_fullscreen() -> bool:
+	return not OS.has_feature("mobile")
+
+
+static func is_fullscreen() -> bool:
+	var m := DisplayServer.window_get_mode()
+	return m == DisplayServer.WINDOW_MODE_FULLSCREEN or m == DisplayServer.WINDOW_MODE_EXCLUSIVE_FULLSCREEN
+
+
+## Fullscreen on or off, remembered in the device settings. In a browser
+## this must come from a click or key press (browsers only allow fullscreen
+## in response to the player).
+static func set_fullscreen(on: bool) -> void:
+	if not can_toggle_fullscreen() or DisplayServer.get_name() == "headless":
+		return
+	if on:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+	else:
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
+	Profile.settings["fullscreen"] = on
+	Profile.save_settings()
+
+
+static func toggle_fullscreen() -> void:
+	set_fullscreen(not is_fullscreen())
+
+
+## At startup: exported desktop builds open fullscreen unless the player
+## turned it off. (Browsers can't start fullscreen: the page fills the
+## browser window or the itch.io frame, and the Fullscreen button goes
+## further. Running from the editor stays windowed unless chosen.)
+static func apply_startup_display() -> void:
+	if OS.has_feature("web") or OS.has_feature("mobile") or DisplayServer.get_name() == "headless":
+		return
+	var want: bool = Profile.settings.get("fullscreen", OS.has_feature("template"))
+	if want and not is_fullscreen():
+		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
+
+
 ## Apply the player's interface size (Settings) or the automatic one.
 ## `--ui-scale=1.6` on the command line overrides it (handy for testing).
 ## Symbols used in the UI (arrows, stars, triangles...) come from a bundled

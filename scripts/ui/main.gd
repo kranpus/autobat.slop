@@ -27,12 +27,14 @@ var draft_layer: CanvasLayer
 var draft_screen: DraftScreenScript
 var login_layer: CanvasLayer
 var _account_label: Label
+var _fullscreen_button: Button
 
 
 func _ready() -> void:
 	if "--server" in OS.get_cmdline_user_args():
 		_run_dedicated_server()
 		return
+	UIKit.apply_startup_display()
 	UIKit.apply_ui_scale(get_tree())
 	menu_layer = CanvasLayer.new()
 	add_child(menu_layer)
@@ -176,10 +178,17 @@ func _build_top_bar() -> Control:
 	h.add_child(_gold_label)
 	h.add_child(_maps_label)
 	h.add_child(_rating_label)
+	if UIKit.can_toggle_fullscreen():
+		_fullscreen_button = UIKit.button("Fullscreen", func(): UIKit.toggle_fullscreen())
+		_fullscreen_button.tooltip_text = "Fill the whole screen (F11). Esc or F11 to leave."
+		_fullscreen_button.focus_mode = Control.FOCUS_NONE
+		h.add_child(_fullscreen_button)
 	return p
 
 
 func _refresh_top_bar() -> void:
+	if _fullscreen_button:
+		_fullscreen_button.text = "Windowed" if UIKit.is_fullscreen() else "Fullscreen"
 	_gold_label.text = "Gold: %d" % Profile.gold()
 	var next := Profile.seconds_to_next_map()
 	var timer_text := ""
@@ -238,6 +247,17 @@ func _on_battle_closed() -> void:
 
 ## Android back button / gesture: close a finished battle, otherwise step
 ## back to the first tab, and quit from there.
+## F11 or Alt+Enter toggles fullscreen everywhere it's possible.
+func _unhandled_key_input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k == null or not k.pressed or k.echo:
+		return
+	if k.keycode == KEY_F11 or (k.keycode == KEY_ENTER and k.alt_pressed):
+		UIKit.toggle_fullscreen()
+		_refresh_top_bar()
+		get_viewport().set_input_as_handled()
+
+
 func _notification(what: int) -> void:
 	if what != NOTIFICATION_WM_GO_BACK_REQUEST or menu_layer == null:
 		return

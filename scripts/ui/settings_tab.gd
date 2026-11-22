@@ -62,6 +62,18 @@ func _ready() -> void:
 		Audio.set_sfx_volume(v)
 		Audio.play_sfx("click")))
 
+	if UIKit.can_toggle_fullscreen():
+		grid.add_child(UIKit.label("Display", 15))
+		var fs := CheckBox.new()
+		fs.text = "Fullscreen  (F11)"
+		fs.button_pressed = UIKit.is_fullscreen()
+		fs.toggled.connect(func(on: bool): UIKit.set_fullscreen(on))
+		# Keep the box in step when fullscreen changes another way (F11, Esc).
+		get_tree().root.size_changed.connect(func():
+			if is_instance_valid(fs):
+				fs.set_pressed_no_signal(UIKit.is_fullscreen()))
+		grid.add_child(fs)
+
 	grid.add_child(UIKit.label("Interface size", 15))
 	var size_pick := OptionButton.new()
 	var current := str(Profile.settings.get("ui_scale", "auto"))

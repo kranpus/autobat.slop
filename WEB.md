@@ -95,8 +95,9 @@ Restart the server after renewing the certificate (Let's Encrypt renews every ~6
 1. Create a new project, **Kind of project: HTML**.
 2. Upload `export/AutobatLegions-web.zip` and tick **This file will be played in the browser**.
 3. **Embed options:**
-   - Viewport size: 1280 × 720.
-   - Tick **Fullscreen button**.
+   - Viewport size: 1280 × 720. The game fills whatever size you choose, and its own
+     **Fullscreen** button (or F11) fills the player's whole screen.
+   - Tick **Fullscreen button** too, if you like.
    - Leave **SharedArrayBuffer support** off (not needed).
    - For phones, tick **Mobile friendly** and choose landscape.
 
