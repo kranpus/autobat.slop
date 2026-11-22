@@ -186,11 +186,12 @@ const GHOST_NAMES := [
 
 ## Generated ("training") ranked opponents: power relative to yours, rating
 ## offset, label. Measured in the simulator (each pairing fought from both
-## sides): a generated army at 0.95x your power wins about half the time,
-## 0.85x about 38%, 1.05x about 59%, so the three average out to an even
-## fight. The rating offsets match those odds, so the rating you can win or
-## lose is fair whichever you pick: no tier is a free climb.
-const GHOST_TIERS := [[0.85, -75, "Easy"], [0.95, 0, "Even"], [1.05, 75, "Hard"]]
+## sides) against a generated army of your power, you win about 55% at 0.9x,
+## 21% at 1.1x and 5% at 1.5x: a hard ladder that rewards a well-built army.
+## The rating offsets pay more for the harder fights but less than those
+## odds would (Easy is about fair, Even and Hard lose rating on average for
+## an ordinary army), so none of them is a free climb.
+const GHOST_TIERS := [[0.9, -40, "Easy"], [1.1, 60, "Even"], [1.5, 150, "Hard"]]
 ## Saved player armies are searched around your rating plus this.
 const RANKED_SEARCH_BIAS := 0
 ## Real opponents more than this far from your rating are labelled Easy / Hard.
@@ -254,6 +255,14 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int)
 			sq["tier"] = int(sq["tier"]) + 1
 		elif int(sq["level"]) < max_level_for_tier(int(sq["tier"])):
 			sq["level"] = int(sq["level"]) + 1
+		elif squads.size() < GameData.MAX_SQUADS and squads.all(func(q): return int(q["tier"]) >= GameData.MAX_TIER and int(q["level"]) >= max_level_for_tier(int(q["tier"]))):
+			# Everything is maxed: very strong targets get extra squads.
+			var spare: Array = pool.filter(func(u): return not used.has(u))
+			if spare.is_empty():
+				break
+			var extra: String = spare[rng.randi_range(0, spare.size() - 1)]
+			used[extra] = true
+			squads.append({"unit": extra, "level": 1, "tier": 0, "row": GameData.default_row_for(extra)})
 	return {
 		"name": GHOST_NAMES[rng.randi_range(0, GHOST_NAMES.size() - 1)],
 		"rating": rating,

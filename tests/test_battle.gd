@@ -732,7 +732,7 @@ func test_harder_ghosts() -> void:
 			total += Army.army_power(o["squads"]) / mine
 			n += 1
 	var avg := total / float(n)
-	check(avg > 0.92 and avg < 1.0, "generated opponents average %.2fx your power (an even fight, measured)" % avg)
+	check(avg > 1.12 and avg < 1.25, "generated opponents average %.2fx your power (Easy 0.9x, Even 1.1x, Hard 1.5x)" % avg)
 	var low := Army.generate_opponent(5000.0, 900, 5)
 	var low_has: bool = low["squads"].any(func(sq): return sq.has("trinkets"))
 	var high_count := 0
@@ -1092,9 +1092,10 @@ func test_rating_speed() -> void:
 	check(Army.elo_delta(3200, 3200, 1.0) == 6, "an even win near the top is +6")
 	var mid := Army.elo_delta(2100, 2100, 1.0)
 	check(mid > 6 and mid < 12, "in between in the middle of the ladder (+%d at 2100)" % mid)
-	# Fair offsets: with the measured odds, no tier pays on average.
-	var odds := {"Easy": 0.62, "Even": 0.5, "Hard": 0.41}
+	# With the measured odds (an ordinary army), no tier pays on average.
+	var odds := {"Easy": 0.55, "Even": 0.21, "Hard": 0.05}
 	for t in Army.GHOST_TIERS:
 		var p: float = odds[t[2]]
 		var ev := p * Army.elo_delta(1500, 1500 + int(t[1]), 1.0) + (1.0 - p) * Army.elo_delta(1500, 1500 + int(t[1]), 0.0)
-		check(absf(ev) < 1.0, "%s opponents are worth about 0 rating on average (%.2f)" % [t[2], ev])
+		check(ev < 0.5, "%s opponents are no free climb (%.2f rating per battle on average)" % [t[2], ev])
+	check(Army.elo_delta(1000, 1000 + int(Army.GHOST_TIERS[2][1]), 1.0) > Army.elo_delta(1000, 1000 + int(Army.GHOST_TIERS[0][1]), 1.0) + 5, "beating Hard pays clearly more than beating Easy")

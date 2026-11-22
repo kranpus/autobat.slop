@@ -7,7 +7,7 @@ extends RefCounted
 
 const LIST := [
 	{"version": "0.9", "date": "2026-11-22", "title": "Splash Down",
-		"summary": "The first balance patch: an across-the-board nerf to ranged splash damage, a fairer army Strength, even ranked opponents and a slower climb up the ranks.",
+		"summary": "The first balance patch: an across-the-board nerf to ranged splash damage, a fairer army Strength, harder ranked opponents and a slower climb up the ranks.",
 		"sections": [
 			{"name": "Balance", "notes": [
 				{"kind": "nerf", "text": "Ranged splash damage, across the board: splash from projectiles (stones, magic bolts and fireballs) now hits nearby enemies for 45% of the attack's damage, down from 60% (25% less). The main target still takes full damage."},
@@ -20,8 +20,8 @@ const LIST := [
 				{"kind": "change", "text": "Ranked opponents are matched using the new Strength, so big melee armies now meet stronger opponents than before."},
 			]},
 			{"name": "Ranked", "notes": [
-				{"kind": "change", "text": "Opponents are an even fight on average. Training opponents are now about 0.85x / 0.95x / 1.05x your Strength (Easy / Even / Hard), each around 62% / 50% / 41% to win; before, they averaged 8% stronger than you (up to 1.3x for Hard). Saved player armies are searched right at your rating instead of slightly above."},
-				{"kind": "change", "text": "Training opponents are rated 75 below, level with and 75 above you, to match their odds: beating an Easy opponent is worth less rating, beating a Hard one more, and none of them is a free climb."},
+				{"kind": "nerf", "text": "Ranked is harder. Training opponents are now 0.9x / 1.1x / 1.5x your Strength (Easy / Even / Hard), up from 0.9x / 1.05x / 1.3x. Against an ordinary army of your Strength, that's roughly a 55% / 21% / 5% chance to win: Hard opponents take a well-built army that counters them."},
+				{"kind": "change", "text": "Training opponents are rated 40 below, 60 above and 150 above you. Beating a Hard opponent is worth clearly more rating than beating an Easy one, but no difficulty is a free climb. Saved player armies are searched right at your rating instead of slightly above."},
 				{"kind": "nerf", "text": "Ranking up is slower. Rating changes by up to 24 per battle at 1200 and below, falling steadily to 12 at 3000 and above (it was 32 at every rating). An even win is now worth about +12 at the start and +6 near the top, instead of +16."},
 			]},
 			{"name": "Challenges", "notes": [

@@ -164,11 +164,12 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Music:** battle music varies between three tracks, and challenge bosses get their own
        theme.
      - **Screen shake** can be turned off in Settings.
-   - **Training opponents:** an even fight on average.
-     - **Strength:** Easy ≈ 0.85×, Even ≈ 0.95×, Hard ≈ 1.05× your power, measured in the
-       simulator as roughly 62% / 50% / 41% to win.
-     - **Rating:** they are rated 75 below, level with and 75 above you, matching those odds, so
-       no difficulty is a free climb.
+   - **Training opponents:** a hard ladder.
+     - **Strength:** Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× your power. Against an ordinary
+       army of your power, the simulator measures roughly 55% / 21% / 5% to win; a well-built
+       army does better.
+     - **Rating:** they are rated 40 below, 60 above and 150 above you. Harder wins pay more
+       rating, but less than the odds would suggest, so no difficulty is a free climb.
      - **Trinkets:** above rating ~950 they carry trinkets too, more and rarer as rating rises.
    - **Rating speed (Elo K-factor):** 24 up to rating 1200, falling steadily to 12 at 3000 and
      above. An even win is worth about +12 at the start and +6 near the top.
