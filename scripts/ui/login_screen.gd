@@ -93,6 +93,9 @@ func _ready() -> void:
 	_status = UIKit.label("", 13, UIKit.TEXT_DIM)
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_status)
+	var ver := UIKit.label("Version %s" % Party.build_version(), 11, UIKit.TEXT_DIM)
+	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	v.add_child(ver)
 	_note = UIKit.label("", 11, UIKit.TEXT_DIM)
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(_note)

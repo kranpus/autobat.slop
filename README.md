@@ -34,7 +34,18 @@ The first time it opens, the editor imports the assets, which takes a few second
 Export Templates).
 
 **Everything at once:** `tools/export_all.sh /path/to/godot` builds the web, Windows, Linux and
-Android versions into `export/<version>/`, with ready-to-share zips and the APK.
+Android versions into `export/legion-<version>/`, e.g. `export/legion-0.7/` with
+`legion-0.7-windows.zip`, `legion-0.7-linux.zip`, `legion-0.7-android.apk` and
+`legion-0.7-web.zip`.
+
+**Versions:** there are two version numbers.
+- **The release version** (currently **0.7**) is what players see on the sign-in screen, in
+  Settings and in update prompts, and it names the builds. It's set in Project Settings →
+  Application → Config → Version.
+- **For a new release:** also raise the Android `version/code` in `export_presets.cfg`
+  (currently 7). Android only installs updates with a higher code.
+- **`GAME_VERSION`** in `scripts/net/party.gd` (e.g. `legion-draft-12`) is the compatibility
+  number between game and server. Bump it whenever an update changes how they talk to each other.
 - **Templates:** fetch only the export templates you need with
   `python3 tools/fetch_export_templates.py web windows linux android`.
 - **Android** also needs Java and the Android SDK (`ANDROID_HOME`).

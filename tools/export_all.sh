@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Build every release into a fresh folder:  export/<game version>/
-#   web/      browser version  (+ AutobatLegions-web.zip for itch.io)
-#   windows/  AutobatLegions.exe (+ zip)
-#   linux/    AutobatLegions.x86_64 (+ zip)
-#   android/  AutobatLegions.apk
+# Build every release into a fresh folder named after the release version
+# (Project Settings -> Application -> Config -> Version), e.g. export/legion-0.7/:
+#   legion-0.7-web.zip       browser version (index.html at the top, for itch.io)
+#   legion-0.7-windows.zip   legion-0.7.exe
+#   legion-0.7-linux.zip     legion-0.7.x86_64
+#   legion-0.7-android.apk
+# plus the unpacked web/, windows/, linux/ and android/ folders.
 #
 # Usage: tools/export_all.sh [path-to-godot-4.3]
 # Needs the export templates (python3 tools/fetch_export_templates.py web windows linux android).
@@ -16,14 +18,16 @@
 set -uo pipefail
 GODOT="${1:-godot}"
 cd "$(dirname "$0")/.."
-VERSION="$(grep -oP 'const GAME_VERSION := "\K[^"]+' scripts/net/party.gd)"
-OUT="export/$VERSION"
+BUILD="$(grep -oP '^config/version="\K[^"]+' project.godot)"
+PROTOCOL="$(grep -oP 'const GAME_VERSION := "\K[^"]+' scripts/net/party.gd)"
+NAME="legion-${BUILD:-dev}"
+OUT="export/$NAME"
 LOG="$OUT/export.log"
 rm -rf "$OUT"
 mkdir -p "$OUT"/{web,windows,linux,android}
 # Keep Godot from importing the exported files as project assets.
 touch export/.gdignore
-echo "Exporting $VERSION into $OUT"
+echo "Exporting Autobat Legions $BUILD (protocol $PROTOCOL) into $OUT"
 "$GODOT" --headless --path . --import > "$LOG" 2>&1 || true
 
 # Point Godot at the Android SDK (it reads the path from its editor settings).
@@ -45,18 +49,18 @@ build() {  # name preset path mode
   fi
 }
 build web "Web" "$OUT/web/index.html"
-build windows "Windows Desktop" "$OUT/windows/AutobatLegions.exe"
-build linux "Linux" "$OUT/linux/AutobatLegions.x86_64"
+build windows "Windows Desktop" "$OUT/windows/$NAME.exe"
+build linux "Linux" "$OUT/linux/$NAME.x86_64"
 if [ -n "${GODOT_ANDROID_KEYSTORE_RELEASE_PATH:-}" ]; then
-  build android "Android" "$OUT/android/AutobatLegions.apk" release
+  build android "Android" "$OUT/android/$NAME.apk" release
 else
-  build android "Android" "$OUT/android/AutobatLegions.apk" debug
+  build android "Android" "$OUT/android/$NAME.apk" debug
 fi
 
 # Zips to hand out / upload.
-(cd "$OUT/web" && [ -f index.html ] && zip -q -r ../AutobatLegions-web.zip .)
-(cd "$OUT/windows" && [ -f AutobatLegions.exe ] && zip -q -r ../AutobatLegions-windows.zip .)
-(cd "$OUT/linux" && [ -f AutobatLegions.x86_64 ] && chmod +x AutobatLegions.x86_64 && zip -q -r ../AutobatLegions-linux.zip .)
-[ -f "$OUT/android/AutobatLegions.apk" ] && cp "$OUT/android/AutobatLegions.apk" "$OUT/AutobatLegions-android.apk"
+(cd "$OUT/web" && [ -f index.html ] && zip -q -r "../$NAME-web.zip" .)
+(cd "$OUT/windows" && [ -f "$NAME.exe" ] && zip -q -r "../$NAME-windows.zip" .)
+(cd "$OUT/linux" && [ -f "$NAME.x86_64" ] && chmod +x "$NAME.x86_64" && zip -q -r "../$NAME-linux.zip" .)
+[ -f "$OUT/android/$NAME.apk" ] && cp "$OUT/android/$NAME.apk" "$OUT/$NAME-android.apk"
 echo "Done: $ok built, $failed failed. Files in $OUT/"
 [ "$failed" -eq 0 ]

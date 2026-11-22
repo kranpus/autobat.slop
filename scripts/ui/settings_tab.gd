@@ -104,6 +104,7 @@ func _ready() -> void:
 	add_child(reset)
 	_build_account()
 
+	add_child(UIKit.label("Autobat Legions %s" % Party.build_version(), 13, UIKit.TEXT_DIM))
 	add_child(UIKit.label("Credits", 18, UIKit.ACCENT))
 	var credits := RichTextLabel.new()
 	credits.bbcode_enabled = true

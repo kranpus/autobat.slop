@@ -89,8 +89,15 @@ var _rng := RandomNumberGenerator.new()
 ## this dictionary, so changes apply to matches already in progress.
 var rewards := DEFAULT_REWARDS.duplicate(true)
 ## This build's protocol version (tests can pretend to be another version
-## with --fake-version=...).
+## with --fake-version=...). Players see the release version instead.
 var game_version := GAME_VERSION
+
+
+## The release version players see, e.g. "0.7" (Project Settings ->
+## Application -> Config -> Version). GAME_VERSION is the compatibility
+## number checked between game and server.
+static func build_version() -> String:
+	return str(ProjectSettings.get_setting("application/config/version", "?"))
 ## Where players get the new version (set with the 'update-url' console
 ## command or the UPDATE_URL environment variable). Sent to out-of-date games.
 var update_url := ""
@@ -196,7 +203,7 @@ const HANDSHAKE_PROTOCOL := 1
 ## A connection is being set up: clients introduce themselves first.
 func _on_peer_authenticating(id: int) -> void:
 	if role == Role.CLIENT and id == 1:
-		mp.send_auth(1, JSON.stringify({"hs": HANDSHAKE_PROTOCOL, "version": game_version}).to_utf8_buffer())
+		mp.send_auth(1, JSON.stringify({"hs": HANDSHAKE_PROTOCOL, "version": game_version, "build": build_version()}).to_utf8_buffer())
 
 
 func _on_auth(id: int, data: PackedByteArray) -> void:
@@ -211,16 +218,16 @@ func _on_auth(id: int, data: PackedByteArray) -> void:
 			mp.send_auth(id, JSON.stringify({"hs": HANDSHAKE_PROTOCOL, "ok": true, "version": game_version}).to_utf8_buffer())
 			mp.complete_auth(id)
 		else:
-			mp.send_auth(id, JSON.stringify({"hs": HANDSHAKE_PROTOCOL, "ok": false, "version": game_version,
+			mp.send_auth(id, JSON.stringify({"hs": HANDSHAKE_PROTOCOL, "ok": false, "version": game_version, "build": build_version(),
 				"update_url": update_url, "host": role == Role.HOST}).to_utf8_buffer())
 			if role == Role.SERVER:
-				_log("Turned away a game on version %s (this server runs %s)" % [theirs, game_version])
+				_log("Turned away a game on version %s / %s (this server runs %s / %s)" % [str(msg.get("build", "?")).left(20), theirs, build_version(), game_version])
 			# The game hangs up once told; if it doesn't, the handshake times out.
 	elif id == 1:
 		if bool(msg.get("ok", false)):
 			mp.complete_auth(1)
 		else:
-			_version_rejected(str(msg.get("version", "?")).left(40), str(msg.get("update_url", "")).left(300), bool(msg.get("host", false)))
+			_version_rejected(str(msg.get("version", "?")).left(40), str(msg.get("update_url", "")).left(300), bool(msg.get("host", false)), str(msg.get("build", "")).left(20))
 
 
 ## "legion-draft-11" -> 11 (0 if unknown).
@@ -229,14 +236,20 @@ static func version_number(v: String) -> int:
 	return int(tail) if tail.is_valid_int() else 0
 
 
-func _version_rejected(theirs: String, url: String, from_host: bool) -> void:
+func _version_rejected(theirs: String, url: String, from_host: bool, theirs_build: String = "") -> void:
 	var older := version_number(game_version) < version_number(theirs)
 	var who := "The match host" if from_host else "The server"
-	var text := ("Update required: %s runs a newer version of the game (%s, you have %s)." % [who.to_lower(), theirs, game_version]) if older \
-		else ("%s runs an older version of the game (%s, you have %s). It needs updating first." % [who, theirs, game_version])
+	# Show release versions ("0.7") when both sides know them.
+	var their_label := theirs_build if theirs_build != "" else theirs
+	var my_label := build_version() if theirs_build != "" else game_version
+	if their_label == my_label:
+		their_label = "%s (%s)" % [theirs_build, theirs]
+		my_label = "%s (%s)" % [build_version(), game_version]
+	var text := ("Update required: %s runs a newer version of the game (%s, you have %s)." % [who.to_lower(), their_label, my_label]) if older \
+		else ("%s runs an older version of the game (%s, you have %s). It needs updating first." % [who, their_label, my_label])
 	# Signed in: don't keep retrying every few seconds with the wrong version.
 	_reconnect_at = Time.get_ticks_msec() + 600000
-	update_required.emit({"mine": game_version, "theirs": theirs, "older": older, "url": url, "host": from_host})
+	update_required.emit({"mine": my_label, "theirs": their_label, "older": older, "url": url, "host": from_host})
 	if _auth_waiting:
 		_auth_failed(text)
 	elif _ranked_only or _awaiting_ranked:
@@ -370,7 +383,7 @@ func start_server(port: int = SERVER_PORT) -> Error:
 			rewards["battle_mult"] = maxf(0.0, float(arg.get_slice("=", 1)))
 		elif arg.begins_with("--draft-gold="):
 			rewards["draft_mult"] = maxf(0.0, float(arg.get_slice("=", 1)))
-	_log("Legion Draft server %s listening on UDP port %d" % [game_version, port])
+	_log("Autobat Legions %s server (protocol %s) listening on UDP port %d" % [build_version(), game_version, port])
 	_log("Gold: battles x%s, draft x%s, draft payouts %s. Type 'help' for commands." % [rewards["battle_mult"], rewards["draft_mult"], rewards["draft_table"]])
 	_stdin_thread = Thread.new()
 	_stdin_thread.start(_read_stdin)
