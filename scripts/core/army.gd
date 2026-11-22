@@ -89,7 +89,7 @@ const SPLASH_POWER_REF := 0.6
 ## What each battle ability is worth in power: [toughness mult, damage mult]
 ## as a function of its value, measured with the balance simulator
 ## (tools/balance_sim.gd) so armies of equal power stay even fights.
-## Tuned with the simulator (armies mode, two rounds of ~1500 battles across all 60 units):
+## Tuned with the simulator (armies mode, rounds of ~1300-1500 battles across all 60 units):
 ## armies with each ability unit should win about as often as others of its
 ## rarity at equal power.
 const ABILITY_TUNING := {

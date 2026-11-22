@@ -13,7 +13,7 @@ const RARITIES := {
 	"uncommon":  {"name": "Uncommon",  "color": "5fd35f", "order": 1, "power_mult": 1.0, "squad_base": 15, "squad_step": 8,  "cost_mult": 1.5, "shard_base": 8,  "find_shards": [2, 4]},
 	"rare":      {"name": "Rare",      "color": "4f9dff", "order": 2, "power_mult": 1.1, "squad_base": 6,  "squad_step": 3,  "cost_mult": 2.5, "shard_base": 5,  "find_shards": [1, 3]},
 	"epic":      {"name": "Epic",      "color": "c065ff", "order": 3, "power_mult": 0.95, "squad_base": 2,  "squad_step": 1,  "cost_mult": 4.0, "shard_base": 3,  "find_shards": [1, 2], "tier_shard_mult": 1.75},
-	"legendary": {"name": "Legendary", "color": "ffb43c", "order": 4, "power_mult": 1.15, "squad_base": 1,  "squad_step": 1,  "cost_mult": 6.0, "shard_base": 2,  "find_shards": [1, 1], "tier_shard_mult": 2.0},
+	"legendary": {"name": "Legendary", "color": "ffb43c", "order": 4, "power_mult": 1.1, "squad_base": 1,  "squad_step": 1,  "cost_mult": 6.0, "shard_base": 2,  "find_shards": [1, 1], "tier_shard_mult": 2.0},
 }
 
 # Damage types and armor classes. DAMAGE_MULT[damage][armor].
