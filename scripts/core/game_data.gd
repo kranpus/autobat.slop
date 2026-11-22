@@ -12,7 +12,7 @@ const RARITIES := {
 	"common":    {"name": "Common",    "color": "b8b8b8", "order": 0, "power_mult": 1.0, "squad_base": 30, "squad_step": 15, "cost_mult": 1.0, "shard_base": 10, "find_shards": [3, 6]},
 	"uncommon":  {"name": "Uncommon",  "color": "5fd35f", "order": 1, "power_mult": 1.0, "squad_base": 15, "squad_step": 8,  "cost_mult": 1.5, "shard_base": 8,  "find_shards": [2, 4]},
 	"rare":      {"name": "Rare",      "color": "4f9dff", "order": 2, "power_mult": 1.1, "squad_base": 6,  "squad_step": 3,  "cost_mult": 2.5, "shard_base": 5,  "find_shards": [1, 3]},
-	"epic":      {"name": "Epic",      "color": "c065ff", "order": 3, "power_mult": 1.0, "squad_base": 2,  "squad_step": 1,  "cost_mult": 4.0, "shard_base": 3,  "find_shards": [1, 2], "tier_shard_mult": 1.75},
+	"epic":      {"name": "Epic",      "color": "c065ff", "order": 3, "power_mult": 0.95, "squad_base": 2,  "squad_step": 1,  "cost_mult": 4.0, "shard_base": 3,  "find_shards": [1, 2], "tier_shard_mult": 1.75},
 	"legendary": {"name": "Legendary", "color": "ffb43c", "order": 4, "power_mult": 1.15, "squad_base": 1,  "squad_step": 1,  "cost_mult": 6.0, "shard_base": 2,  "find_shards": [1, 1], "tier_shard_mult": 2.0},
 }
 
@@ -148,11 +148,11 @@ const UNITS := {
 		"damage": "magic", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 10.0, "scale": 1.3, "flying": false,
 		"desc": "Raises the fallen to fight for it.",
-		"ability": {"id": "raise_dead", "value": 6.0},
+		"ability": {"id": "raise_dead", "value": 8.0},
 	},
 	"griffon": {
 		"name": "Griffon", "rarity": "epic", "role": "melee",
-		"hp": 850.0, "dmg": 40.0, "cooldown": 0.9, "range": 8.0, "speed": 130.0,
+		"hp": 1000.0, "dmg": 40.0, "cooldown": 0.9, "range": 8.0, "speed": 130.0,
 		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 14.0, "scale": 1.6, "flying": true, "targets": "ranged",
 		"desc": "Flies over the melee to hunt casters.",
@@ -385,11 +385,11 @@ const UNITS := {
 	},
 	"stone_giant": {
 		"name": "Stone Giant", "rarity": "epic", "role": "ranged", "locked": true,
-		"hp": 1500.0, "dmg": 95.0, "cooldown": 2.4, "range": 240.0, "speed": 38.0,
+		"hp": 1500.0, "dmg": 110.0, "cooldown": 2.4, "range": 240.0, "speed": 38.0,
 		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "stone", "radius": 16.0, "scale": 1.8, "flying": false,
 		"desc": "Boulders the size of houses send enemies flying.",
-		"ability": {"id": "knockback", "value": 60.0},
+		"ability": {"id": "knockback", "value": 40.0},
 	},
 	"frost_giant": {
 		"name": "Frost Giant", "rarity": "epic", "role": "tank", "locked": true,
@@ -453,7 +453,7 @@ const UNITS := {
 		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 22.0, "scale": 2.4, "flying": true,
 		"desc": "Darkness given wings and hunger.",
-		"ability": {"id": "devour", "value": 0.6},
+		"ability": {"id": "devour", "value": 0.75},
 	},
 	"storm_dragon": {
 		"name": "Storm Dragon", "rarity": "legendary", "role": "caster", "locked": true,
@@ -465,7 +465,7 @@ const UNITS := {
 	},
 	"seraph": {
 		"name": "Seraph", "rarity": "legendary", "role": "healer", "locked": true,
-		"hp": 2000.0, "dmg": 40.0, "cooldown": 1.2, "range": 180.0, "speed": 90.0,
+		"hp": 2400.0, "dmg": 40.0, "cooldown": 1.2, "range": 180.0, "speed": 90.0,
 		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 120.0, "regen": 0.0,
 		"projectile": "magic", "radius": 18.0, "scale": 2.0, "flying": true,
 		"desc": "Heals whole squads with radiant light, and calls the fallen back.",
@@ -622,7 +622,7 @@ const ABILITIES := {
 	"dread": {"name": "Dread", "text": "Enemies near it lose their nerve and deal 35%% less damage.%s"},
 	"rising_storm": {"name": "Rising Storm", "text": "Each blow adds +%s%% damage to the next, up to +100%%."},
 	"resurrect": {"name": "Resurrection", "text": "Every %ss it brings the most recently fallen ally nearby back with half its health (once each)."},
-	"aegis": {"name": "Divine Aegis", "text": "Allies near it take 25%% less damage.%s"},
+	"aegis": {"name": "Divine Aegis", "text": "Allies near it take 20%% less damage.%s"},
 }
 ## Values shown as percentages in the text.
 const ABILITY_PERCENT := ["burn", "rebirth", "unstoppable", "devour", "predator", "death_blast", "heads", "soul_harvest", "rising_storm"]

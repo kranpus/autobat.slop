@@ -318,26 +318,26 @@ obstacles (x/y as fractions of the map; anything left of centre is mirrored auto
   |---|---|---|
   | Stun | Ogre Brute (0.6s) | The target can't move or attack. |
   | Chill | Ice Dragon (3s) | Half speed, moving and attacking. |
-  | Burn | Salamander Firebrand | 120% of the hit again as burn damage over 4s. |
+  | Burn | Salamander Firebrand | 150% of the hit again as burn damage over 4s. |
   | Chain Lightning | Elven Mage (2), Storm Dragon (5) | Jumps to more enemies nearby, each jump 30% weaker. |
   | Shatter | Frost Giant (4s) | The target takes 30% more damage from everyone. |
   | Wither | Sphinx (4s) | The target deals 35% less damage. |
   | Charge | Minotaur | The first blow against each new target deals 3x damage. |
   | Double Strike | Ettin | Each blow also hits a second enemy in reach. |
-  | Rebirth | Phoenix | Rises again once with 60% of its health. |
+  | Rebirth | Phoenix | Rises again once at full health. |
   | Unstoppable | Juggernaut | Immune to stun and chill, 35% less damage from projectiles. |
-  | Devour | Shadow Dragon | Heals for 40% of the damage it deals. |
-  | Raise Dead | Lich | Its victims rise as skeletons on its side (up to 6 per Lich). |
+  | Devour | Shadow Dragon | Heals for 75% of the damage it deals. |
+  | Raise Dead | Lich | Its victims rise as skeletons on its side (up to 8 per Lich). |
   | Quake | Hill Giant | Every third blow stuns every enemy around the target for 0.8s. |
-  | Predator | Griffon | +100% damage to ranged units, casters and healers. |
+  | Predator | Griffon | +150% damage to ranged units, casters and healers. |
   | Knockback | Stone Giant | Boulders hurl the target back and knock it down briefly. |
   | Molten Core | Fire Giant | Erupts when it dies: 35% of its health as fire damage nearby. |
-  | Many Heads | Hydra | +30% attack speed for each quarter of its health lost (up to 3). |
+  | Many Heads | Hydra | +40% attack speed for each quarter of its health lost (up to 3). |
   | Soul Harvest | Bone Dragon | Each kill heals 20% and adds +10% damage (up to +50%). |
   | Dread | Golden Dragon | Enemies nearby deal 35% less damage. |
   | Rising Storm | Storm Titan | Each blow adds +5% damage, up to +100%. |
-  | Resurrection | Seraph | Every 6s brings the latest fallen ally nearby back at half health. |
-  | Divine Aegis | Grand Avatar | Allies nearby take 25% less damage. |
+  | Resurrection | Seraph | Every 4s brings the latest fallen ally nearby back at half health. |
+  | Divine Aegis | Grand Avatar | Allies nearby take 20% less damage. |
 
   - **Squad growth:** epic and legendary squad upgrades cost 1.75× and 2× the shards.
 

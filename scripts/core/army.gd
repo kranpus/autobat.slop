@@ -94,27 +94,27 @@ const SPLASH_POWER_REF := 0.6
 ## rarity at equal power.
 const ABILITY_TUNING := {
 	"stun": 0.15,         # x (stun seconds / cooldown, up to 1), on toughness and damage
-	"chill": 0.35,        # x (chill seconds / cooldown, up to 1), on toughness
+	"chill": 0.2,        # x (chill seconds / cooldown, up to 1), on toughness
 	"curse": 0.12,         # x (seconds / cooldown, up to 1), on damage
 	"weaken": 0.15,       # x (seconds / cooldown, up to 1), on toughness
-	"burn": 0.2,          # x burn share, on damage
+	"burn": 0.05,          # x burn share, on damage
 	"chain": 1.0,         # x chain damage share (later jumps rarely find targets: capped at CHAIN_POWER_CAP)
 	"double_strike": 0.55, # x extra targets, on damage
 	"charge": 0.25,       # x (multiplier - 1), on damage
 	"rebirth": 0.2,       # x health share revived, on toughness
 	"unstoppable": 3.0,   # x projectile resistance, on toughness
-	"devour": 0.1,        # x lifesteal share, on toughness
-	"raise_dead": 0.15,    # on toughness and damage
+	"devour": 0.05,        # x lifesteal share, on toughness
+	"raise_dead": 0.0,    # on toughness and damage
 	"quake": 0.15,        # x (stun seconds / cooldown, up to 1), on toughness and damage
 	"predator": 0.05,      # x bonus (share of targets that are ranged), on damage
 	"knockback": 0.0,     # on toughness
 	"death_blast": 2.0,   # x health share, on damage
 	"heads": 0.2,         # x attack speed per head (about 1.5 heads on average), on damage
 	"soul_harvest": 0.2,  # x heal share, on toughness; kills also add damage
-	"dread": 0.2,         # on toughness
-	"rising_storm": 0.5,  # on damage (the cap is reached after ~20 blows)
+	"dread": 0.45,         # on toughness
+	"rising_storm": 0.3,  # on damage (the cap is reached after ~20 blows)
 	"resurrect": 0.35,    # on toughness and damage
-	"aegis": 0.8,        # on toughness
+	"aegis": 1.2,        # on toughness
 }
 const CHAIN_POWER_CAP := 1.2
 

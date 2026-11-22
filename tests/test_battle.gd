@@ -1193,7 +1193,7 @@ func test_abilities() -> void:
 	var raised: Array = range(sim.n).filter(func(i): return sim.raised[i] == 1)
 	check(raised.size() > 0 and raised.all(func(i): return sim.team[i] == 0 and sim.unit_ids[sim.kind[i]] == "skeleton"), "the Lich raises its victims as skeletons on its side (%d)" % raised.size())
 	var liches: Array = range(sim.n).filter(func(i): return sim.ab_id[i] == BattleSim.Ab.RAISE_DEAD)
-	check(liches.all(func(i): return sim.ab_used[i] <= 6), "up to 6 per Lich")
+	check(liches.all(func(i): return sim.ab_used[i] <= 8), "up to 8 per Lich")
 	var again: Dictionary = _ability_battle(one.call("lich"), [{"unit": "goblin", "level": 3, "tier": 6, "row": "front"}])
 	check((again["sim"] as BattleSim).checksum() == sim.checksum(), "battles with raised units stay deterministic")
 	# Direct checks: double strike, unstoppable, devour.
@@ -1226,8 +1226,9 @@ func test_abilities() -> void:
 	s3.ab_val[giant] = 2.0
 	s3._on_hit(giant, 1, jug, 10.0, 10.0, 0)
 	check(s3.stun_until[jug] == 0, "...and can't be stunned")
-	check(is_equal_approx(float(Army.unit_stats("shadow_dragon", 1)["lifesteal"]), 0.4), "Shadow Dragon devours (40% lifesteal)")
-	check(Army.unit_power("lich", 5) > Army.unit_power("lich", 5) / Army.ability_power(Army.unit_stats("lich", 5)).x, "abilities count toward Strength")
+	check(is_equal_approx(float(Army.unit_stats("shadow_dragon", 1)["lifesteal"]), 0.75), "Shadow Dragon devours (75% lifesteal)")
+	var mino := Army.ability_power(Army.unit_stats("minotaur", 5))
+	check(mino.y > 1.1, "abilities count toward Strength (Minotaur's charge: x%.2f damage)" % mino.y)
 	# Epic and legendary abilities.
 	r = _ability_battle(one.call("hill_giant"), foes)
 	check(int(r["ev"].get(BattleSim.Ev.QUAKE, 0)) > 0 and r["stun"] > 0, "Hill Giant's quake stuns")
@@ -1258,19 +1259,20 @@ func test_abilities() -> void:
 	var orc: int = range(s4.n).filter(func(i): return s4.team[i] == 1 and s4.role[i] == BattleSim.Role.MELEE)[0]
 	var a0 := s4.hp[archer]
 	s4.rng.seed = 3
-	s4._damage_unit(archer, 50.0, 0, true, 0)
+	s4._damage_unit(archer, 5.0, 0, true, 0)
 	var o0 := s4.hp[orc]
 	s4.rng.seed = 3
-	s4._damage_unit(orc, 50.0, 0, true, 0)
+	s4._damage_unit(orc, 5.0, 0, true, 0)
 	var vs_ranged := (a0 - s4.hp[archer]) / float(s4._dmg_mult[0 * s4._armor_count + s4.armor[archer]])
 	var vs_melee := (o0 - s4.hp[orc]) / float(s4._dmg_mult[0 * s4._armor_count + s4.armor[orc]])
-	check(absf(vs_ranged / vs_melee - 2.0) < 0.01, "Griffon's predator doubles damage to ranged units")
+	var pred := 1.0 + float(GameData.ability_of("griffon")["value"])
+	check(absf(vs_ranged / vs_melee - pred) < 0.01, "Griffon's predator: x%.1f damage to ranged units (measured x%.2f)" % [pred, vs_ranged / vs_melee])
 	var s5 := BattleSim.new()
 	s5.setup([{"unit": "stone_giant", "level": 1, "tier": 0, "row": "back"}], [{"unit": "goblin", "level": 1, "tier": 0, "row": "front"}], 1, "open_arena")
 	var gob: int = range(s5.n).filter(func(i): return s5.team[i] == 1)[0]
 	var x0 := s5.px[gob]
 	s5._on_hit(0, 0, gob, 10.0, 10.0, 0)
-	check(s5.px[gob] > x0 + 50.0 and s5.stun_until[gob] > s5.tick, "Stone Giant's boulders knock enemies back")
+	check(s5.px[gob] > x0 + float(GameData.ability_of("stone_giant")["value"]) - 1.0 and s5.stun_until[gob] > s5.tick, "Stone Giant's boulders knock enemies back")
 	# Slower squad growth.
 	var pl := ProfileLogic.new()
 	pl.data["units"]["golden_dragon"] = {"level": 1, "tier": 4, "shards": 0}
