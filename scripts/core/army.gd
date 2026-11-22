@@ -84,21 +84,24 @@ const SPLASH_POWER_REF := 0.6
 ## What each battle ability is worth in power: [toughness mult, damage mult]
 ## as a function of its value, measured with the balance simulator
 ## (tools/balance_sim.gd) so armies of equal power stay even fights.
-## Starting estimates, then tuned with the simulator.
+## Tuned with the simulator (armies mode, ~1500 battles across all 60 units):
+## armies with each ability unit should win about as often as others of its
+## rarity at equal power.
 const ABILITY_TUNING := {
-	"stun": 0.3,          # x (stun seconds / cooldown, up to 1), on toughness and damage
-	"chill": 0.25,        # x (chill seconds / cooldown, up to 1), on toughness
-	"curse": 0.3,         # x (seconds / cooldown, up to 1), on damage
-	"weaken": 0.3,        # x (seconds / cooldown, up to 1), on toughness
-	"burn": 0.8,          # x burn share, on damage
-	"chain": 0.75,        # x total chain damage share, on damage
+	"stun": 0.25,         # x (stun seconds / cooldown, up to 1), on toughness and damage
+	"chill": 0.35,        # x (chill seconds / cooldown, up to 1), on toughness
+	"curse": 0.2,         # x (seconds / cooldown, up to 1), on damage
+	"weaken": 0.25,       # x (seconds / cooldown, up to 1), on toughness
+	"burn": 0.7,          # x burn share, on damage
+	"chain": 1.0,         # x chain damage share (later jumps rarely find targets: capped at CHAIN_POWER_CAP)
 	"double_strike": 0.7, # x extra targets, on damage
-	"charge": 0.15,       # x (multiplier - 1), on damage
+	"charge": 0.35,       # x (multiplier - 1), on damage
 	"rebirth": 0.9,       # x health share revived, on toughness
-	"unstoppable": 0.6,   # x projectile resistance, on toughness
-	"devour": 0.6,        # x lifesteal share, on toughness
-	"raise_dead": 0.15,   # on toughness and damage
+	"unstoppable": 1.1,   # x projectile resistance, on toughness
+	"devour": 0.4,        # x lifesteal share, on toughness
+	"raise_dead": 0.3,    # on toughness and damage
 }
+const CHAIN_POWER_CAP := 1.2
 
 
 ## [toughness multiplier, damage multiplier] for a unit's battle ability.
@@ -125,7 +128,7 @@ static func ability_power(s: Dictionary) -> Vector2:
 			for _k in int(v):
 				f *= BattleSim.CHAIN_FALLOFF
 				sum += f
-			return Vector2(1.0, 1.0 + ABILITY_TUNING["chain"] * sum)
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["chain"] * minf(sum, CHAIN_POWER_CAP))
 		"double_strike":
 			return Vector2(1.0, 1.0 + ABILITY_TUNING["double_strike"] * v)
 		"charge":

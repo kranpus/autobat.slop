@@ -6,6 +6,32 @@ extends RefCounted
 ## kept under. Note kinds: "nerf", "buff", "change", "note".
 
 const LIST := [
+	{"version": "0.9.2", "date": "2026-11-22", "title": "Abilities",
+		"summary": "Splash is now rare: 16 units trade it for abilities of their own, and melee splash is nerfed.",
+		"sections": [
+			{"name": "Splash", "notes": [
+				{"kind": "nerf", "text": "Melee splash: blows now splash nearby enemies for 45% of the damage, down from 60%. Ranged splash stays at 35%."},
+				{"kind": "change", "text": "Only six units splash now: Orc Sorcerer, Hill Giant, Cyclops, Fire Giant, Golden Dragon and Grand Avatar. Every other former splasher has a battle ability instead (shown on its card in the Collection)."},
+			]},
+			{"name": "New abilities", "notes": [
+				{"kind": "change", "text": "Stun: Ogre Brute (0.6s) and Stone Giant (1s) knock their target senseless: it can't move or attack."},
+				{"kind": "change", "text": "Chill: Ice Dragon's breath halves the target's speed, moving and attacking, for 3s."},
+				{"kind": "change", "text": "Burn: Salamander Firebrand sets its target ablaze for 120% of the hit again over 4s."},
+				{"kind": "change", "text": "Chain Lightning: Elven Mage (2 jumps), Storm Titan (3) and Storm Dragon (5). Each attack jumps to more enemies nearby, 30% weaker each jump."},
+				{"kind": "change", "text": "Shatter: Frost Giant's hits make the target take 30% more damage from everyone for 4s."},
+				{"kind": "change", "text": "Wither: the Sphinx's spells make the target deal 35% less damage for 4s."},
+				{"kind": "change", "text": "Charge: the Minotaur's first blow against each new target deals triple damage."},
+				{"kind": "change", "text": "Double Strike: the Ettin's two clubs hit two enemies at once."},
+				{"kind": "change", "text": "Rebirth: the Phoenix (60% health) and the Bone Dragon (40%) rise again the first time they die."},
+				{"kind": "change", "text": "Unstoppable: the Juggernaut can't be stunned or chilled and takes 35% less damage from arrows, stones and spells."},
+				{"kind": "change", "text": "Devour: the Shadow Dragon heals itself for 40% of the damage it deals."},
+				{"kind": "change", "text": "Raise Dead: enemies the Lich kills rise as skeletons on its side, up to 6 per Lich."},
+			]},
+			{"name": "Strength and challenges", "notes": [
+				{"kind": "change", "text": "Abilities count toward army Strength, tuned with thousands of simulated battles so armies of equal Strength stay close fights."},
+				{"kind": "change", "text": "Challenge bosses use their new abilities too: Vorlath raises the dead, Ashwing is reborn, the Colossus throws chain lightning. The Titan Awakens and The Golden Wyrm got bigger armies to make up for the splash they lost (recommended 2050 and 3650); the rest were re-measured."},
+			]},
+		]},
 	{"version": "0.9.1", "date": "2026-11-22", "title": "Splash Down, Again",
 		"summary": "Ranged splash takes a second nerf, and the server can now tune how hard ranked opponents and challenges are.",
 		"sections": [

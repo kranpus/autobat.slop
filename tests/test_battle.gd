@@ -1047,11 +1047,11 @@ func test_ranged_splash_nerf() -> void:
 		lost.append(before - after)
 	check(lost[1] > 0.0 and absf(lost[1] / lost[0] - BattleSim.RANGED_SPLASH_MULT / BattleSim.AOE_SPLASH_MULT) < 0.001,
 		"projectile splash deals %.0f%% of melee splash (%.1f vs %.1f)" % [100.0 * lost[1] / lost[0], lost[1], lost[0]])
-	check(is_equal_approx(BattleSim.RANGED_SPLASH_MULT, 0.35) and is_equal_approx(BattleSim.AOE_SPLASH_MULT, 0.6), "ranged splash 35% of the hit (0.9.1), melee splash still 60%")
+	check(is_equal_approx(BattleSim.RANGED_SPLASH_MULT, 0.35) and is_equal_approx(BattleSim.AOE_SPLASH_MULT, 0.45), "ranged splash 35% of the hit (0.9.1), melee splash 45% (0.9.2)")
 	# Strength follows: a splash caster lost power, a melee splasher didn't.
-	var lich_full := Army.unit_power("lich", 1)
-	var ogre_full := Army.unit_power("ogre", 1)
-	check(lich_full < 1.0 * _old_power("lich") and is_equal_approx(ogre_full, _old_power("ogre")), "splash counts less in a ranged unit's Strength only")
+	var caster := Army.unit_power("orc_sorcerer", 1) / _old_power("orc_sorcerer")
+	var brute := Army.unit_power("hill_giant", 1) / _old_power("hill_giant")
+	check(caster < brute and brute < 1.0 and is_equal_approx(Army.unit_power("goblin", 1), _old_power("goblin")), "splash counts for less in Strength, ranged splash most (%.2fx, %.2fx)" % [caster, brute])
 	check(PatchNotes.latest() == UnitStats.current_patch(), "the patch notes cover this version (%s)" % PatchNotes.latest())
 
 
@@ -1129,7 +1129,7 @@ func test_difficulty() -> void:
 	var rec := Challenges.recommended("golden_wyrm")
 	party.run_command("difficulty challenges 1.5")
 	check(absf(Challenges.enemy_power("golden_wyrm") / wyrm - 1.5) < 0.01 and Challenges.recommended("golden_wyrm") == roundi(rec * 1.5), "challenge enemies and their recommended power scale")
-	check(Challenges.get_challenge("golden_wyrm")["enemy"][0]["mods"]["hp_mult"] == 90.0, "the challenge data itself is untouched")
+	check(Challenges.get_challenge("golden_wyrm")["enemy"][0]["mods"]["hp_mult"] == 150.0, "the challenge data itself is untouched")
 	var saved := Difficulty.to_dict()
 	Difficulty.reset()
 	Difficulty.apply(saved)
