@@ -30,6 +30,7 @@ func _initialize() -> void:
 	test_drop_rates()
 	test_rank_progression()
 	test_challenges()
+	test_target_modes()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -924,3 +925,59 @@ func test_challenges() -> void:
 		if not s2.finished:
 			stuck.append(c["id"])
 	check(stuck.is_empty(), "every challenge battle finishes %s" % [stuck])
+
+
+## Count what a squad's living units are targeting after a few retargets.
+func _targets_of(sim: BattleSim, uid: String) -> Array:
+	var out: Array = []
+	for i in sim.n:
+		if sim.alive[i] == 1 and sim.unit_ids[sim.kind[i]] == uid and sim.team[i] == 0 and sim.target[i] >= 0:
+			out.append(sim.target[i])
+	return out
+
+
+func test_target_modes() -> void:
+	print("flying unit targeting")
+	check(GameData.UNITS["griffon"].get("targets", "") == "ranged" and GameData.UNITS["cave_bat"].get("targets", "") == "healers"
+		and GameData.UNITS["hippogriff"].get("targets", "") == "backline", "griffons hunt ranged units, cave bats hunt healers, hippogriffs dive for the back line")
+	check(GameData.target_text("griffon") != "" and GameData.target_text("goblin") == "", "the Collection explains who a unit targets")
+	var enemy := [{"unit": "orc_warrior", "level": 5, "count": 60, "row": "front"},
+		{"unit": "gnoll_shaman", "level": 5, "count": 10, "row": "middle"},
+		{"unit": "elf_archer", "level": 5, "count": 30, "row": "back"}]
+	for spec in [["griffon", BattleSim.Role.RANGED, "ranged"], ["cave_bat", BattleSim.Role.HEALER, "healer"]]:
+		var sim := BattleSim.new()
+		sim.setup([{"unit": spec[0], "level": 5, "count": 12, "row": "front"}, {"unit": "goblin", "level": 5, "count": 40, "row": "front"}], enemy, 4, "open_arena")
+		for k in 15:
+			sim.step()
+		var picked := _targets_of(sim, spec[0])
+		var hits := picked.filter(func(j): return sim.role[j] == spec[1]).size()
+		check(picked.size() > 0 and hits == picked.size(), "%s go after %s units first (%d of %d)" % [spec[0], spec[2], hits, picked.size()])
+		var goblins := _targets_of(sim, "goblin")
+		var front := goblins.filter(func(j): return sim.unit_ids[sim.kind[j]] == "orc_warrior").size()
+		check(front * 2 > goblins.size(), "ordinary units still fight the nearest enemies")
+	var sim2 := BattleSim.new()
+	sim2.setup([{"unit": "hippogriff", "level": 5, "count": 12, "row": "front"}], enemy, 4, "open_arena")
+	for k in 15:
+		sim2.step()
+	var deep := 0
+	var picked2 := _targets_of(sim2, "hippogriff")
+	var max_x := 0.0
+	for j in sim2.n:
+		if sim2.team[j] == 1:
+			max_x = maxf(max_x, sim2.px[j])
+	for j in picked2:
+		if sim2.px[j] > max_x - 250.0:
+			deep += 1
+	check(picked2.size() > 0 and deep == picked2.size(), "hippogriffs dive for the rear of the enemy formation (%d of %d)" % [deep, picked2.size()])
+	# No healers left: cave bats fall back to ranged units, then anyone.
+	var sim3 := BattleSim.new()
+	sim3.setup([{"unit": "cave_bat", "level": 5, "count": 8, "row": "front"}], [{"unit": "goblin", "level": 1, "count": 20, "row": "front"}], 4, "open_arena")
+	sim3.run_to_end(200000)
+	check(sim3.finished, "units with a preferred target still fight when none are left")
+	var a := BattleSim.new()
+	a.setup([{"unit": "griffon", "level": 5, "count": 12, "row": "front"}, {"unit": "hippogriff", "level": 5, "count": 12, "row": "front"}], enemy, 77, "goblin_warrens")
+	a.run_to_end(200000)
+	var b := BattleSim.new()
+	b.setup([{"unit": "griffon", "level": 5, "count": 12, "row": "front"}, {"unit": "hippogriff", "level": 5, "count": 12, "row": "front"}], enemy, 77, "goblin_warrens")
+	b.run_to_end(200000)
+	check(a.checksum() == b.checksum(), "battles with targeting stay deterministic")

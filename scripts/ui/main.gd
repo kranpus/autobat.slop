@@ -269,7 +269,11 @@ func start_battle(config: Dictionary) -> void:
 	screen.closed.connect(_on_battle_closed)
 	_battle = screen
 	add_child(screen)
-	Audio.play_music("battle")
+	# Challenge fights with a named boss get the boss theme.
+	var boss := false
+	for sq in Challenges.get_challenge(str(config.get("challenge", ""))).get("enemy", []):
+		boss = boss or sq.has("title")
+	Audio.play_music("boss" if boss else "battle")
 
 
 func _on_battle_closed() -> void:

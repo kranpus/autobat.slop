@@ -69,6 +69,13 @@ legion_helm (armor/headgear/helmet_art_1), titans_orb (misc/misc_orb).
 | bow.ogg, arrow_hit.ogg | [RPG Sound Pack](https://opengameart.org/content/50-rpg-sound-effects) (drawKnife1, knifeSlice) | Kenney | CC0 |
 | sword_1–4.ogg, clash_1–4.ogg | [20 Sword Sound Effects](https://opengameart.org/content/20-sword-sound-effects-attacks-and-clashes) | StarNinjas | CC0 |
 | die_1, hurt_1, hurt_2, spell_fire, spell, coins, gem, scroll, roar (.ogg) | [80 CC0 RPG SFX](https://opengameart.org/content/80-cc0-rpg-sfx) | rubberduck | CC0 |
+| impact_1–4.ogg | [75 CC0 breaking / falling / hit sfx](https://opengameart.org/content/75-cc0-breaking-falling-hit-sfx) (bfh1_hit_01, _04, _07, bfh1_rock_hit_01) | rubberduck | CC0 |
+| roar_2, roar_3, grunt_1–3 (.ogg) | [80 CC0 creature SFX](https://opengameart.org/content/80-cc0-creature-sfx) (roar_02, roar_03, hurt_03, hurt_05, grunt_04) | rubberduck | CC0 |
+| swish_1–3.ogg | [Battle Sound Effects](https://opengameart.org/content/battle-sound-effects) (swish_2–4, converted to Ogg) | Ogrebane | CC0 |
+| spell_1–4.ogg | [Magic Spell SFX](https://opengameart.org/content/magic-spell-sfx) (magical_1–4) | JaggedStone | CC0 |
+| explosion.ogg | [Muffled Distant Explosion](https://opengameart.org/content/muffled-distant-explosion) (trimmed, Ogg) | NenadSimic | CC0 |
+| war_horn.ogg | [Their Coming (generic horn sound)](https://opengameart.org/content/their-coming-generic-horn-sound) (first 4.5 s) | StumpyStrust | CC0 |
+| fanfare.ogg | [Classic fanfare lick](https://opengameart.org/content/classic-fanfare-lick) (fanfare_3) | fvcalderan | CC0 |
 
 ## Music — `assets/music/`
 
@@ -76,6 +83,11 @@ legion_helm (armor/headgear/helmet_art_1), titans_orb (misc/misc_orb).
 |---|---|---|---|
 | battle_theme_a.mp3 | [Battle Theme A](https://opengameart.org/content/battle-theme-a) | cynicmusic | CC0 |
 | town_theme.mp3 | [Town Theme RPG](https://opengameart.org/content/town-theme-rpg) | cynicmusic | CC0 |
+| battle_theme_b.mp3 | [Battle Theme B for RPG](https://opengameart.org/content/battle-theme-b-for-rpg) | cynicmusic | CC0 |
+| determined_pursuit.ogg | [Determined Pursuit (epic orchestra loop)](https://opengameart.org/content/determined-pursuit-epic-orchestra-loop) (Ogg) | Emma_MA | CC0 |
+| boss_battle.ogg | [QaziJamJam (orchestral battle theme)](https://opengameart.org/content/qazijamjam-orchestral-battle-theme) (Ogg) | Emma_MA | CC0 |
+| victory.ogg | [Victory](https://opengameart.org/content/victory) (Ogg) | celestialghost8 | CC0 |
+| defeat.ogg | [Medieval: Defeat Theme](https://opengameart.org/content/medieval-defeat-theme) (first 12 s, faded) | RandomMind | CC0 |
 
 ## Engine
 

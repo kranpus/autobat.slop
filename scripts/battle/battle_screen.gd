@@ -19,6 +19,7 @@ var _verify_label: Label
 var _local_team := 0
 var _auto_start_timer: Timer
 var _rewards_box: VBoxContainer
+var _hud_root: Control
 
 
 func _ready() -> void:
@@ -48,6 +49,7 @@ func _build_hud() -> void:
 	_hud.layer = 5
 	add_child(_hud)
 	var root := Control.new()
+	_hud_root = root
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.theme = UIKit.make_theme()
@@ -104,10 +106,6 @@ func _build_hud() -> void:
 		var sp: int = s
 		bottom.add_child(UIKit.button("%dx" % sp, func(): view.speed_mult = float(sp)))
 	bottom.add_child(UIKit.button("Recenter", func(): view.fit_camera()))
-	if config.get("mode", "") != "live":
-		bottom.add_child(UIKit.button("Skip to result", func():
-			_begin()
-			view.skip_to_end()))
 
 	var hint := UIKit.label("Pinch: zoom    Drag: pan" if UIKit.is_mobile() else "Mouse wheel: zoom    Drag: pan", 12, UIKit.TEXT_DIM)
 	hint.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
@@ -192,7 +190,40 @@ func _begin() -> void:
 		return
 	_start_panel.visible = false
 	view.running = true
-	Audio.play_sfx("roar", -4.0)
+	Audio.play_sfx("horn", -2.0)
+	if _has_boss():
+		Audio.play_sfx("big_roar", 0.0)
+	_banner("FIGHT!", UIKit.ACCENT, 0.9)
+
+
+## A challenge with a named boss in it.
+func _has_boss() -> bool:
+	for sq in Challenges.get_challenge(str(config.get("challenge", ""))).get("enemy", []):
+		if sq.has("title"):
+			return true
+	return false
+
+
+## A big word that punches in and fades (FIGHT!, VICTORY, DEFEAT).
+func _banner(text: String, color: Color, hold: float) -> void:
+	var l := UIKit.label(text, 72, color)
+	l.add_theme_constant_override("outline_size", 12)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.85))
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hud_root.add_child(l)
+	l.pivot_offset = get_viewport().get_visible_rect().size * 0.5
+	l.scale = Vector2(2.2, 2.2)
+	l.modulate.a = 0.0
+	var tw := create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(l, "scale", Vector2.ONE, 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 1.0, 0.15)
+	tw.chain().tween_interval(hold)
+	tw.chain().tween_property(l, "modulate:a", 0.0, 0.35)
+	tw.chain().tween_callback(l.queue_free)
 
 
 func _process(_delta: float) -> void:
@@ -269,7 +300,16 @@ func _on_finished(winner: int) -> void:
 	var cont := UIKit.button("Continue", func(): closed.emit())
 	cont.custom_minimum_size = Vector2(0, 40)
 	v.add_child(cont)
-	_result_panel.visible = true
+	# The finish: a big banner and music sting, then the results.
+	_banner(title_text, title_color, 0.6)
+	if score >= 1.0:
+		Audio.play_stinger("victory")
+	elif score <= 0.0:
+		Audio.play_stinger("defeat")
+	view.shake(6.0 if score >= 1.0 else 3.0)
+	get_tree().create_timer(1.1).timeout.connect(func():
+		if is_instance_valid(_result_panel):
+			_result_panel.visible = true)
 
 
 func _show_rewards(summary: Dictionary, mode: String) -> void:
@@ -303,6 +343,7 @@ func _show_challenge_rewards(summary: Dictionary, mode: String) -> void:
 		_rewards_box.add_child(UIKit.label("Challenge cleared again. Rewards are only given the first time.", 14, UIKit.TEXT_DIM))
 		return
 	_rewards_box.add_child(UIKit.label("Challenge complete! First-clear reward:", 15, UIKit.GOOD))
+	Audio.play_sfx("fanfare", -2.0)
 	if int(summary.get("gold", 0)) > 0:
 		_rewards_box.add_child(UIKit.label("+%d gold" % int(summary["gold"]), 16, Color("ffd76a")))
 	if int(summary.get("maps", 0)) > 0:

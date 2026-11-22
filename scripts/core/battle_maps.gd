@@ -138,8 +138,10 @@ const MAPS := {
 	"fortress_gate": {
 		"name": "Fortress Gate", "tile": "marble", "size": [2600, 1400], "challenge": true,
 		"desc": "The defenders hold a walled line with a single gate. Archers fire from behind the walls.",
-		"obstacles": [["wall", 0.6, 0.06, 80], ["wall", 0.6, 0.18, 80], ["wall", 0.6, 0.3, 80], ["wall", 0.6, 0.38, 60],
-			["wall", 0.6, 0.62, 60], ["wall", 0.6, 0.7, 80], ["wall", 0.6, 0.82, 80], ["wall", 0.6, 0.94, 80]],
+		# Overlapping wall sections (no gaps a unit could squeeze into), with
+		# one gate in the middle.
+		"obstacles": [["wall", 0.6, 0.04, 80], ["wall", 0.6, 0.14, 80], ["wall", 0.6, 0.24, 80], ["wall", 0.6, 0.34, 80],
+			["wall", 0.6, 0.66, 80], ["wall", 0.6, 0.76, 80], ["wall", 0.6, 0.86, 80], ["wall", 0.6, 0.96, 80]],
 	},
 	"dragon_lair": {
 		"name": "The Dragon's Lair", "tile": "infernal", "size": [2600, 1500], "challenge": true,

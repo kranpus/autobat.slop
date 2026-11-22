@@ -12,10 +12,12 @@ const CREDITS := """[b]Art[/b]
 [b]Sound effects[/b]
 • Kenney: UI SFX Set and RPG Sounds (CC0). kenney.nl
 • StarNinjas: 20 sword sound effects (CC0). opengameart.org/content/20-sword-sound-effects-attacks-and-clashes
-• rubberduck: 80 CC0 RPG SFX (CC0). opengameart.org/content/80-cc0-rpg-sfx
+• rubberduck: 80 CC0 RPG SFX, 75 CC0 hit SFX and 80 CC0 creature SFX (CC0). opengameart.org
+• Ogrebane, JaggedStone, NenadSimic, StumpyStrust, fvcalderan: battle swishes, spells, explosion, war horn, fanfare (CC0)
 
 [b]Music[/b]
-• cynicmusic: "Battle Theme A" and "Town Theme RPG" (CC0). opengameart.org
+• cynicmusic: "Battle Theme A", "Battle Theme B" and "Town Theme RPG" (CC0). opengameart.org
+• Emma_MA: "Determined Pursuit" and "QaziJamJam" (CC0); celestialghost8: "Victory"; RandomMind: "Medieval: Defeat Theme" (CC0)
 
 [b]Engine[/b]
 • Godot Engine (MIT). godotengine.org
@@ -73,6 +75,15 @@ func _ready() -> void:
 			if is_instance_valid(fs):
 				fs.set_pressed_no_signal(UIKit.is_fullscreen()))
 		grid.add_child(fs)
+
+	grid.add_child(UIKit.label("Battles", 15))
+	var shake_box := CheckBox.new()
+	shake_box.text = "Screen shake"
+	shake_box.button_pressed = bool(Profile.settings.get("screen_shake", true))
+	shake_box.toggled.connect(func(on: bool):
+		Profile.settings["screen_shake"] = on
+		Profile.save_settings())
+	grid.add_child(shake_box)
 
 	grid.add_child(UIKit.label("Interface size", 15))
 	var size_pick := OptionButton.new()

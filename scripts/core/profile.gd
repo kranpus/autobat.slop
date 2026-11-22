@@ -25,7 +25,7 @@ const SAVE_PATH := "user://profile.json"
 const SETTINGS_PATH := "user://settings.json"
 const MAP_REGEN_SECONDS := ProfileLogic.MAP_REGEN_SECONDS
 const MAX_MAPS := ProfileLogic.MAX_MAPS
-const SETTING_KEYS := ["music_volume", "sfx_volume", "ui_scale", "server_address", "unit_locks", "region_locks", "server_rewards", "drop_rates"]
+const SETTING_KEYS := ["music_volume", "sfx_volume", "ui_scale", "server_address", "unit_locks", "region_locks", "server_rewards", "drop_rates", "screen_shake"]
 
 var logic := ProfileLogic.new()
 var settings: Dictionary = {"music_volume": 0.6, "sfx_volume": 0.8}

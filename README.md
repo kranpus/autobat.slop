@@ -39,11 +39,11 @@ Android versions into `export/legion-<version>/`, e.g. `export/legion-0.7/` with
 `legion-0.7-web.zip`.
 
 **Versions:** there are two version numbers.
-- **The release version** (currently **0.7**) is what players see on the sign-in screen, in
+- **The release version** (currently **0.8**) is what players see on the sign-in screen, in
   Settings and in update prompts, and it names the builds. It's set in Project Settings →
   Application → Config → Version.
 - **For a new release:** also raise the Android `version/code` in `export_presets.cfg`
-  (currently 7). Android only installs updates with a higher code.
+  (currently 8). Android only installs updates with a higher code.
 - **`GAME_VERSION`** in `scripts/net/party.gd` (e.g. `legion-draft-12`) is the compatibility
   number between game and server. Bump it whenever an update changes how they talk to each other.
 - **Templates:** fetch only the export templates you need with
@@ -148,6 +148,18 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
    - **Only nearby players:** you're only matched against saved player armies within **±200
      rating** of yours (the server admin can change this). If nobody is that close, training
      opponents fill in.
+   - **Flying hunters:** some flyers ignore the nearest enemy and go after a kind of target
+     anywhere on the field (shown with ⚑ in the Collection):
+     - **Ranged units and casters:** Griffon, Tengu Warrior, Sphinx.
+     - **Healers:** Cave Bat, Phoenix; they go for ranged units once the healers are gone.
+     - **The back line:** Hippogriff, Bone Dragon.
+   - **Battles play out in full** (there's no skip button; use 2× or 4× speed).
+     - **The effects:** a war horn and FIGHT! banner, hit flashes, slash and spark effects,
+       death puffs, shockwaves and screen shake for big splash attacks and falling giants, and
+       a VICTORY / DEFEAT banner with a music sting.
+     - **Music:** battle music varies between three tracks, and challenge bosses get their own
+       theme.
+     - **Screen shake** can be turned off in Settings.
    - **Training opponents:** on average a little stronger than your army, about 8% (Easy ≈ 0.9×,
      Even ≈ 1.05×, Hard ≈ 1.3× your power). Above rating ~950 they carry trinkets too, more and
      rarer as rating rises.

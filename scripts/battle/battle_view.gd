@@ -23,7 +23,13 @@ var _kind_units: Array = []          # kind -> PackedInt32Array of unit indexes
 var _kind_scale: PackedFloat32Array = PackedFloat32Array()
 var _base_mm: MultiMesh
 var _proj_mm: Array[MultiMesh] = []
-var _fx: Array = []                  # [type, x, y, radius, age, life]
+var _fx: Array = []                  # [type, x, y, radius, age, life, angle]
+var _shake := 0.0                    # camera shake strength (pixels), decays
+var _hit_seed := 0
+## FX types (purely visual: the simulation never sees them).
+enum Fx { BLAST, HEAL, PUFF, SPARK, SLASH, SHOCKWAVE, GLOW }
+const MAX_FX := 450                  # keeps huge battles smooth
+const MAX_NEW_FX_PER_STEP := 40
 var _camera: Camera2D
 var _dragging := false
 var _finished_emitted := false
@@ -250,36 +256,86 @@ func skip_to_end() -> void:
 	_acc = 0.0
 
 
+func _add_fx(type: int, x: float, y: float, r: float, life: float, angle: float = 0.0) -> void:
+	if _fx.size() < MAX_FX:
+		_fx.append([type, x, y, r, 0.0, life, angle])
+
+
+func shake(amount: float) -> void:
+	if bool(Profile.settings.get("screen_shake", true)):
+		_shake = minf(18.0, maxf(_shake, amount))
+
+
 func _handle_events(evs: Array) -> void:
 	var melee := 0
 	var shots := 0
 	var magic := 0
 	var deaths := 0
+	var impacts := 0
+	var big_blast := 0.0
+	var big_death := false
+	var spawned := 0
 	for e in evs:
+		var room := spawned < MAX_NEW_FX_PER_STEP
 		match int(e[0]):
 			BattleSim.Ev.MELEE_HIT:
 				melee += 1
+				if room and (melee % 3 == 1):
+					_hit_seed += 1
+					_add_fx(Fx.SLASH, e[1], e[2] - 6.0, 15.0, 0.2, float(_hit_seed) * 2.39)
+					spawned += 1
 			BattleSim.Ev.SHOT:
 				if int(e[3]) >= 4:
 					magic += 1
 				else:
 					shots += 1
+			BattleSim.Ev.IMPACT:
+				impacts += 1
+				if room and (impacts % 2 == 1):
+					_hit_seed += 1
+					_add_fx(Fx.SPARK, e[1], e[2] - 6.0, 14.0, 0.25, float(_hit_seed) * 1.7)
+					spawned += 1
 			BattleSim.Ev.BLAST:
-				_fx.append([0, e[1], e[2], e[3], 0.0, 0.35])
+				var r := float(e[3])
+				_add_fx(Fx.BLAST, e[1], e[2], r, 0.35)
+				if r >= 25.0:
+					_add_fx(Fx.SHOCKWAVE, e[1], e[2], r * 1.6, 0.45)
+					big_blast = maxf(big_blast, r)
 			BattleSim.Ev.HEAL:
-				_fx.append([1, e[1], e[2], 10.0, 0.0, 0.5])
+				_add_fx(Fx.HEAL, e[1], e[2], 10.0, 0.5)
 			BattleSim.Ev.DIE:
 				deaths += 1
+				var j := int(e[3])
+				if sim.max_hp[j] >= 500.0:
+					# A big unit falls: a flash, a shockwave and a shake.
+					big_death = true
+					_add_fx(Fx.GLOW, e[1], e[2], 70.0, 0.7)
+					_add_fx(Fx.SHOCKWAVE, e[1], e[2], 140.0, 0.6)
+				elif room:
+					_add_fx(Fx.PUFF, e[1], e[2], 13.0, 0.5)
+					spawned += 1
+	if big_death:
+		shake(10.0)
+	elif big_blast > 0.0:
+		shake(clampf(big_blast / 12.0, 2.0, 7.0))
 	if speed_mult > 2.0 and randf() < 0.5:
 		return
 	if melee > 0:
 		Audio.play_sfx("melee", -10.0 + minf(6.0, float(melee) * 0.3))
+		if melee >= 4:
+			Audio.play_sfx("swish", -14.0)
 	if shots > 0:
 		Audio.play_sfx("shoot", -14.0)
+	if impacts > 0:
+		Audio.play_sfx("impact", -16.0 + minf(4.0, float(impacts) * 0.3))
 	if magic > 0:
-		Audio.play_sfx("magic", -10.0)
+		Audio.play_sfx("spell" if magic >= 3 else "magic", -12.0)
+	if big_blast >= 25.0:
+		Audio.play_sfx("explosion", -8.0)
 	if deaths > 0:
 		Audio.play_sfx("die", -12.0 + minf(6.0, float(deaths)))
+	if big_death:
+		Audio.play_sfx("big_roar", -2.0)
 
 
 func _sync_visuals(alpha: float) -> void:
@@ -308,9 +364,16 @@ func _sync_visuals(alpha: float) -> void:
 				var xf := Transform2D(0.0, Vector2(base_scale * face, base_scale), 0.0, Vector2(x + lunge * toward, y + bob + fly - 6.0 * base_scale))
 				mm.set_instance_transform_2d(idx, xf)
 				var c: Color = TEAM_TINT[sim.team[i]]
-				if t - sim.hit_tick[i] < 2:
-					c = Color(1.0, 0.45, 0.45)
+				var since_hit := t - sim.hit_tick[i]
+				if since_hit < 1:
+					c = Color(1.0, 1.0, 1.0)          # white flash on the hit tick
+				elif since_hit < 3:
+					c = Color(1.0, 0.5, 0.45)         # then a red tint
 				mm.set_instance_color(idx, c)
+				if since_hit < 2:
+					# A quick squash on being hit.
+					xf = xf.scaled_local(Vector2(1.12, 0.9))
+					mm.set_instance_transform_2d(idx, xf)
 				_base_mm.set_instance_transform_2d(i, Transform2D(0.0, Vector2(sim.radius[i] * 2.4, sim.radius[i] * 1.2), 0.0, Vector2(x, y + 2.0)))
 				_base_mm.set_instance_color(i, TEAM_BASE[sim.team[i]])
 			else:
@@ -352,6 +415,13 @@ func _sync_projectiles() -> void:
 
 
 func _update_fx(delta: float) -> void:
+	if _camera:
+		if _shake > 0.05:
+			_camera.offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake / maxf(0.5, _camera.zoom.x)
+			_shake *= pow(0.0025, delta)   # fades out in about a second
+		else:
+			_shake = 0.0
+			_camera.offset = Vector2.ZERO
 	var keep: Array = []
 	for f in _fx:
 		f[4] = float(f[4]) + delta * speed_mult
@@ -366,15 +436,40 @@ func _draw_overlay() -> void:
 	_overlay.draw_line(Vector2(sim.map_w * 0.5, 0), Vector2(sim.map_w * 0.5, sim.map_h), Color(1, 1, 1, 0.06), 2.0)
 	for f in _fx:
 		var k := float(f[4]) / float(f[5])
+		var fade := 1.0 - k
 		var pos := Vector2(float(f[1]), float(f[2]))
-		if int(f[0]) == 0:
-			var r := float(f[3]) * (0.4 + 0.6 * k)
-			_overlay.draw_circle(pos, r, Color(1.0, 0.55, 0.15, 0.35 * (1.0 - k)))
-			_overlay.draw_arc(pos, r, 0.0, TAU, 24, Color(1.0, 0.85, 0.4, 0.8 * (1.0 - k)), 2.0)
-		else:
-			var y := pos.y - 10.0 - 14.0 * k
-			_overlay.draw_line(Vector2(pos.x - 4, y), Vector2(pos.x + 4, y), Color(0.4, 1.0, 0.4, 1.0 - k), 2.0)
-			_overlay.draw_line(Vector2(pos.x, y - 4), Vector2(pos.x, y + 4), Color(0.4, 1.0, 0.4, 1.0 - k), 2.0)
+		var r0 := float(f[3])
+		match int(f[0]):
+			Fx.BLAST:
+				var r := r0 * (0.4 + 0.6 * k)
+				if k < 0.25:
+					_overlay.draw_circle(pos, r * 0.6, Color(1.0, 0.95, 0.7, 0.7 * (1.0 - k * 4.0)))   # flash
+				_overlay.draw_circle(pos, r, Color(1.0, 0.55, 0.15, 0.35 * fade))
+				_overlay.draw_arc(pos, r, 0.0, TAU, 24, Color(1.0, 0.85, 0.4, 0.8 * fade), 2.0)
+			Fx.HEAL:
+				var y := pos.y - 10.0 - 14.0 * k
+				_overlay.draw_line(Vector2(pos.x - 4, y), Vector2(pos.x + 4, y), Color(0.4, 1.0, 0.4, fade), 2.0)
+				_overlay.draw_line(Vector2(pos.x, y - 4), Vector2(pos.x, y + 4), Color(0.4, 1.0, 0.4, fade), 2.0)
+			Fx.PUFF:
+				# A dust/blood puff that swells and fades where a unit fell.
+				_overlay.draw_circle(pos + Vector2(0, -4.0 * k), r0 * (0.6 + 0.9 * k), Color(0.55, 0.12, 0.1, 0.45 * fade))
+				_overlay.draw_circle(pos + Vector2(3, -6.0 * k), r0 * (0.4 + 0.7 * k), Color(0.75, 0.68, 0.6, 0.35 * fade))
+			Fx.SPARK:
+				# Short sparks bursting out where a projectile landed.
+				var a := float(f[6])
+				for s_i in 4:
+					var dir := Vector2.from_angle(a + float(s_i) * TAU / 4.0)
+					_overlay.draw_line(pos + dir * r0 * k, pos + dir * r0 * (0.45 + k), Color(1.0, 0.9, 0.5, fade), 2.5)
+			Fx.SLASH:
+				# A bright arc across the target.
+				var a2 := float(f[6])
+				_overlay.draw_arc(pos, r0, a2, a2 + 2.2, 8, Color(1.0, 1.0, 1.0, 0.95 * fade), 3.0)
+			Fx.SHOCKWAVE:
+				var rr := r0 * (0.2 + 0.8 * k)
+				_overlay.draw_arc(pos, rr, 0.0, TAU, 40, Color(1.0, 0.95, 0.8, 0.6 * fade), 3.0 * fade + 1.0)
+			Fx.GLOW:
+				_overlay.draw_circle(pos, r0 * (0.5 + 0.5 * k), Color(1.0, 0.9, 0.6, 0.45 * fade))
+				_overlay.draw_circle(pos, r0 * 0.3, Color(1.0, 1.0, 1.0, 0.6 * fade))
 	# Health bars for big units
 	for i in _big_units:
 		if sim.alive[i] == 0:

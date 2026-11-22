@@ -151,7 +151,7 @@ const UNITS := {
 		"name": "Griffon", "rarity": "epic", "role": "melee",
 		"hp": 730.0, "dmg": 40.0, "cooldown": 0.9, "range": 8.0, "speed": 130.0,
 		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
-		"projectile": "none", "radius": 14.0, "scale": 1.6, "flying": true,
+		"projectile": "none", "radius": 14.0, "scale": 1.6, "flying": true, "targets": "ranged",
 		"desc": "Flies over the melee to hunt casters.",
 	},
 	"golden_dragon": {
@@ -172,7 +172,7 @@ const UNITS := {
 		"name": "Phoenix", "rarity": "legendary", "role": "caster",
 		"hp": 1750.0, "dmg": 55.0, "cooldown": 1.4, "range": 180.0, "speed": 110.0,
 		"damage": "fire", "armor": "beast", "aoe": 60.0, "heal": 0.0, "regen": 20.0,
-		"projectile": "fire", "radius": 18.0, "scale": 2.0, "flying": true,
+		"projectile": "fire", "radius": 18.0, "scale": 2.0, "flying": true, "targets": "healers",
 		"desc": "Blazing, fast and self-healing.",
 	},
 	# --- Locked by default (enable with the server's `unlock` command) ---
@@ -215,7 +215,7 @@ const UNITS := {
 		"name": "Cave Bat", "rarity": "common", "role": "melee", "locked": true,
 		"hp": 30.0, "dmg": 6.0, "cooldown": 0.6, "range": 5.0, "speed": 120.0,
 		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
-		"projectile": "none", "radius": 6.0, "scale": 0.7, "flying": true,
+		"projectile": "none", "radius": 6.0, "scale": 0.7, "flying": true, "targets": "healers",
 		"desc": "Flitting swarms that fly over terrain.",
 	},
 	"soldier_ant": {
@@ -250,7 +250,7 @@ const UNITS := {
 		"name": "Hippogriff", "rarity": "uncommon", "role": "melee", "locked": true,
 		"hp": 200.0, "dmg": 16.0, "cooldown": 0.8, "range": 6.0, "speed": 120.0,
 		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
-		"projectile": "none", "radius": 10.0, "scale": 1.1, "flying": true,
+		"projectile": "none", "radius": 10.0, "scale": 1.1, "flying": true, "targets": "backline",
 		"desc": "A lighter cousin of the griffon.",
 	},
 	"war_hound": {
@@ -299,7 +299,7 @@ const UNITS := {
 		"name": "Tengu Warrior", "rarity": "uncommon", "role": "melee", "locked": true,
 		"hp": 120.0, "dmg": 16.0, "cooldown": 0.8, "range": 6.0, "speed": 110.0,
 		"damage": "physical", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
-		"projectile": "none", "radius": 8.0, "scale": 0.9, "flying": true,
+		"projectile": "none", "radius": 8.0, "scale": 0.9, "flying": true, "targets": "ranged",
 		"desc": "Winged swordsmen who strike from above.",
 	},
 	"troll": {
@@ -397,7 +397,7 @@ const UNITS := {
 		"name": "Sphinx", "rarity": "epic", "role": "caster", "locked": true,
 		"hp": 900.0, "dmg": 55.0, "cooldown": 1.8, "range": 200.0, "speed": 90.0,
 		"damage": "magic", "armor": "beast", "aoe": 40.0, "heal": 0.0, "regen": 0.0,
-		"projectile": "magic", "radius": 14.0, "scale": 1.6, "flying": true,
+		"projectile": "magic", "radius": 14.0, "scale": 1.6, "flying": true, "targets": "ranged",
 		"desc": "An ancient riddler with withering spells.",
 	},
 	"ice_dragon": {
@@ -418,7 +418,7 @@ const UNITS := {
 		"name": "Bone Dragon", "rarity": "epic", "role": "melee", "locked": true,
 		"hp": 1100.0, "dmg": 65.0, "cooldown": 1.2, "range": 10.0, "speed": 85.0,
 		"damage": "physical", "armor": "undead", "aoe": 30.0, "heal": 0.0, "regen": 0.0,
-		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": true,
+		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": true, "targets": "backline",
 		"desc": "A dragon that refused to stay dead.",
 	},
 	"juggernaut": {
@@ -565,6 +565,18 @@ static func unit_ids_sorted() -> Array:
 			return ra < rb
 		return String(UNITS[a]["name"]) < String(UNITS[b]["name"]))
 	return ids
+
+
+## Who a unit goes after first (most attack whatever is nearest).
+const TARGET_TEXT := {
+	"ranged": "Hunts ranged units and casters first",
+	"healers": "Hunts healers first",
+	"backline": "Dives for the enemy back line first",
+}
+
+
+static func target_text(unit_id: String) -> String:
+	return TARGET_TEXT.get(str(UNITS[unit_id].get("targets", "")), "")
 
 
 static func rarity_color(rarity: String) -> Color:

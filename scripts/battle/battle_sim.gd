@@ -23,6 +23,12 @@ const HALF_NEIGHBOURS := [Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vecto
 
 enum Ev { MELEE_HIT, SHOT, IMPACT, BLAST, HEAL, DIE }
 enum Role { MELEE, RANGED, CASTER, HEALER, TANK }
+## Who a unit attacks first (GameData "targets"): the nearest enemy, or the
+## nearest of a preferred kind anywhere on the field (flyers hunting the
+## enemy's ranged units, healers or back line).
+enum Target { NEAREST, RANGED, HEALERS, BACKLINE }
+const TARGET_MODES := {"ranged": Target.RANGED, "healers": Target.HEALERS, "backline": Target.BACKLINE}
+const BACKLINE_SHARE := 0.35      # the rearmost 35% of the enemy formation counts as back line
 
 # --- unit state -------------------------------------------------------------
 var n := 0
@@ -57,6 +63,7 @@ var regen := PackedFloat32Array()
 var radius := PackedFloat32Array()
 var lifesteal := PackedFloat32Array()
 var thorns := PackedFloat32Array()
+var tmode := PackedInt32Array()      # Target mode per unit
 
 # --- projectiles (pooled) ---------------------------------------------------
 var pr_count := 0
@@ -248,6 +255,7 @@ func _add_unit(uid: String, s: Dictionary, t: int, x: float, y: float) -> void:
 	radius.append(s["radius"])
 	lifesteal.append(float(s.get("lifesteal", 0.0)))
 	thorns.append(float(s.get("thorns", 0.0)))
+	tmode.append(int(TARGET_MODES.get(str(s.get("targets", "")), Target.NEAREST)))
 	alive_count[t] += 1
 	start_count[t] += 1
 	start_hp[t] += float(s["hp"])
@@ -353,6 +361,10 @@ func _approach_and_act(i: int, t: int, healing: bool) -> void:
 
 
 func _find_enemy(i: int) -> int:
+	if tmode[i] != Target.NEAREST:
+		var p := _find_priority_enemy(i, tmode[i])
+		if p >= 0:
+			return p
 	var my_team := team[i]
 	var x := px[i]
 	var y := py[i]
@@ -406,6 +418,55 @@ func _find_enemy(i: int) -> int:
 				best = j
 		k += stride
 	return best
+
+
+## The nearest enemy of the preferred kind anywhere on the field, or -1 if
+## there is none left (then the unit attacks whatever is nearest).
+func _find_priority_enemy(i: int, mode: int) -> int:
+	var list: PackedInt32Array = team_lists[1 - team[i]]
+	var x := px[i]
+	var y := py[i]
+	# Back line: how deep each enemy stands in its own formation. The right-hand
+	# army (team 1) has its rear at large x, the left-hand one at small x.
+	var cutoff := 0.0
+	var rear_sign := 1.0 if team[i] == 0 else -1.0
+	if mode == Target.BACKLINE:
+		var lo := INF
+		var hi := -INF
+		for j in list:
+			if alive[j] == 1:
+				var depth := px[j] * rear_sign
+				lo = minf(lo, depth)
+				hi = maxf(hi, depth)
+		if lo == INF:
+			return -1
+		cutoff = hi - (hi - lo) * BACKLINE_SHARE
+	for pass_i in 2:
+		var best := -1
+		var best_d2 := INF
+		for j in list:
+			if alive[j] == 0:
+				continue
+			var ok := false
+			match mode:
+				Target.RANGED:
+					ok = role[j] == Role.RANGED or role[j] == Role.CASTER
+				Target.HEALERS:
+					# No healers left: go for ranged units and casters instead.
+					ok = role[j] == Role.HEALER if pass_i == 0 else (role[j] == Role.RANGED or role[j] == Role.CASTER)
+				Target.BACKLINE:
+					ok = px[j] * rear_sign >= cutoff
+			if not ok:
+				continue
+			var dx := px[j] - x
+			var dy := py[j] - y
+			var d2 := dx * dx + dy * dy
+			if d2 < best_d2:
+				best_d2 = d2
+				best = j
+		if best >= 0 or mode != Target.HEALERS:
+			return best
+	return -1
 
 
 func _find_wounded_ally(i: int) -> int:

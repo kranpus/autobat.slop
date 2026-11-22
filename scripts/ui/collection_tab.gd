@@ -110,6 +110,8 @@ func _build_detail() -> void:
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.custom_minimum_size = Vector2(170 if UIKit.is_compact(self) else 240, 0)
 	hv.add_child(desc)
+	if GameData.target_text(id) != "":
+		hv.add_child(UIKit.label("⚑ " + GameData.target_text(id) + ".", 12, Color("9fd3ff")))
 	head.add_child(hv)
 	_detail.add_child(head)
 
