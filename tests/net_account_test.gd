@@ -141,7 +141,7 @@ func _run() -> void:
 	print("difficulty from the server")
 	check((await _admin("difficulty challenges 1.2")).begins_with("Difficulty updated"), "the admin changed challenge difficulty")
 	await _wait_ms(500)
-	check(is_equal_approx(Difficulty.challenge_mult, 1.2) and Challenges.recommended("titan") == roundi(2150 * 1.2), "signed-in players get it straight away")
+	check(is_equal_approx(Difficulty.challenge_mult, 1.2) and Challenges.recommended("titan") == roundi(int(Challenges.get_challenge("titan")["recommended"]) * 1.2), "signed-in players get it straight away")
 	await _admin("difficulty reset")
 	await _wait_ms(500)
 	check(Difficulty.is_default(), "and the reset")
