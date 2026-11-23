@@ -673,10 +673,11 @@ const AI_RATING_DIV_HIGH := 10.0
 const AI_RATING_FROM := 2500
 
 
+## (The server can move these: Difficulty.train_*.)
 static func ai_rating_div(my_rating: int) -> float:
-	if my_rating < AI_RATING_FULL_UNTIL:
+	if my_rating < Difficulty.train_slow_from:
 		return 1.0
-	return AI_RATING_DIV_LOW if my_rating < AI_RATING_FROM else AI_RATING_DIV_HIGH
+	return Difficulty.train_div if my_rating < Difficulty.train_slower_from else Difficulty.train_div_late
 
 
 ## Rating change for a ranked battle; vs_ai: against a training band.

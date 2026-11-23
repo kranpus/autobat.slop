@@ -21,15 +21,34 @@ const MAX_CHALLENGE := 5.0
 ## [[power mult, rating offset, label], ...] in TIER_NAMES order.
 static var tiers: Array = Army.GHOST_TIERS.duplicate(true)
 static var challenge_mult := 1.0
+## Rating from battles against training bands: in full below slow_from, then
+## divided by div (a quarter by default), and by div_late from slower_from.
+## Defaults in Army (AI_RATING_*); the server's 'difficulty training' sets them.
+static var train_slow_from: int = Army.AI_RATING_FULL_UNTIL
+static var train_slower_from: int = Army.AI_RATING_FROM
+static var train_div: float = Army.AI_RATING_DIV_LOW
+static var train_div_late: float = Army.AI_RATING_DIV_HIGH
+const MAX_TRAIN_RATING := 20000
+const MAX_TRAIN_DIV := 100.0
 
 
 static func reset() -> void:
 	tiers = Army.GHOST_TIERS.duplicate(true)
 	challenge_mult = 1.0
+	set_training(Army.AI_RATING_FULL_UNTIL, Army.AI_RATING_FROM, Army.AI_RATING_DIV_LOW, Army.AI_RATING_DIV_HIGH)
+
+
+static func set_training(slow_from: int, slower_from: int, div: float = -1.0, div_late: float = -1.0) -> void:
+	train_slow_from = clampi(slow_from, 0, MAX_TRAIN_RATING)
+	train_slower_from = clampi(slower_from, train_slow_from, MAX_TRAIN_RATING)
+	if div > 0.0:
+		train_div = clampf(div, 1.0, MAX_TRAIN_DIV)
+	if div_late > 0.0:
+		train_div_late = clampf(div_late, 1.0, MAX_TRAIN_DIV)
 
 
 static func to_dict() -> Dictionary:
-	var d := {"challenges": challenge_mult}
+	var d := {"challenges": challenge_mult, "training": [train_slow_from, train_slower_from, train_div, train_div_late]}
 	for t in tiers:
 		d[str(t[2]).to_lower()] = [float(t[0]), int(t[1])]
 	return d
@@ -47,6 +66,9 @@ static func apply(d) -> void:
 			set_tier(i, float(v[0]), int(v[1]))
 	if d.has("challenges"):
 		challenge_mult = clampf(float(d["challenges"]), MIN_CHALLENGE, MAX_CHALLENGE)
+	var t = d.get("training")
+	if typeof(t) == TYPE_ARRAY and t.size() == 4:
+		set_training(int(t[0]), int(t[1]), float(t[2]), float(t[3]))
 
 
 static func set_tier(i: int, power: float, rating_offset: int) -> void:
@@ -61,7 +83,8 @@ static func tier_index(name: String) -> int:
 
 
 static func is_default() -> bool:
-	return JSON.stringify(to_dict()) == JSON.stringify({"challenges": 1.0, "easy": [float(Army.GHOST_TIERS[0][0]), int(Army.GHOST_TIERS[0][1])],
+	return JSON.stringify(to_dict()) == JSON.stringify({"challenges": 1.0, "training": [Army.AI_RATING_FULL_UNTIL, Army.AI_RATING_FROM, Army.AI_RATING_DIV_LOW, Army.AI_RATING_DIV_HIGH],
+		"easy": [float(Army.GHOST_TIERS[0][0]), int(Army.GHOST_TIERS[0][1])],
 		"even": [float(Army.GHOST_TIERS[1][0]), int(Army.GHOST_TIERS[1][1])], "hard": [float(Army.GHOST_TIERS[2][0]), int(Army.GHOST_TIERS[2][1])]})
 
 
@@ -69,8 +92,17 @@ static func describe() -> String:
 	var parts: Array = []
 	for t in tiers:
 		parts.append("%s %sx power, rating %+d" % [t[2], _num(float(t[0])), int(t[1])])
-	return "Ranked training opponents: %s. Challenges: enemies x%s HP and damage.%s" % [
-		"; ".join(PackedStringArray(parts)), _num(challenge_mult), " (defaults)" if is_default() else ""]
+	return "Ranked training opponents: %s. Rating from them: in full below %d, 1/%s from %d, 1/%s from %d. Challenges: enemies x%s HP and damage.%s" % [
+		"; ".join(PackedStringArray(parts)), train_slow_from, _num(train_div), train_slow_from, _num(train_div_late), train_slower_from,
+		_num(challenge_mult), " (defaults)" if is_default() else ""]
+
+
+## "a quarter", "a tenth"... of the rating, for a divisor.
+static func share_text(div: float) -> String:
+	var names := {2: "half", 3: "a third", 4: "a quarter", 5: "a fifth", 10: "a tenth"}
+	if is_equal_approx(div, roundf(div)) and names.has(int(roundf(div))):
+		return names[int(roundf(div))]
+	return "1/%s" % _num(div)
 
 
 static func _num(v: float) -> String:

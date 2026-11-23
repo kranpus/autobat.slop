@@ -492,6 +492,9 @@ func run_command(line: String) -> String:
                                   tiers: easy, even, hard
   difficulty ranked 1.2           scale all three ranked tiers' power
   difficulty challenges 1.3       challenge enemies' HP and damage (1 = as designed)
+  difficulty training 1000 2500 [4 10]
+                                  rating from training bands: in full below the first
+                                  rating, divided by 4 from it, by 10 from the second
   difficulty reset                back to the defaults
   update-url <url>                where out-of-date games download the new version
   unitstats                       unit use and win rates in ranked and Legion Draft
@@ -785,7 +788,7 @@ func _drops_changed() -> void:
 
 
 func _difficulty_command(a: PackedStringArray) -> String:
-	var usage := "Usage: difficulty | difficulty easy|even|hard <power x> [rating offset] | difficulty ranked <factor> | difficulty challenges <x> | difficulty reset"
+	var usage := "Usage: difficulty | difficulty easy|even|hard <power x> [rating offset] | difficulty ranked <factor> | difficulty challenges <x> | difficulty training <slow from> <slower from> [divisor] [later divisor] | difficulty reset"
 	if a.size() == 1:
 		return Difficulty.describe()
 	var what := a[1].to_lower()
@@ -799,6 +802,11 @@ func _difficulty_command(a: PackedStringArray) -> String:
 			Difficulty.set_tier(k, float(Difficulty.tiers[k][0]) * float(a[2]), int(Difficulty.tiers[k][1]))
 	elif what in ["challenge", "challenges"] and a.size() == 3 and a[2].is_valid_float():
 		Difficulty.challenge_mult = clampf(float(a[2]), Difficulty.MIN_CHALLENGE, Difficulty.MAX_CHALLENGE)
+	elif what == "training" and a.size() == 2:
+		return "Rating from training bands: in full below %d, %s from %d, %s from %d. Usage: difficulty training <slow from> <slower from> [divisor] [later divisor], e.g. 'difficulty training 1500 3000' or 'difficulty training 1000 2500 4 10'." % [
+			Difficulty.train_slow_from, Difficulty.share_text(Difficulty.train_div), Difficulty.train_slow_from, Difficulty.share_text(Difficulty.train_div_late), Difficulty.train_slower_from]
+	elif what == "training" and a.size() in [4, 5, 6] and a[2].is_valid_int() and a[3].is_valid_int() and (a.size() < 5 or a[4].is_valid_float()) and (a.size() < 6 or a[5].is_valid_float()):
+		Difficulty.set_training(int(a[2]), int(a[3]), float(a[4]) if a.size() >= 5 else -1.0, float(a[5]) if a.size() >= 6 else -1.0)
 	else:
 		return usage
 	_save_config()

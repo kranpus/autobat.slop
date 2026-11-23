@@ -253,6 +253,7 @@ Ctrl+P then Ctrl+Q to detach again.
 | `difficulty hard 1.5 150` | Set a ranked tier (`easy`, `even` or `hard`): its power relative to the player's army, and optionally its rating offset. Defaults: easy 0.9 −40, even 1.1 +60, hard 1.5 +150. |
 | `difficulty ranked 1.2` | Scale the power of all three ranked tiers at once (1.2 = 20% stronger opponents). |
 | `difficulty challenges 1.3` | Multiply challenge enemies' HP and damage (1 = as designed, 0.25–5). The recommended power on each card scales with it. |
+| `difficulty training <slow from> <slower from> [divisor] [later divisor]` | When battles against training bands start counting for less rating: in full below the first rating, divided by the divisor from it (default a quarter from 1000), and by the later divisor from the second (default a tenth from 2500). E.g. `difficulty training 1500 3000`, or `difficulty training 1000 2500 4 10` for the defaults. `difficulty training` shows the current values. Players' games pick it up (their preview, offline play and the one-time message). |
 | `difficulty reset` | Back to the default difficulty. |
 | `drops` | Show the drop chance settings. |
 | `drops unit legendary 0.25` | Scale how often units of a rarity are offered on expeditions, in every region. 1 = the normal table, 2 = twice as likely, 0 = never. Default: legendary 0.5, everything else 1. |
