@@ -95,7 +95,15 @@ static func unit_stats(unit_id: String, level: int, mods: Dictionary = {}) -> Di
 	s["cooldown"] = float(base["cooldown"]) * float(mods.get("cooldown_mult", 1.0))
 	if float(base["range"]) >= 20.0:
 		s["range"] = float(base["range"]) + float(mods.get("range_add", 0.0))
-	s["aoe"] = float(base["aoe"]) + float(mods.get("aoe_add", 0.0))
+	# Splash from trinkets (0.9.7): on archers and casters it has half the
+	# radius, and when the unit has no splash of its own it reaches at most
+	# TRINKET_SPLASH_TARGETS enemies (a bolt into a packed swarm used to hit 6).
+	var aoe_add := float(mods.get("aoe_add", 0.0))
+	var ranged := str(base["projectile"]) != "none"
+	if ranged:
+		aoe_add *= TRINKET_RANGED_AOE_MULT
+	s["aoe"] = float(base["aoe"]) + aoe_add
+	s["splash_cap"] = TRINKET_SPLASH_TARGETS if ranged and float(base["aoe"]) <= 0.0 and aoe_add > 0.0 else BattleSim.MAX_SPLASH_TARGETS
 	s["lifesteal"] = float(mods.get("lifesteal", 0.0))
 	var ab = base.get("ability", {})
 	if typeof(ab) == TYPE_DICTIONARY and str(ab.get("id", "")) == "devour":
@@ -126,7 +134,8 @@ static func unit_power(unit_id: String, level: int, mods: Dictionary = {}) -> fl
 	var s := unit_stats(unit_id, level, mods)
 	var cd: float = s["cooldown"]
 	var splash_share := BattleSim.AOE_SPLASH_MULT if str(s["projectile"]) == "none" else BattleSim.RANGED_SPLASH_MULT
-	var splash_bonus := minf(float(s["aoe"]), 60.0) / 40.0 * splash_share / SPLASH_POWER_REF
+	var splash_bonus := minf(float(s["aoe"]), 60.0) / 40.0 * splash_share / SPLASH_POWER_REF \
+		* float(s.get("splash_cap", BattleSim.MAX_SPLASH_TARGETS)) / float(BattleSim.MAX_SPLASH_TARGETS)
 	var dps: float = (float(s["dmg"]) * (1.0 + splash_bonus) + float(s["heal"]) * HEAL_POWER) / cd + float(s["regen"])
 	var reach_bonus := 1.0 + minf(float(s["range"]), 260.0) / 520.0
 	# Big units are worth more than raw stats suggest (they can't be swarmed
@@ -175,6 +184,10 @@ static func dmg_nerf(unit_id: String) -> float:
 static func caster_nerfed(unit_id: String) -> bool:
 	var u: Dictionary = GameData.UNITS.get(unit_id, {})
 	return str(u.get("role", "")) == "caster" and str(u.get("rarity", "")) in CASTER_NERF_RARITIES
+
+
+const TRINKET_RANGED_AOE_MULT := 0.5
+const TRINKET_SPLASH_TARGETS := 2
 
 
 ## What a point of healing is worth in power, against a point of damage.

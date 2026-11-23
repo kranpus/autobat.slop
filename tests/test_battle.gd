@@ -43,6 +43,7 @@ func _initialize() -> void:
 	test_player_command()
 	test_caster_nerf()
 	test_rarity_levels()
+	test_trinket_splash()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -1643,3 +1644,21 @@ func test_rarity_levels() -> void:
 	var d_sq: Dictionary = DraftData.board_to_squads([DraftData.new_entry("golden_dragon")])[0]
 	check(Army.squad_stat_level(d_sq) == int(d_sq["level"]), "Legion Draft squads aren't shifted")
 	check(Challenges.enemy_squads("golden_wyrm").all(func(sq): return Army.squad_stat_level(sq) == int(sq["level"])), "nor challenge enemies")
+
+
+func test_trinket_splash() -> void:
+	print("trinket splash on ranged units (patch 0.9.7)")
+	var rod := {"aoe_add": 30.0}
+	var mage := Army.unit_stats("elf_mage", 20, rod)
+	check(is_equal_approx(float(mage["aoe"]), 15.0) and int(mage["splash_cap"]) == 2, "Rod of Storms on an Elven Mage: half the radius (%.0f), at most 2 extra enemies" % float(mage["aoe"]))
+	var sorc := Army.unit_stats("orc_sorcerer", 20, rod)
+	check(is_equal_approx(float(sorc["aoe"]), float(GameData.UNITS["orc_sorcerer"]["aoe"]) + 15.0) and int(sorc["splash_cap"]) == BattleSim.MAX_SPLASH_TARGETS, "a natural splasher keeps its own splash; the trinket adds half its radius")
+	var ogre := Army.unit_stats("ogre", 20, rod)
+	check(is_equal_approx(float(ogre["aoe"]), float(GameData.UNITS["ogre"]["aoe"]) + 30.0) and int(ogre["splash_cap"]) == BattleSim.MAX_SPLASH_TARGETS, "melee units are unchanged")
+	var plain := Army.unit_power("elf_mage", 20)
+	var full_old := plain * sqrt(1.0 + 30.0 / 40.0 * BattleSim.RANGED_SPLASH_MULT / Army.SPLASH_POWER_REF)
+	check(Army.unit_power("elf_mage", 20, rod) < full_old * 0.92, "Strength counts the smaller splash")
+	var sim := BattleSim.new()
+	sim.setup([{"unit": "elf_mage", "level": 10, "tier": 3, "row": "back", "trinkets": ["rod_of_storms"]}], [{"unit": "goblin", "level": 1, "tier": 10, "row": "front"}], 2, "open_arena")
+	var mages: Array = range(sim.n).filter(func(i): return sim.team[i] == 0)
+	check(mages.all(func(i): return sim.splash_cap[i] == 2), "...and so does the battle")

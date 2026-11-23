@@ -10,13 +10,17 @@ extends RefCounted
 
 const LIST := [
 	{"version": "0.9.7", "date": "2026-11-24", "title": "Steady Hands",
-		"summary": "Rarer units now have fewer levels but start stronger, plus bug fixes.",
+		"summary": "Rarer units now have fewer levels but start stronger, splash trinkets on ranged units are toned down, training bands are better led, plus bug fixes.",
 		"sections": [
 			{"name": "Levels by rarity", "notes": [
 				{"kind": "change", "text": "Rarer units have fewer levels, but start further up: Common 50 levels, Uncommon 40, Rare 30, Epic 20, Legendary 10. Level 1 of an uncommon is as strong as a common at level 11, a rare as a level 21 common, an epic level 31 and a legendary level 41."},
 				{"kind": "change", "text": "Every rarity's top level is exactly as strong as before, so fully levelled units haven't changed. A newly found rare, epic or legendary is ready to fight straight away instead of needing dozens of levels."},
 				{"kind": "change", "text": "Level caps still grow with the squad tier: a fifth of the levels at tier 0, all of them at tier 10. Each level costs what the same strength cost before, so the first levels of rare units are pricier, but there are far fewer of them."},
 				{"kind": "note", "text": "Your units have been moved to the new levels without losing any strength (a rare unit at level 26 is now level 6). Units that were below their rarity's new starting strength got stronger. Legion Draft is unchanged."},
+			]},
+			{"name": "Splash trinkets", "notes": [
+				{"kind": "nerf", "text": "Splash from trinkets on archers, casters and other ranged units: half the radius, and units with no splash of their own now hit at most 2 enemies around their target (it was 6). A swarm of mages with the Rod of Storms could shred armies half again their Strength."},
+				{"kind": "note", "text": "Melee units and units that splash by nature (Orc Sorcerer, Hill Giant, Cyclops and others) keep their splash; on them a splash trinket still adds radius (half of it for ranged splashers). Strength counts the smaller splash."},
 			]},
 			{"name": "Fixes", "notes": [
 				{"kind": "fix", "text": "The game froze when a fourth message popped up while three were already on screen (for example levelling up several units quickly). Now the oldest message makes way."},

@@ -121,6 +121,7 @@ var speed := PackedFloat32Array()
 var cooldown := PackedFloat32Array()
 var cd_t := PackedFloat32Array()
 var aoe := PackedFloat32Array()
+var splash_cap := PackedInt32Array()   # most enemies one splash reaches (0.9.7: trinket splash on ranged units 2)
 var heal := PackedFloat32Array()
 var regen := PackedFloat32Array()
 var radius := PackedFloat32Array()
@@ -351,6 +352,7 @@ func _resolve(uid: String, s: Dictionary) -> Dictionary:
 		"armor": GameData.ARMOR_TYPES.find(s["armor"]), "flying": 1 if s["flying"] else 0, "proj": GameData.PROJECTILES.find(s["projectile"]),
 		"hp": float(s["hp"]), "dmg": float(s["dmg"]), "range": float(s["range"]), "speed": float(s["speed"]), "cooldown": float(s["cooldown"]),
 		"aoe": float(s["aoe"]), "heal": float(s["heal"]), "regen": float(s["regen"]), "radius": float(s["radius"]),
+		"splash_cap": int(s.get("splash_cap", MAX_SPLASH_TARGETS)),
 		"lifesteal": float(s.get("lifesteal", 0.0)), "thorns": float(s.get("thorns", 0.0)),
 		"tmode": int(TARGET_MODES.get(str(s.get("targets", "")), Target.NEAREST)),
 		"ab": int(AB_IDS.get(str(ab.get("id", "")), Ab.NONE)), "ab_val": float(ab.get("value", 0.0)), "tpl": -1,
@@ -406,6 +408,7 @@ func _add_resolved(r: Dictionary, t: int, x: float, y: float) -> void:
 	cooldown.append(r["cooldown"])
 	cd_t.append(rng.randf_range(0.0, float(r["cooldown"])))
 	aoe.append(r["aoe"])
+	splash_cap.append(int(r.get("splash_cap", MAX_SPLASH_TARGETS)))
 	heal.append(r["heal"])
 	regen.append(r["regen"])
 	radius.append(r["radius"])
@@ -922,6 +925,7 @@ func _deal_damage(src: int, src_team: int, dt_idx: int, amount: float, primary: 
 	events.append([Ev.BLAST, x, y, radius_aoe])
 	var splash := amount * (AOE_SPLASH_MULT if melee else RANGED_SPLASH_MULT)
 	var hits := 0
+	var cap := splash_cap[src] if src >= 0 else MAX_SPLASH_TARGETS
 	var rings := ceili(radius_aoe / CELL)
 	var cx := clampi(int(x / CELL), 0, gw - 1)
 	var cy := clampi(int(y / CELL), 0, gh - 1)
@@ -936,7 +940,7 @@ func _deal_damage(src: int, src_team: int, dt_idx: int, amount: float, primary: 
 					if dx * dx + dy * dy <= rr * rr:
 						_damage_unit(j, splash, dt_idx, melee, src)
 						hits += 1
-						if hits >= MAX_SPLASH_TARGETS:
+						if hits >= cap:
 							return
 				j = cell_next[j]
 
