@@ -1492,6 +1492,16 @@ func test_rank_scaling() -> void:
 	rng.seed = 7
 	var offers: Array = []
 	Army.fill_ghosts(offers, 2000, rng)
+	var dupes := false
+	for seed_i in 200:
+		rng.seed = seed_i
+		var o3: Array = []
+		Army.fill_ghosts(o3, 1500, rng)
+		var names: Array = o3.map(func(o): return o["name"])
+		if names.any(func(n): return names.count(n) > 1):
+			dupes = true
+	check(not dupes, "the three training bands in a search always have different names")
+	rng.seed = 7
 	var p_easy := Army.army_power(offers[0]["squads"]) / Army.rank_power(2000)
 	check(p_easy > 0.8 and p_easy < 1.05, "Easy at 2000 is about 0.9x of %.0f (%.2fx)" % [Army.rank_power(2000) / 10.0, p_easy])
 	# AI battles count in full below 1000, then move rating less.

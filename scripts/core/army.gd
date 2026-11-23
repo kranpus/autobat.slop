@@ -437,6 +437,12 @@ static func fill_ghosts(offers: Array, rating: int, rng: RandomNumberGenerator) 
 			var opp := generate_opponent(rank_power(rating) * float(t[0]) * rng.randf_range(0.95, 1.05), maxi(0, rating + int(t[1]) + rng.randi_range(-15, 15)), rng.randi())
 			opp["difficulty"] = t[2]
 			opp["player"] = false
+			# No two opponents in one search share a name.
+			var taken_names: Array = offers.map(func(o): return str(o.get("name", "")))
+			if str(opp["name"]) in taken_names:
+				var free: Array = GHOST_NAMES.filter(func(n): return not n in taken_names)
+				if not free.is_empty():
+					opp["name"] = free[rng.randi_range(0, free.size() - 1)]
 			opp["saved_at"] = 0
 			offers.append(opp)
 
