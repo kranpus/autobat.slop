@@ -339,6 +339,9 @@ obstacles (x/y as fractions of the map; anything left of centre is mirrored auto
   - **Melee splash** hits nearby enemies for 45% of the blow (60% before 0.9.2).
   - **Projectile splash** (stones, magic, fire) hits them for 35% (60% before patch 0.9, 45% in
     0.9).
+- **Caster nerf** (patch 0.9.6): common, uncommon and rare casters deal 15% less damage
+  (`Army.CASTER_DMG_MULT`), spells and spell abilities alike. Their Strength is unchanged: the
+  simulator had them winning 55% at equal Strength, so the nerf brings them in line.
 - **Battle abilities** (patch 0.9.2, 40 more in 0.9.4): 63 units have one, including every epic and legendary,
   each with an ability no other epic or legendary shares. They're shown on each unit's card and
   simulated in `BattleSim` (`Ab`); see `GameData.ABILITIES`.

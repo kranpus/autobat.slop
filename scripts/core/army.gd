@@ -33,6 +33,8 @@ static func unit_stats(unit_id: String, level: int, mods: Dictionary = {}) -> Di
 	var s := base.duplicate()
 	s["hp"] = float(base["hp"]) * m * float(mods.get("hp_mult", 1.0))
 	s["dmg"] = float(base["dmg"]) * m * float(mods.get("dmg_mult", 1.0))
+	if caster_nerfed(unit_id):
+		s["dmg"] = float(s["dmg"]) * CASTER_DMG_MULT
 	s["heal"] = float(base["heal"]) * m * float(mods.get("dmg_mult", 1.0))
 	s["regen"] = float(base["regen"]) * m + float(s["hp"]) * float(mods.get("regen_pct", 0.0))
 	s["speed"] = float(base["speed"]) * float(mods.get("speed_mult", 1.0))
@@ -77,7 +79,22 @@ static func unit_power(unit_id: String, level: int, mods: Dictionary = {}) -> fl
 	# as efficiently), so rarer units carry a calibrated multiplier.
 	var rarity_mult: float = GameData.RARITIES[s["rarity"]]["power_mult"]
 	var ab := ability_power(s)
-	return sqrt(float(s["hp"]) * ab.x * dps * ab.y * reach_bonus) * rarity_mult
+	var keep := 1.0 / sqrt(CASTER_DMG_MULT) if caster_nerfed(unit_id) else 1.0
+	return sqrt(float(s["hp"]) * ab.x * dps * ab.y * reach_bonus) * rarity_mult * keep
+
+
+## Patch 0.9.6: casters below epic (common, uncommon and rare) deal this much
+## of their damage, spells and spell abilities alike (hellfire, burning aura,
+## chain lightning...). Their Strength stays where it was: the simulator had
+## them winning 55% of battles at equal Strength (every other group 46-51%),
+## so they were worth more than it said, and the nerf closes that gap.
+const CASTER_DMG_MULT := 0.85
+const CASTER_NERF_RARITIES := ["common", "uncommon", "rare"]
+
+
+static func caster_nerfed(unit_id: String) -> bool:
+	var u: Dictionary = GameData.UNITS.get(unit_id, {})
+	return str(u.get("role", "")) == "caster" and str(u.get("rarity", "")) in CASTER_NERF_RARITIES
 
 
 ## What a point of healing is worth in power, against a point of damage.

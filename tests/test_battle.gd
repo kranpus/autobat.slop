@@ -41,6 +41,7 @@ func _initialize() -> void:
 	test_new_units()
 	test_rank_scaling()
 	test_player_command()
+	test_caster_nerf()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -1459,7 +1460,7 @@ func test_new_units() -> void:
 	var low := h0 - e.hp[tr]
 	check(absf(low / full - 2.5) < 0.05, "Executioner hits much harder below 30%% health (%.0f vs %.0f)" % [low, full])
 	var proto: String = root.get_node("Party").GAME_VERSION
-	check(proto == "legion-draft-18", "protocol bumped for the new units (%s)" % proto)
+	check(proto.trim_prefix("legion-draft-").to_int() >= 18, "protocol bumped for the new units (%s)" % proto)
 	UnitLocks.set_locked_list(UnitLocks.defaults())
 
 
@@ -1555,3 +1556,25 @@ func test_player_command() -> void:
 	party.run_command("player bob reset confirm")
 	check(pl.data["units"].size() == GameData.STARTER_UNITS.size() and pl.rating() == 0 and str(pl.data["name"]) == "Lord Bob", "reset starts the profile over (name kept)")
 	party.accounts = saved_accounts
+
+
+func test_caster_nerf() -> void:
+	print("caster nerf (patch 0.9.6)")
+	var nerfed: Array = GameData.UNITS.keys().filter(func(u): return Army.caster_nerfed(u))
+	check(nerfed.size() == 10 and nerfed.all(func(u): return GameData.UNITS[u]["role"] == "caster" and not GameData.UNITS[u]["rarity"] in ["epic", "legendary"]), "10 casters below epic are nerfed")
+	check(not Army.caster_nerfed("lich") and not Army.caster_nerfed("storm_dragon") and not Army.caster_nerfed("elf_archer"), "epic and legendary casters and other roles aren't")
+	var s := Army.unit_stats("orc_sorcerer", 5)
+	var raw := float(GameData.UNITS["orc_sorcerer"]["dmg"]) * Army.level_mult(5)
+	check(is_equal_approx(float(s["dmg"]), raw * 0.85), "their damage is 85%% (%.1f of %.1f)" % [float(s["dmg"]), raw])
+	var sim := BattleSim.new()
+	sim.setup([{"unit": "orc_sorcerer", "level": 5, "tier": 0, "row": "back"}], [{"unit": "goblin", "level": 1, "tier": 0, "row": "front"}], 1, "open_arena")
+	check(is_equal_approx(sim.dmg[0], raw * 0.85), "...in battle too")
+	# Strength stays what it was before the nerf.
+	var s_full := s.duplicate()
+	s_full["dmg"] = raw
+	var cd: float = s_full["cooldown"]
+	var splash := minf(float(s_full["aoe"]), 60.0) / 40.0 * BattleSim.RANGED_SPLASH_MULT / Army.SPLASH_POWER_REF
+	var dps := raw * (1.0 + splash) / cd + float(s_full["regen"])
+	var ab := Army.ability_power(s_full)
+	var before := sqrt(float(s_full["hp"]) * ab.x * dps * ab.y * (1.0 + minf(float(s_full["range"]), 260.0) / 520.0)) * float(GameData.RARITIES["rare"]["power_mult"])
+	check(absf(Army.unit_power("orc_sorcerer", 5) / before - 1.0) < 0.001, "their Strength is unchanged")

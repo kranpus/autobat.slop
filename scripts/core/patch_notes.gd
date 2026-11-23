@@ -9,6 +9,15 @@ extends RefCounted
 ## out; they belong in HOSTING.md.
 
 const LIST := [
+	{"version": "0.9.6", "date": "2026-11-23", "title": "Silenced Spells",
+		"summary": "An across-the-board nerf to casters below epic: they deal 15% less damage.",
+		"sections": [
+			{"name": "Balance", "notes": [
+				{"kind": "nerf", "text": "Every common, uncommon and rare caster deals 15% less damage, with its spells and its spell abilities alike: Orc Sorcerer, Elven Mage, Salamander Firebrand, Deathcap, Spider Matriarch, Electric Eel, Merfolk Aquamancer, Quasit, Hellion and Blizzard Demon."},
+				{"kind": "note", "text": "Their Strength stays the same: in thousands of simulated battles, armies with these casters won about 55% of fights at equal Strength, more than any other kind of unit, so they were stronger than their Strength showed."},
+				{"kind": "note", "text": "Epic and legendary casters (the Lich, Phoenix, dragons and others) are unchanged."},
+			]},
+		]},
 	{"version": "0.9.5", "date": "2026-11-23", "title": "The Long Road",
 		"summary": "Scroll any menu by dragging on a touchscreen. New commanders start at 0 with Badlands Camp open and the next regions at 250 and 500, training bands match your rank instead of your army and count for less from 1000 rating, and the lobby has four more songs.",
 		"sections": [
