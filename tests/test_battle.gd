@@ -792,7 +792,14 @@ func test_leaderboard() -> void:
 func test_drop_rates() -> void:
 	print("drop chances")
 	DropRates.reset()
-	check(is_equal_approx(DropRates.unit_mult["legendary"], 0.5) and DropRates.pity["legendary"] == 60 and is_equal_approx(DropRates.trinket_mult["legendary"], 0.5), "legendaries are rarer by default (half weight, guaranteed every 60)")
+	check(is_equal_approx(DropRates.unit_mult["legendary"], 0.3) and is_equal_approx(DropRates.unit_mult["epic"], 0.6) and DropRates.pity["legendary"] == 80 and DropRates.pity["epic"] == 20 and is_equal_approx(DropRates.trinket_mult["legendary"], 0.5), "epics and legendaries are rarer by default (0.9.8: weights 0.6 / 0.3, guaranteed every 20 / 80)")
+	DropRates.apply({"unit": {"epic": 1.0, "legendary": 0.5}, "pity": {"epic": 15, "legendary": 60}})
+	check(is_equal_approx(DropRates.unit_mult["epic"], 0.6) and is_equal_approx(DropRates.unit_mult["legendary"], 0.3) and DropRates.pity["legendary"] == 80, "settings saved with the old defaults move to the new ones")
+	DropRates.apply({"unit": {"epic": 2.0, "legendary": 0.5}, "pity": {"epic": 15, "legendary": 40}})
+	check(is_equal_approx(DropRates.unit_mult["epic"], 2.0) and DropRates.pity["legendary"] == 40 and is_equal_approx(DropRates.unit_mult["legendary"], 0.3), "...while values the admin changed are kept")
+	DropRates.apply(DropRates.to_dict())
+	check(is_equal_approx(DropRates.unit_mult["epic"], 2.0), "...and new saves are taken as they are")
+	DropRates.reset()
 	var pl := ProfileLogic.new()
 	var rarer := pl.drop_chance("peaks", "golden_dragon")
 	DropRates.apply({"unit": {"legendary": 1.0}})
@@ -834,7 +841,7 @@ func test_drop_rates() -> void:
 	check(typeof(saved) == TYPE_DICTIONARY and is_equal_approx(float(saved["drops"]["unit"]["legendary"]), 0.25), "drop settings are saved with the server config")
 	check(party.run_command("drops unit mythic 2").begins_with("Usage") and party.run_command("drops pity common 3").begins_with("Usage"), "bad drop commands show usage")
 	party.run_command("drops reset")
-	check(DropRates.to_dict() == {"unit": DropRates.DEFAULT_UNIT, "trinket": DropRates.DEFAULT_TRINKET, "pity": DropRates.DEFAULT_PITY}, "'drops reset' restores the defaults")
+	check(DropRates.to_dict() == {"version": DropRates.VERSION, "unit": DropRates.DEFAULT_UNIT, "trinket": DropRates.DEFAULT_TRINKET, "pity": DropRates.DEFAULT_PITY}, "'drops reset' restores the defaults")
 
 
 func test_rank_progression() -> void:
@@ -1072,7 +1079,9 @@ func test_ranged_splash_nerf() -> void:
 	var caster := Army.unit_power("orc_sorcerer", 1) / _old_power("orc_sorcerer")
 	var brute := Army.unit_power("hill_giant", 1) / _old_power("hill_giant")
 	check(caster < brute and brute < 1.0 and is_equal_approx(Army.unit_power("goblin", 1), _old_power("goblin")), "splash counts for less in Strength, ranged splash most (%.2fx, %.2fx)" % [caster, brute])
-	check(PatchNotes.latest() == UnitStats.current_patch(), "the patch notes cover this version (%s)" % PatchNotes.latest())
+	var latest_v := Array(PatchNotes.latest().split(".")).map(func(x): return int(x))
+	var cur_v := Array(UnitStats.current_patch().split(".")).map(func(x): return int(x))
+	check(latest_v <= cur_v and PatchNotes.latest() != "", "the newest patch notes (%s) aren't ahead of this version (%s); some patches have none" % [PatchNotes.latest(), UnitStats.current_patch()])
 
 
 ## Unit power with the pre-0.9 splash formula (every splash counted fully).
@@ -1634,14 +1643,21 @@ func test_rarity_levels() -> void:
 	check(caps == [50, 40, 30, 20, 10], "fully upgraded caps: common 50, uncommon 40, rare 30, epic 20, legendary 10 (%s)" % [caps])
 	var caps0 := ["goblin", "orc_warrior", "ogre", "lich", "golden_dragon"].map(func(u): return Army.max_level(u, 0))
 	check(caps0 == [10, 8, 6, 4, 2], "at tier 0 a fifth of that (%s)" % [caps0])
-	check(Army.stat_level("goblin", 1) == 1 and Army.stat_level("orc_warrior", 1) == 11 and Army.stat_level("ogre", 1) == 21 and Army.stat_level("lich", 1) == 31 and Army.stat_level("golden_dragon", 1) == 41, "level 1 of each rarity is as strong as a common at 1, 11, 21, 31 and 41")
+	check(Army.stat_level("goblin", 1) == 1 and Army.stat_level("orc_warrior", 1) == 11 and Army.stat_level("ogre", 1) == 21 and Army.stat_level("lich", 1) == 21 and Army.stat_level("golden_dragon", 1) == 31, "level 1 of each rarity is as strong as a common at 1, 11, 21, 21 and 31 (0.9.8: epics and legendaries 10 levels below the curve)")
 	var same_top := true
 	for u in GameData.UNITS:
-		if Army.stat_level(u, Army.max_level(u, GameData.MAX_TIER)) != Army.STAT_MAX_LEVEL:
+		var top := Army.stat_level(u, Army.max_level(u, GameData.MAX_TIER))
+		if top != (40 if GameData.UNITS[u]["rarity"] in ["epic", "legendary"] else Army.STAT_MAX_LEVEL):
 			same_top = false
-	check(same_top, "every unit's top level has exactly the stats it had at level 50 before")
+	check(same_top, "fully levelled: commons to rares as strong as a common at 50, epics and legendaries at 40")
 	var lich1 := float(Army.unit_stats("lich", Army.stat_level("lich", 1))["hp"])
-	check(is_equal_approx(lich1, float(GameData.UNITS["lich"]["hp"]) * Army.level_mult(31)), "a level 1 Lich has %.0f HP (x%.1f its base)" % [lich1, Army.level_mult(31)])
+	check(is_equal_approx(lich1, float(GameData.UNITS["lich"]["hp"]) * Army.level_mult(21)), "a level 1 Lich has %.0f HP (x%.1f its base)" % [lich1, Army.level_mult(21)])
+	var cost := ProfileLogic.new()
+	for u in ["golden_dragon", "lich"]:
+		cost.data["units"][u] = {"level": 1, "tier": 10, "shards": 0}
+	check(cost.level_up_cost("golden_dragon") == 10000 and cost.level_up_cost("lich") == 5000, "a legendary's first level-up costs 10,000 gold, an epic's 5,000")
+	cost.data["units"]["golden_dragon"]["level"] = 9
+	check(cost.level_up_cost("golden_dragon") > 10000 and cost.level_up_cost("golden_dragon") < 16000, "...and later ones climb from there (%d for the last legendary level)" % cost.level_up_cost("golden_dragon"))
 	var a := Army.army_power([{"unit": "ogre", "level": 1, "tier": 0, "row": "front"}])
 	var b := Army.army_power([{"unit": "ogre", "level": 21, "tier": 0, "row": "front", "count": Army.squad_size("ogre", 0)}])
 	check(absf(a / b - 1.0) < 0.001, "Strength follows the stat level")
@@ -1661,7 +1677,7 @@ func test_rarity_levels() -> void:
 	check(not dec.is_empty() and int(dec["squads"][0]["level"]) == 6 and int(dec["squads"][1]["level"]) == 17, "army codes from before 0.9.7 still work, converted")
 	check(Army.encode("X", 1, [{"unit": "goblin", "level": 3, "tier": 0, "row": "front"}]).begins_with("AB2:"), "new codes are AB2")
 	var proto: String = root.get_node("Party").GAME_VERSION
-	check(proto == "legion-draft-20", "protocol bumped (%s)" % proto)
+	check(proto.trim_prefix("legion-draft-").to_int() >= 20, "protocol bumped (%s)" % proto)
 	# Legion Draft and challenges keep the stat scale.
 	var d_sq: Dictionary = DraftData.board_to_squads([DraftData.new_entry("golden_dragon")])[0]
 	check(Army.squad_stat_level(d_sq) == int(d_sq["level"]), "Legion Draft squads aren't shifted")

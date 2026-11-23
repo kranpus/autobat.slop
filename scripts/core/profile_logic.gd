@@ -220,8 +220,18 @@ func level_up_cost(id: String) -> int:
 	# Priced by where the unit is on the stat scale (0.9.7): a rare's first
 	# level costs what a common's 21st does, since it adds the same stats.
 	var lvl := Army.stat_level(id, int(unit(id).get("level", 1)))
-	var mult: float = GameData.RARITIES[GameData.UNITS[id]["rarity"]]["cost_mult"]
+	var rarity := str(GameData.UNITS[id]["rarity"])
+	if FIRST_LEVEL_COST.has(rarity):
+		# Same curve, scaled so the first level-up costs FIRST_LEVEL_COST.
+		var first := float(Army.stat_level(id, 1))
+		return roundi(float(FIRST_LEVEL_COST[rarity]) * pow(float(lvl) / first, 1.6))
+	var mult: float = GameData.RARITIES[rarity]["cost_mult"]
 	return roundi(40.0 * pow(float(lvl), 1.6) * mult)
+
+
+## 0.9.8: epic and legendary levels are much cheaper: the first level-up costs
+## this much, later ones follow the usual curve from there.
+const FIRST_LEVEL_COST := {"epic": 5000, "legendary": 10000}
 
 
 func can_level_up(id: String) -> bool:

@@ -10,9 +10,16 @@ extends RefCounted
 ## - Pity: "rarity X or better guaranteed every N expeditions" (0 = off).
 
 const RARITIES := ["common", "uncommon", "rare", "epic", "legendary"]
-const DEFAULT_UNIT := {"common": 1.0, "uncommon": 1.0, "rare": 1.0, "epic": 1.0, "legendary": 0.5}
+## 0.9.8: epics and legendaries are rarer (epic 1.0 -> 0.6, legendary 0.5 -> 0.3,
+## guaranteed every 20 / 80 expeditions instead of 15 / 60).
+const DEFAULT_UNIT := {"common": 1.0, "uncommon": 1.0, "rare": 1.0, "epic": 0.6, "legendary": 0.3}
 const DEFAULT_TRINKET := {"common": 1.0, "uncommon": 1.0, "rare": 1.0, "epic": 1.0, "legendary": 0.5}
-const DEFAULT_PITY := {"rare": 5, "epic": 15, "legendary": 60}
+const DEFAULT_PITY := {"rare": 5, "epic": 20, "legendary": 80}
+## The defaults before 0.9.8: settings saved with exactly these move to the new
+## defaults once (anything the admin changed is kept).
+const OLD_UNIT := {"epic": 1.0, "legendary": 0.5}
+const OLD_PITY := {"epic": 15, "legendary": 60}
+const VERSION := 2
 const PITY_RARITIES := ["rare", "epic", "legendary"]
 const MAX_MULT := 100.0
 const MAX_PITY := 1000
@@ -29,7 +36,7 @@ static func reset() -> void:
 
 
 static func to_dict() -> Dictionary:
-	return {"unit": unit_mult.duplicate(), "trinket": trinket_mult.duplicate(), "pity": pity.duplicate()}
+	return {"version": VERSION, "unit": unit_mult.duplicate(), "trinket": trinket_mult.duplicate(), "pity": pity.duplicate()}
 
 
 ## Load settings from untrusted input (a save file or the server); anything
@@ -46,6 +53,13 @@ static func apply(d) -> void:
 	for r in PITY_RARITIES:
 		if typeof(d.get("pity")) == TYPE_DICTIONARY and d["pity"].has(r):
 			pity[r] = clampi(int(d["pity"][r]), 0, MAX_PITY)
+	if int(d.get("version", 1)) < 2:
+		for r in OLD_UNIT:
+			if is_equal_approx(float(unit_mult[r]), float(OLD_UNIT[r])):
+				unit_mult[r] = DEFAULT_UNIT[r]
+		for r in OLD_PITY:
+			if int(pity[r]) == int(OLD_PITY[r]):
+				pity[r] = DEFAULT_PITY[r]
 
 
 ## Drop weight of a unit in a region after the server's multiplier.

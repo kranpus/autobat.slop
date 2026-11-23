@@ -127,8 +127,8 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
    **Legendaries are rare:** their drop weight is halved, and in Dragon Peaks a Golden Dragon
    is offered about 7% of the time.
    **Guaranteed pulls:** if 4 expeditions in a row offered nothing Rare or better, the 5th is
-   guaranteed to include one. Epic or better is guaranteed every 15 expeditions, and Legendary
-   every 60 (counting only regions that have legendaries). The tab shows the countdowns, and the
+   guaranteed to include one. Epic or better is guaranteed every 20 expeditions, and Legendary
+   every 80 (counting only regions that have legendaries; 15 and 60 before 0.9.8). The tab shows the countdowns, and the
    guaranteed unit is marked on its card.
    - **Server settings:** the server admin can change all of these, and trinket odds, with the
      `drops` command (see [HOSTING.md](HOSTING.md)).
@@ -146,19 +146,22 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
    - The sub-tab shows each site's odds and your whole collection.
 2. **Level up: Collection tab.** Spend gold to raise a unit's level (+8% HP and damage per level).
    - **Levels by rarity (0.9.7):** rarer units have fewer levels but start stronger. A unit's
-     level 1 is as strong as a common unit at the level shown below, and every rarity's top level
-     has the same stats (a common at level 50), so a fully levelled unit is as strong as before.
+     level 1 is as strong as a common unit at the level shown below. Commons to rares top out at a
+     common's level 50; since 0.9.8 epics and legendaries sit 10 levels below that curve
+     (`Army.RARITY_LEVEL_PENALTY`) and top out at a common's level 40.
 
      | Rarity | Levels | Level 1 is as strong as a common at |
      |---|---|---|
      | Common | 50 | level 1 |
      | Uncommon | 40 | level 11 |
      | Rare | 30 | level 21 |
-     | Epic | 20 | level 31 |
-     | Legendary | 10 | level 41 |
+     | Epic | 20 | level 21 (31 before 0.9.8) |
+     | Legendary | 10 | level 31 (41 before 0.9.8) |
 
      The cost of a level follows its strength: a rare's first level costs what a common's 21st
-     does (times the rare price). Legion Draft and challenge enemies keep the old 1-50 scale
+     does (times the rare price). Epics and legendaries are cheaper (0.9.8): their first level-up
+     costs 5,000 and 10,000 gold, later ones follow the same curve from there
+     (`ProfileLogic.FIRST_LEVEL_COST`). Legion Draft and challenge enemies keep the old 1-50 scale
      (`Army.squad_stat_level`).
    **Trinkets:** each unit has **2 trinket slots**. Equip, swap or remove them in the unit's
    details panel. A trinket can only be on one unit at a time, so equipping it elsewhere moves

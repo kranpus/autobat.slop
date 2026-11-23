@@ -258,9 +258,9 @@ Ctrl+P then Ctrl+Q to detach again.
 | `quests reset 06:00 [monday]` | Set the daily reset time (UTC, HH:MM) and optionally the weekly reset day. Saved, and sent to players (offline play follows it too). Players get new quests from the next reset. |
 | `difficulty reset` | Back to the default difficulty. |
 | `drops` | Show the drop chance settings. |
-| `drops unit legendary 0.25` | Scale how often units of a rarity are offered on expeditions, in every region. 1 = the normal table, 2 = twice as likely, 0 = never. Default: legendary 0.5, everything else 1. |
+| `drops unit legendary 0.25` | Scale how often units of a rarity are offered on expeditions, in every region. 1 = the normal table, 2 = twice as likely, 0 = never. Default (0.9.8): epic 0.6, legendary 0.3, everything else 1. A server whose saved settings still had the old defaults (epic 1, legendary 0.5, pity 15 / 60) moves to the new ones once; values you changed are kept. |
 | `drops trinket epic 2` | Same for trinket hunts, at every site. Default: legendary 0.5. |
-| `drops pity legendary 80` | Guarantee a rare / epic / legendary (or better) every N expeditions without one; 0 turns that guarantee off. Defaults: rare 5, epic 15, legendary 60. |
+| `drops pity legendary 80` | Guarantee a rare / epic / legendary (or better) every N expeditions without one; 0 turns that guarantee off. Defaults: rare 5, epic 20, legendary 80 (15 / 60 before 0.9.8). |
 | `drops reset` | Back to the default drop chances. |
 | `gold battle 1.5` | Multiply the gold players earn at the end of every battle (1 = normal, 2 = double). |
 | `gold draft 2` | Multiply the gold paid when a Legion Draft match ends. |

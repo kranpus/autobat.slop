@@ -29,6 +29,10 @@ const STAT_MAX_LEVEL := 50
 ## The cap grows with the squad tier like before: a fifth of the levels at
 ## tier 0, all of them at tier 10.
 const RARITY_LEVELS := {"common": 50, "uncommon": 40, "rare": 30, "epic": 20, "legendary": 10}
+## 0.9.8: epics and legendaries sit this many levels below the curve: their
+## level 1 is a common at level 21 / 31 (not 31 / 41), and fully levelled they
+## top out at a common's level 40.
+const RARITY_LEVEL_PENALTY := {"epic": 10, "legendary": 10}
 
 
 static func rarity_levels(unit_id: String) -> int:
@@ -37,7 +41,8 @@ static func rarity_levels(unit_id: String) -> int:
 
 ## How far up the stat scale this unit's level 1 is.
 static func level_offset(unit_id: String) -> int:
-	return STAT_MAX_LEVEL - rarity_levels(unit_id)
+	var rarity := str(GameData.UNITS.get(unit_id, {}).get("rarity", "common"))
+	return STAT_MAX_LEVEL - rarity_levels(unit_id) - int(RARITY_LEVEL_PENALTY.get(rarity, 0))
 
 
 ## A collection unit's level cap at a squad tier.
