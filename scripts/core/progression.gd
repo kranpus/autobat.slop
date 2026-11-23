@@ -59,6 +59,7 @@ const UNLOCKS := {
 	3: {"key": "trinkets", "text": "Trinket hunts"},
 	4: {"key": "weekly", "text": "Weekly quests"},
 	5: {"key": "draft", "text": "Legion Draft"},
+	6: {"key": "champion", "text": "Your champion, to lead the army"},
 	8: {"key": "trinket_slot2", "text": "A second trinket slot on every unit"},
 	10: {"key": "maps_2", "text": "Store 2 more scouting maps"},
 	15: {"key": "daily_4", "text": "A fourth daily quest"},
@@ -99,6 +100,8 @@ static func trinket_slots(level: int) -> int:
 ## third level, a trinket every sixth (rarer as you go).
 static func level_reward(level: int) -> Dictionary:
 	var r := {"gold": 150 * level}
+	if level >= unlock_level("champion"):
+		r["sigils"] = 2
 	if level % 3 == 0:
 		r["maps"] = 2
 	if level % 6 == 0:
@@ -109,7 +112,7 @@ static func level_reward(level: int) -> Dictionary:
 # --- quests ----------------------------------------------------------------------------
 
 const COUNTER_GOALS := ["battle", "ranked_win", "kills", "explore", "new_unit", "unit_level", "tier_up",
-	"gold_spend", "trinket_hunt", "challenge_win", "draft_play", "draft_win"]
+	"gold_spend", "trinket_hunt", "challenge_win", "draft_play", "draft_win", "champion_roll"]
 
 ## Daily quest pool: three (four from level 15) are picked each day.
 ## "min_level": only offered once that part of the game is unlocked.
@@ -124,8 +127,10 @@ const DAILY := [
 	{"id": "d_challenge", "goal": "challenge_win", "n": 1, "text": "Win a challenge (replays count)", "gold": 300},
 	{"id": "d_trinket", "goal": "trinket_hunt", "n": 1, "text": "Go on a trinket hunt", "gold": 250, "min_level": 3},
 	{"id": "d_draft", "goal": "draft_play", "n": 1, "text": "Play a Legion Draft match", "gold": 400, "min_level": 5},
+	{"id": "d_altar", "goal": "champion_roll", "n": 2, "text": "Roll twice at the champion's Altar", "gold": 350, "min_level": 6},
 ]
 const DAILY_XP := 60
+const DAILY_SIGILS := 1
 
 ## Weekly quest pool: three (four from level 25) are picked each week.
 const WEEKLY := [
@@ -139,8 +144,10 @@ const WEEKLY := [
 	{"id": "w_spend", "goal": "gold_spend", "n": 12000, "text": "Spend 12,000 gold on upgrades", "gold": 3000, "maps": 2},
 	{"id": "w_trinkets", "goal": "trinket_hunt", "n": 5, "text": "Go on 5 trinket hunts", "gold": 1500, "maps": 3, "min_level": 3},
 	{"id": "w_draft", "goal": "draft_play", "n": 3, "text": "Play 3 Legion Draft matches", "gold": 2500, "maps": 3, "min_level": 5},
+	{"id": "w_altar", "goal": "champion_roll", "n": 10, "text": "Roll 10 times at the champion's Altar", "gold": 2500, "maps": 2, "min_level": 6},
 ]
 const WEEKLY_XP := 300
+const WEEKLY_SIGILS := 3
 
 ## The 50 story quests, in order. Rewards grow along the way; every fifth
 ## brings scouting maps, every tenth a trinket.
@@ -206,6 +213,7 @@ static func story(i: int) -> Dictionary:
 	q["id"] = "s%d" % (i + 1)
 	q["gold"] = 150 + 60 * i
 	q["xp"] = 50 + 10 * i
+	q["sigils"] = 5 if (i + 1) % 5 == 0 else 2
 	if (i + 1) % 5 == 0:
 		q["maps"] = 3
 	if (i + 1) % 10 == 0:
@@ -216,10 +224,10 @@ static func story(i: int) -> Dictionary:
 static func quest_def(id: String) -> Dictionary:
 	for q in DAILY:
 		if q["id"] == id:
-			return q.merged({"xp": DAILY_XP})
+			return q.merged({"xp": DAILY_XP, "sigils": DAILY_SIGILS})
 	for q in WEEKLY:
 		if q["id"] == id:
-			return q.merged({"xp": WEEKLY_XP})
+			return q.merged({"xp": WEEKLY_XP, "sigils": WEEKLY_SIGILS})
 	if id.begins_with("s") and id.substr(1).is_valid_int():
 		return story(int(id.substr(1)) - 1)
 	return {}
@@ -233,6 +241,8 @@ static func reward_text(q: Dictionary) -> String:
 		parts.append("%d map%s" % [int(q["maps"]), "" if int(q["maps"]) == 1 else "s"])
 	if q.has("trinket_rarity"):
 		parts.append("a%s %s trinket" % ["n" if str(q["trinket_rarity"]).begins_with("e") or str(q["trinket_rarity"]).begins_with("u") else "", q["trinket_rarity"]])
+	if int(q.get("sigils", 0)) > 0:
+		parts.append("%d sigil%s" % [int(q["sigils"]), "" if int(q["sigils"]) == 1 else "s"])
 	if int(q.get("xp", 0)) > 0:
 		parts.append("%d XP" % int(q["xp"]))
 	return ", ".join(PackedStringArray(parts))

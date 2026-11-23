@@ -36,12 +36,12 @@ const RARITY_LEVEL_PENALTY := {"epic": 10, "legendary": 10}
 
 
 static func rarity_levels(unit_id: String) -> int:
-	return int(RARITY_LEVELS.get(str(GameData.UNITS.get(unit_id, {}).get("rarity", "common")), STAT_MAX_LEVEL))
+	return int(RARITY_LEVELS.get(str(GameData.unit(unit_id).get("rarity", "common")), STAT_MAX_LEVEL))
 
 
 ## How far up the stat scale this unit's level 1 is.
 static func level_offset(unit_id: String) -> int:
-	var rarity := str(GameData.UNITS.get(unit_id, {}).get("rarity", "common"))
+	var rarity := str(GameData.unit(unit_id).get("rarity", "common"))
 	return STAT_MAX_LEVEL - rarity_levels(unit_id) - int(RARITY_LEVEL_PENALTY.get(rarity, 0))
 
 
@@ -75,7 +75,7 @@ static func level_mult(level: int) -> float:
 
 
 static func squad_size(unit_id: String, tier: int) -> int:
-	var r: Dictionary = GameData.RARITIES[GameData.UNITS[unit_id]["rarity"]]
+	var r: Dictionary = GameData.RARITIES[GameData.unit(unit_id)["rarity"]]
 	var n := int(r["squad_base"]) + int(r["squad_step"]) * tier
 	if caster_nerfed(unit_id):
 		n = maxi(1, roundi(float(n) * CASTER_COUNT_MULT))
@@ -88,7 +88,7 @@ static func squad_size(unit_id: String, tier: int) -> int:
 ##   aoe_add, regen_pct (fraction of max HP per second), lifesteal, thorns,
 ##   flying (bool), armor (String), damage (String)
 static func unit_stats(unit_id: String, level: int, mods: Dictionary = {}) -> Dictionary:
-	var base: Dictionary = GameData.UNITS[unit_id]
+	var base: Dictionary = GameData.unit(unit_id)
 	var m := level_mult(level)
 	var s := base.duplicate()
 	s["hp"] = float(base["hp"]) * m * float(mods.get("hp_mult", 1.0))
@@ -178,7 +178,7 @@ static func dmg_nerf(unit_id: String) -> float:
 
 
 static func caster_nerfed(unit_id: String) -> bool:
-	var u: Dictionary = GameData.UNITS.get(unit_id, {})
+	var u: Dictionary = GameData.unit(unit_id)
 	return str(u.get("role", "")) == "caster" and str(u.get("rarity", "")) in CASTER_NERF_RARITIES
 
 
@@ -340,7 +340,7 @@ const COUNT_EXPONENT := {"melee": 0.85, "tank": 0.85}
 
 ## Power of `count` units of a kind (the building block of army power).
 static func squad_power(unit_id: String, level: int, count: int, mods: Dictionary = {}) -> float:
-	var e := float(COUNT_EXPONENT.get(str(GameData.UNITS[unit_id]["role"]), 1.0))
+	var e := float(COUNT_EXPONENT.get(str(GameData.unit(unit_id)["role"]), 1.0))
 	return unit_power(unit_id, level, mods) * pow(float(maxi(0, count)), e)
 
 
@@ -370,9 +370,21 @@ static func total_units(squads: Array) -> int:
 static func army_power(squads: Array) -> float:
 	var counts := deploy_counts(squads)
 	var p := 0.0
+	var share := 0.0
 	for i in squads.size():
-		p += squad_power(squads[i]["unit"], squad_stat_level(squads[i]), int(counts[i]), squad_mods(squads[i]))
-	return p
+		var sq: Dictionary = squads[i]
+		if sq.has("champion"):
+			# A champion (0.9.9): its own power, plus what its ability adds to
+			# the rest of the army.
+			var bd := Champion.sanitize_battle(sq["champion"])
+			if bd.is_empty():
+				continue
+			var csq := Champion.to_squad(bd)
+			p += squad_power(csq["unit"], int(csq["level"]), 1, csq["mods"])
+			share += Champion.army_share(bd)
+			continue
+		p += squad_power(sq["unit"], squad_stat_level(sq), int(counts[i]), squad_mods(sq))
+	return p * (1.0 + share)
 
 
 static func format_power(p: float) -> String:
@@ -383,12 +395,18 @@ static func format_power(p: float) -> String:
 
 static func encode(player_name: String, rating: int, squads: Array) -> String:
 	var s: Array = []
+	var champ := {}
 	for sq in squads:
+		if sq.has("champion"):
+			champ = sq["champion"]   # the army's champion (0.9.9) travels separately
+			continue
 		var e: Array = [sq["unit"], int(sq["level"]), int(sq["tier"]), GameData.ROWS.find(sq["row"])]
 		if not (sq.get("trinkets", []) as Array).is_empty():
 			e.append(sq["trinkets"])
 		s.append(e)
 	var payload := {"n": player_name.left(24), "r": rating, "s": s}
+	if not champ.is_empty():
+		payload["c"] = champ
 	return CODE_PREFIX + Marshalls.utf8_to_base64(JSON.stringify(payload))
 
 
@@ -423,6 +441,10 @@ static func decode(code: String) -> Dictionary:
 		squads.append(sq)
 		if squads.size() >= GameData.MAX_SQUADS:
 			break
+	if typeof(parsed.get("c")) == TYPE_DICTIONARY and not squads.is_empty():
+		var bd := Champion.sanitize_battle(parsed["c"])
+		if not bd.is_empty():
+			squads.append(Champion.to_squad(bd))
 	if squads.is_empty():
 		return {}
 	return {
@@ -508,7 +530,8 @@ static func fill_ghosts(offers: Array, rating: int, rng: RandomNumberGenerator) 
 
 ## trinkets: false leaves them out (the balance simulator measures bare units).
 ## weighted: false gives the old purely random unit picks (for comparisons).
-static func generate_opponent(target_power: float, rating: int, seed_value: int, trinkets: bool = true, weighted: bool = true) -> Dictionary:
+## with_champion: false leaves the champion out (the balance simulator measures units).
+static func generate_opponent(target_power: float, rating: int, seed_value: int, trinkets: bool = true, weighted: bool = true, with_champion: bool = true) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	# Higher ratings unlock rarer units for ghosts.
@@ -535,9 +558,13 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int,
 		squads.append({"unit": id, "level": 1, "tier": 0, "row": GameData.default_row_for(id)})
 	if trinkets:
 		_give_ghost_trinkets(squads, rating, rng)
+	# From 1000 rating, training bands are led by a champion (0.9.9). It's
+	# added last and never upgraded or sent home.
+	var champ := Champion.for_rating(rating, rng) if with_champion else {}
+	var with_champ := func() -> Array: return squads + ([Champion.to_squad(champ)] if not champ.is_empty() else [])
 	# Rarer units start strong (0.9.7): if the fresh army is already over the
 	# target, send home its strongest squads first.
-	while squads.size() > 1 and army_power(squads) > target_power:
+	while squads.size() > 1 and army_power(with_champ.call()) > target_power:
 		var strongest := 0
 		for k in squads.size():
 			if army_power([squads[k]]) > army_power([squads[strongest]]):
@@ -546,7 +573,7 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int,
 		squads.remove_at(strongest)
 	# Upgrade random squads until we reach the target power.
 	var guard := 0
-	while army_power(squads) < target_power and guard < 2000:
+	while army_power(with_champ.call()) < target_power and guard < 2000:
 		guard += 1
 		var sq: Dictionary = squads[rng.randi_range(0, squads.size() - 1)]
 		if rng.randf() < 0.55 and int(sq["level"]) < max_level(sq["unit"], int(sq["tier"])):
@@ -565,7 +592,7 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int,
 	return {
 		"name": GHOST_NAMES[rng.randi_range(0, GHOST_NAMES.size() - 1)],
 		"rating": rating,
-		"squads": squads,
+		"squads": with_champ.call(),
 	}
 
 

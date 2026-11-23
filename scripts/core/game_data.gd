@@ -1038,7 +1038,18 @@ static func rarity_color(rarity: String) -> Color:
 
 
 static func unit_texture(id: String) -> Texture2D:
+	if Champion.is_champion(id):
+		var bd: Dictionary = Champion.unit_def(id).get("battle_data", {})
+		return Champion.texture(bd.get("look", {}), bd.get("equipped", {}))
 	return load("res://assets/sprites/units/%s.png" % id)
+
+
+## A unit's definition: from UNITS, or a champion registered for this battle
+## (Champion.register, patch 0.9.9).
+static func unit(id: String) -> Dictionary:
+	if UNITS.has(id):
+		return UNITS[id]
+	return Champion.unit_def(id)
 
 
 static func tile_texture(tile: String) -> Texture2D:

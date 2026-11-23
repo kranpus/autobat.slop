@@ -206,7 +206,7 @@ func _build_unit_meshes() -> void:
 		_kind_units[sim.kind[i]] = list
 	# Draw small units first so big ones sit on top.
 	var order: Array = range(sim.unit_ids.size())
-	order.sort_custom(func(a, b): return float(GameData.UNITS[sim.unit_ids[a]]["scale"]) < float(GameData.UNITS[sim.unit_ids[b]]["scale"]))
+	order.sort_custom(func(a, b): return float(GameData.unit(sim.unit_ids[a])["scale"]) < float(GameData.unit(sim.unit_ids[b])["scale"]))
 	_unit_mm.resize(sim.unit_ids.size())
 	_kind_scale.resize(sim.unit_ids.size())
 	for k in order:
@@ -216,8 +216,8 @@ func _build_unit_meshes() -> void:
 		var mm := _new_multimesh((_kind_units[k] as PackedInt32Array).size(), 32.0)
 		node.multimesh = mm
 		_unit_mm[k] = mm
-		_kind_scale[k] = float(GameData.UNITS[uid]["scale"])
-		if bool(GameData.UNITS[uid]["flying"]):
+		_kind_scale[k] = float(GameData.unit(uid)["scale"])
+		if bool(GameData.unit(uid)["flying"]):
 			node.z_index = 2
 		add_child(node)
 
@@ -490,7 +490,7 @@ func _add_new_units() -> void:
 			node.multimesh = mm
 			_unit_mm.append(mm)
 			_kind_units.append(PackedInt32Array())
-			_kind_scale.append(float(GameData.UNITS[uid]["scale"]))
+			_kind_scale.append(float(GameData.unit(uid)["scale"]))
 			add_child(node)
 			move_child(node, _overlay.get_index())
 		var list: PackedInt32Array = _kind_units[k]
@@ -692,7 +692,7 @@ func _draw_overlay() -> void:
 		if sim.alive[i] == 0:
 			continue
 		var w := sim.radius[i] * 2.0
-		var scale_px: float = 32.0 * float(GameData.UNITS[sim.unit_ids[sim.kind[i]]]["scale"])
+		var scale_px: float = 32.0 * float(GameData.unit(sim.unit_ids[sim.kind[i]])["scale"])
 		var x := sim.px[i] - w * 0.5
 		var y := sim.py[i] - scale_px * 0.5 - 14.0 - (10.0 if sim.flying[i] == 1 else 0.0)
 		var ratio := sim.hp[i] / sim.max_hp[i]

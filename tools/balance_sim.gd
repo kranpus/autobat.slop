@@ -164,10 +164,10 @@ func _run_armies(calibrate: bool) -> void:
 		var sims: Array = []
 		for _i in mini(batch_size, total - done):
 			var target := exp(rng.randf_range(log(pr.x), log(pr.y)))
-			var a := Army.generate_opponent(target, opts["rating"], rng.randi(), opts["trinkets"])
+			var a := Army.generate_opponent(target, opts["rating"], rng.randi(), opts["trinkets"], true, false)
 			var pa := Army.army_power(a["squads"])
 			var ratio := rng.randf_range(0.7, 1.5) if calibrate else 1.0
-			var b := Army.generate_opponent(pa * ratio, opts["rating"], rng.randi(), opts["trinkets"])
+			var b := Army.generate_opponent(pa * ratio, opts["rating"], rng.randi(), opts["trinkets"], true, false)
 			var map := _map(rng)
 			var seed_v := rng.randi()
 			var s1 := BattleSim.new()

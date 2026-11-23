@@ -2429,6 +2429,8 @@ func _rc_profile(profile_data: Dictionary, event: String, payload: Dictionary) -
 			Profile.trinket_result.emit(payload)
 		"quest":
 			Profile.quest_claimed.emit(payload)
+		"champion_roll":
+			Profile.champion_rolled.emit(payload)
 
 
 @rpc("authority", "reliable")
@@ -2697,6 +2699,26 @@ func _rq_profile_action(action: Array) -> void:
 				pl.unequip_trinket(str(action[1]), int(action[2]))
 		"refresh_quests":
 			pl.refresh_quests()
+		"champion_roll":
+			payload = pl.champion_roll()
+			event = "champion_roll" if not payload.is_empty() else ""
+		"champion_buy":
+			pl.buy_sigil()
+		"champion_equip":
+			if action.size() == 3:
+				pl.champion_equip(str(action[1]), str(action[2]))
+		"champion_ability":
+			if action.size() == 2:
+				pl.champion_set_ability(str(action[1]))
+		"champion_look":
+			if action.size() == 3:
+				pl.champion_set_look(str(action[1]), str(action[2]))
+		"champion_name":
+			if action.size() == 2:
+				pl.champion_rename(str(action[1]))
+		"champion_row":
+			if action.size() == 2:
+				pl.champion_set_row(str(action[1]))
 		"claim_quest":
 			if action.size() == 3:
 				payload = pl.claim_quest(str(action[1]), int(action[2]))
@@ -2731,7 +2753,7 @@ func _account_command(a: PackedStringArray) -> String:
 
 # --- player admin ------------------------------------------------------------------
 
-const PLAYER_STATS := ["rating", "gold", "maps", "wins", "losses", "draft_wins", "draft_played", "xp", "commander_level"]
+const PLAYER_STATS := ["rating", "gold", "maps", "wins", "losses", "draft_wins", "draft_played", "xp", "commander_level", "sigils"]
 const PLAYER_KEYWORDS := ["level", "tier", "shards", "remove"]
 
 
@@ -2866,7 +2888,11 @@ func _player_summary(user: String, pl: ProfileLogic) -> String:
 	var rank := accounts.rank_of(user)
 	var lines: Array = []
 	lines.append("%s (commander name %s)%s" % [user, d.get("name", user), "  ONLINE" if _player_sessions(user).size() > 0 else ""])
-	lines.append("  commander level %d (%d XP), story quest %d of %d" % [pl.player_level(), pl.xp(), int(d["quests"]["story"]["index"]) + 1, Progression.STORY.size()])
+	lines.append("  commander level %d (%d XP), story quest %d of %d, %d sigils" % [pl.player_level(), pl.xp(), int(d["quests"]["story"]["index"]) + 1, Progression.STORY.size(), pl.sigils()])
+	if pl.has_champion():
+		var ch := pl.champion()
+		lines.append("  champion %s: %s, %s, stats %s, %d of %d items, %d abilities, %d rolls" % [ch["name"], Champion.weapon_class(ch),
+			Champion.ABILITIES[ch["ability"]]["name"], ch["stats"], (ch["items"] as Array).size(), Champion.ITEMS.size(), (ch["abilities"] as Array).size(), int(ch["rolls"])])
 	lines.append("  rating %d%s, wins %d, losses %d, gold %d, maps %d, Legion Draft %d wins of %d" % [pl.rating(),
 		(" (#%d of %d)" % [int(rank["rank"]), int(rank["of"])]) if int(rank.get("rank", 0)) > 0 else "", int(d["wins"]), int(d["losses"]),
 		pl.gold(), pl.maps(), int(d.get("draft_wins", 0)), int(d.get("draft_played", 0))])

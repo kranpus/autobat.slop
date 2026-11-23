@@ -22,6 +22,8 @@ signal trinket_choice_ready(choice: Dictionary)
 signal trinket_result(result: Dictionary)
 ## Signed in: a quest reward the server paid ({gold, maps, trinket, xp, levels, quest}).
 signal quest_claimed(result: Dictionary)
+## Signed in: the result of an Altar roll the server made.
+signal champion_rolled(result: Dictionary)
 
 const SAVE_PATH := "user://profile.json"
 const SETTINGS_PATH := "user://settings.json"
@@ -193,6 +195,65 @@ func refresh_quests() -> void:
 		return
 	if logic.refresh_quests():
 		save()
+
+
+# --- champion (0.9.9) ---
+
+func has_champion() -> bool:
+	return logic.has_champion()
+
+
+func champion() -> Dictionary:
+	return logic.champion()
+
+
+func sigils() -> int:
+	return logic.sigils()
+
+
+func _champion_action(action: Array, local: Callable) -> bool:
+	if online:
+		_remote(action)
+		return true
+	var ok: bool = local.call()
+	if ok:
+		save()
+	return ok
+
+
+## Offline: returns the roll. Signed in: {} now; `champion_rolled` fires.
+func champion_roll() -> Dictionary:
+	if online:
+		_remote(["champion_roll"])
+		return {}
+	var res := logic.champion_roll()
+	if not res.is_empty():
+		save()
+	return res
+
+
+func buy_sigil() -> bool:
+	return _champion_action(["champion_buy"], logic.buy_sigil)
+
+
+func champion_equip(slot: String, id: String) -> bool:
+	return _champion_action(["champion_equip", slot, id], logic.champion_equip.bind(slot, id))
+
+
+func champion_set_ability(id: String) -> bool:
+	return _champion_action(["champion_ability", id], logic.champion_set_ability.bind(id))
+
+
+func champion_set_look(part: String, v: String) -> bool:
+	return _champion_action(["champion_look", part, v], logic.champion_set_look.bind(part, v))
+
+
+func champion_rename(n: String) -> bool:
+	return _champion_action(["champion_name", n], logic.champion_rename.bind(n))
+
+
+func champion_set_row(row: String) -> bool:
+	return _champion_action(["champion_row", row], logic.champion_set_row.bind(row))
 
 
 ## Offline: returns {gold, maps, trinket, xp, levels}. Signed in: {} now, and

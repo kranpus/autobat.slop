@@ -48,6 +48,8 @@ const QUAKE_RADIUS := 70.0
 const DEATH_BLAST_RADIUS := 90.0
 const AURA_RADIUS := 150.0        # dread and divine aegis
 const AURA_TICKS := 10            # auras refresh twice a second
+const CHAMPION_AURA_MULT := 1.8    # a champion's aura radius (x AURA_RADIUS)
+const CHAMPION_AURA_CAP := 160     # ...and how many it reaches
 const AEGIS_MULT := 0.8           # allies under divine aegis take 20% less damage
 const HARVEST_MAX_STACKS := 5     # soul harvest: +10% damage per kill, up to +50%
 const STORM_MAX_STACKS := 20      # rising storm: up to 20 stacks
@@ -121,6 +123,7 @@ var speed := PackedFloat32Array()
 var cooldown := PackedFloat32Array()
 var cd_t := PackedFloat32Array()
 var aoe := PackedFloat32Array()
+var champ := PackedByteArray()     # 1: a champion (its auras reach further, 0.9.9)
 var heal := PackedFloat32Array()
 var regen := PackedFloat32Array()
 var radius := PackedFloat32Array()
@@ -242,11 +245,25 @@ func setup(squads_a: Array, squads_b: Array, seed_value: int, map: String = Batt
 	gh = int(ceil(map_h / CELL))
 	cell_head.resize(gw * gh)
 	_build_obstacles()
-	_spawn_army(squads_a, 0)
-	_spawn_army(squads_b, 1)
+	_spawn_army(_with_champions(squads_a), 0)
+	_spawn_army(_with_champions(squads_b), 1)
 	cell_next.resize(n)
 	_resolve_obstacles()
 	_rebuild_team_lists()
+
+
+## Champion squads (0.9.9) rebuilt from their battle data, so every machine
+## registers the same champion under the same id.
+func _with_champions(squads: Array) -> Array:
+	var out: Array = []
+	for sq in squads:
+		if typeof(sq) == TYPE_DICTIONARY and sq.has("champion"):
+			var bd := Champion.sanitize_battle(sq["champion"])
+			if not bd.is_empty():
+				out.append(Champion.to_squad(bd))
+		else:
+			out.append(sq)
+	return out
 
 
 func _build_obstacles() -> void:
@@ -334,7 +351,7 @@ func _spawn_army(squads: Array, t: int) -> void:
 
 
 func _spacing(uid: String) -> float:
-	return float(GameData.UNITS[uid]["radius"]) * 2.0 + 3.0
+	return float(GameData.unit(uid)["radius"]) * 2.0 + 3.0
 
 
 func _add_unit(uid: String, s: Dictionary, t: int, x: float, y: float) -> void:
@@ -351,6 +368,7 @@ func _resolve(uid: String, s: Dictionary) -> Dictionary:
 		"armor": GameData.ARMOR_TYPES.find(s["armor"]), "flying": 1 if s["flying"] else 0, "proj": GameData.PROJECTILES.find(s["projectile"]),
 		"hp": float(s["hp"]), "dmg": float(s["dmg"]), "range": float(s["range"]), "speed": float(s["speed"]), "cooldown": float(s["cooldown"]),
 		"aoe": float(s["aoe"]), "heal": float(s["heal"]), "regen": float(s["regen"]), "radius": float(s["radius"]),
+		"champ": 1 if bool(s.get("champion", false)) else 0,
 		"lifesteal": float(s.get("lifesteal", 0.0)), "thorns": float(s.get("thorns", 0.0)),
 		"tmode": int(TARGET_MODES.get(str(s.get("targets", "")), Target.NEAREST)),
 		"ab": int(AB_IDS.get(str(ab.get("id", "")), Ab.NONE)), "ab_val": float(ab.get("value", 0.0)), "tpl": -1,
@@ -406,6 +424,7 @@ func _add_resolved(r: Dictionary, t: int, x: float, y: float) -> void:
 	cooldown.append(r["cooldown"])
 	cd_t.append(rng.randf_range(0.0, float(r["cooldown"])))
 	aoe.append(r["aoe"])
+	champ.append(int(r.get("champ", 0)))
 	heal.append(r["heal"])
 	regen.append(r["regen"])
 	radius.append(r["radius"])
@@ -1163,26 +1182,29 @@ func _apply_auras() -> void:
 		if alive[i] == 0:
 			continue
 		var until := tick + AURA_TICKS + 1
+		# Champions lead from further away and reach many more (0.9.9).
+		var reach_r := AURA_RADIUS * (CHAMPION_AURA_MULT if champ[i] == 1 else 1.0)
+		var cap := CHAMPION_AURA_CAP if champ[i] == 1 else 40
 		match ab_id[i]:
 			Ab.DREAD:
-				for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], false, 40):
+				for k in _enemies_near(px[i], py[i], reach_r, team[i], false, cap):
 					weaken_until[k] = maxi(weaken_until[k], until)
 			Ab.AEGIS:
-				for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], true, 40):
+				for k in _enemies_near(px[i], py[i], reach_r, team[i], true, cap):
 					aegis_until[k] = maxi(aegis_until[k], until)
 			Ab.SONG:
-				for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], true, 40):
+				for k in _enemies_near(px[i], py[i], reach_r, team[i], true, cap):
 					haste_until[k] = maxi(haste_until[k], until)
 					haste_amt[k] = maxf(haste_amt[k], ab_val[i])
 			Ab.INSPIRE:
-				for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], true, 40):
+				for k in _enemies_near(px[i], py[i], reach_r, team[i], true, cap):
 					inspire_until[k] = maxi(inspire_until[k], until)
 					inspire_amt[k] = maxf(inspire_amt[k], ab_val[i])
 			Ab.IMMOLATE:
 				for k in _enemies_near(px[i], py[i], 80.0, team[i], false, 8):
 					_damage_unit(k, dmg[i] * ab_val[i] * float(AURA_TICKS) * DT, 3, false, -1)
 			Ab.FROST_AURA:
-				for k in _enemies_near(px[i], py[i], 110.0, team[i], false, 30):
+				for k in _enemies_near(px[i], py[i], 110.0 * (CHAMPION_AURA_MULT if champ[i] == 1 else 1.0), team[i], false, CHAMPION_AURA_CAP if champ[i] == 1 else 30):
 					if ab_id[k] != Ab.UNSTOPPABLE:
 						chill_until[k] = maxi(chill_until[k], until)
 		if tick % (AURA_TICKS * 4) == 1:

@@ -47,6 +47,7 @@ static func default_profile() -> Dictionary:
 		"xp": 0,                  # commander XP (0.9.7)
 		"level_rewarded": 1,      # commander levels whose reward has been paid
 		"quests": {},             # the quest log (see Progression)
+		"sigils": 0,              # champion Altar rolls (0.9.9)
 	}
 
 
@@ -144,6 +145,10 @@ func _sanitize() -> void:
 	data["xp"] = clampi(int(data.get("xp", 0)), 0, Progression.xp_for_level(Progression.MAX_LEVEL))
 	data["level_rewarded"] = clampi(int(data.get("level_rewarded", 1)), 1, Progression.MAX_LEVEL)
 	_sanitize_quests()
+	data["sigils"] = maxi(0, int(data.get("sigils", 0)))
+	if data.has("champion"):
+		data["champion"] = Champion.sanitize(data["champion"])
+	_ensure_champion()
 
 
 func _regen_maps() -> void:
@@ -500,6 +505,8 @@ func battle_squads() -> Array:
 	for sq in army_squads():
 		if not UnitLocks.is_locked(sq["unit"]):
 			out.append(sq)
+	if has_champion() and not out.is_empty():
+		out.append(Champion.to_squad(Champion.battle_data(data["champion"], player_level())))
 	return out
 
 
@@ -770,6 +777,7 @@ func add_xp(amount: int) -> Array:
 		gained.append(lvl)
 	if not gained.is_empty():
 		refresh_quests()   # new quest slots may have opened
+		_ensure_champion()
 	return gained
 
 
@@ -789,6 +797,9 @@ func _pay(r: Dictionary) -> Dictionary:
 			out["trinket"] = t
 	data["gold"] = gold() + int(out["gold"])
 	data["maps"] = int(data["maps"]) + int(out["maps"])
+	if int(r.get("sigils", 0)) > 0:
+		data["sigils"] = int(data.get("sigils", 0)) + int(r["sigils"])
+		out["sigils"] = int(r["sigils"])
 	return out
 
 
@@ -936,3 +947,158 @@ func claimable_quests() -> int:
 		if bool(e["done"]) and not bool(e["claimed"]):
 			n += 1
 	return n
+
+
+
+# --- champion (0.9.9) -------------------------------------------------------------------
+
+func has_champion() -> bool:
+	return data.has("champion") and feature_unlocked("champion")
+
+
+func champion() -> Dictionary:
+	return data.get("champion", {})
+
+
+func sigils() -> int:
+	return int(data.get("sigils", 0))
+
+
+## The champion arrives at its commander level with the starter kit and a few sigils.
+func _ensure_champion() -> void:
+	if feature_unlocked("champion") and not data.has("champion"):
+		data["champion"] = Champion.new_champion(Champion.clean_name("%s's Champion" % str(data.get("name", "Commander")).left(10)))
+		data["sigils"] = sigils() + Champion.START_SIGILS
+
+
+## Buy a sigil with gold.
+func buy_sigil() -> bool:
+	if not has_champion() or gold() < Champion.SIGIL_GOLD:
+		return false
+	data["gold"] = gold() - Champion.SIGIL_GOLD
+	data["sigils"] = sigils() + 1
+	return true
+
+
+## Spend a sigil at the Altar: a stat point, a piece of equipment, an
+## appearance part or an ability, at random (Champion.ROLL_ODDS). Things you
+## already own aren't rolled; when a kind has nothing left, it gives stat
+## points instead. Returns {kind, id, part, stat, points, text} ({} if you can't).
+func champion_roll(rng: RandomNumberGenerator = null) -> Dictionary:
+	if not has_champion() or sigils() < 1:
+		return {}
+	if rng == null:
+		rng = RandomNumberGenerator.new()
+		rng.randomize()
+	data["sigils"] = sigils() - 1
+	var c: Dictionary = data["champion"]
+	var kind := _weighted_pick(Champion.ROLL_ODDS, rng)
+	var res := {"kind": kind}
+	if kind == "ability":
+		var pool: Array = Champion.ABILITIES.keys().filter(func(a): return not (c["abilities"] as Array).has(a))
+		if pool.is_empty():
+			kind = "stat"
+			res["bonus"] = 3
+		else:
+			var a: String = pool[rng.randi_range(0, pool.size() - 1)]
+			c["abilities"].append(a)
+			res["id"] = a
+			res["text"] = "New ability: %s" % Champion.ABILITIES[a]["name"]
+	if kind == "look":
+		var pool: Array = []
+		for part in Champion.LOOKS:
+			for v in Champion.LOOKS[part]:
+				if not (c["looks"][part] as Array).has(v):
+					pool.append([part, v])
+		if pool.is_empty():
+			kind = "stat"
+			res["bonus"] = 2
+		else:
+			var pick: Array = pool[rng.randi_range(0, pool.size() - 1)]
+			c["looks"][pick[0]].append(pick[1])
+			res["part"] = pick[0]
+			res["id"] = pick[1]
+			res["text"] = "New look: %s %s" % [Champion.look_name(pick[0], pick[1]), Champion.LOOK_NAMES[pick[0]].to_lower()]
+	if kind == "item":
+		var rarity := _weighted_pick(Champion.ITEM_RARITY_ODDS, rng)
+		var not_owned: Array = Champion.ITEMS.keys().filter(func(i): return not (c["items"] as Array).has(i))
+		var pool: Array = not_owned.filter(func(i): return Champion.ITEMS[i]["rarity"] == rarity)
+		if pool.is_empty():
+			pool = not_owned
+		if pool.is_empty():
+			kind = "stat"
+			res["bonus"] = 2
+		else:
+			var it: String = pool[rng.randi_range(0, pool.size() - 1)]
+			c["items"].append(it)
+			res["id"] = it
+			res["text"] = "New %s %s: %s" % [Champion.ITEMS[it]["rarity"], Champion.SLOT_NAMES[Champion.ITEMS[it]["slot"]].to_lower(), Champion.ITEMS[it]["name"]]
+	if kind == "stat":
+		var points := int(res.get("bonus", 1))
+		var gained := {}
+		for _p in points:
+			var open: Array = Champion.STAT_ORDER.filter(func(k): return int(c["stats"][k]) < Champion.MAX_STAT)
+			if open.is_empty():
+				data["gold"] = gold() + Champion.SIGIL_GOLD / 2   # everything maxed: half a sigil's price back
+				break
+			var k: String = open[rng.randi_range(0, open.size() - 1)]
+			c["stats"][k] = int(c["stats"][k]) + 1
+			gained[k] = int(gained.get(k, 0)) + 1
+		res["kind"] = "stat"
+		res["stats"] = gained
+		var parts: Array = []
+		for k in gained:
+			parts.append("+%d %s" % [gained[k], Champion.STATS[k]["name"]])
+		res["text"] = ", ".join(PackedStringArray(parts)) if not parts.is_empty() else "Your champion is already at its peak: %d gold instead." % (Champion.SIGIL_GOLD / 2)
+	c["rolls"] = int(c.get("rolls", 0)) + 1
+	c["last_roll"] = res
+	quest_event("champion_roll")
+	return res
+
+
+func champion_equip(slot: String, id: String) -> bool:
+	if not has_champion() or not slot in Champion.SLOTS:
+		return false
+	var c: Dictionary = data["champion"]
+	if id == "":
+		if slot == "weapon":
+			return false   # a champion always holds a weapon
+		c["equipped"].erase(slot)
+		return true
+	if not Champion.ITEMS.has(id) or Champion.ITEMS[id]["slot"] != slot or not (c["items"] as Array).has(id):
+		return false
+	c["equipped"][slot] = id
+	return true
+
+
+func champion_set_ability(id: String) -> bool:
+	if not has_champion() or not (data["champion"]["abilities"] as Array).has(id):
+		return false
+	data["champion"]["ability"] = id
+	return true
+
+
+func champion_set_look(part: String, v: String) -> bool:
+	if not has_champion() or not Champion.LOOKS.has(part):
+		return false
+	if v == "" and part != "race":
+		data["champion"]["look"][part] = ""
+		return true
+	if not (data["champion"]["looks"][part] as Array).has(v):
+		return false
+	data["champion"]["look"][part] = v
+	return true
+
+
+func champion_rename(n: String) -> bool:
+	if not has_champion():
+		return false
+	data["champion"]["name"] = Champion.clean_name(n)
+	return true
+
+
+func champion_set_row(row: String) -> bool:
+	if not has_champion() or not (row in GameData.ROWS or row == ""):
+		return false
+	data["champion"]["row"] = row
+	return true

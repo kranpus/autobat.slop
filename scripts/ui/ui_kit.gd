@@ -267,7 +267,10 @@ static func squad_strip(squads: Array, px: int = 28, text_color: Color = TEXT_DI
 		var sq: Dictionary = squads[i]
 		var v := vbox(0)
 		var ic := unit_icon(sq["unit"], px)
-		ic.tooltip_text = "%s  Lv %d  x%d" % [GameData.UNITS[sq["unit"]]["name"], int(sq["level"]), int(counts[i])]
+		if sq.has("champion"):
+			ic.tooltip_text = "%s, champion (%s)" % [str(sq["champion"].get("name", "Champion")), Champion.ABILITIES.get(str(sq["champion"].get("ability", "")), {}).get("name", "")]
+		else:
+			ic.tooltip_text = "%s  Lv %d  x%d" % [GameData.unit(sq["unit"])["name"], int(sq["level"]), int(counts[i])]
 		v.add_child(ic)
 		var l := label("x%d" % int(counts[i]), 11, text_color)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
