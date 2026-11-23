@@ -43,8 +43,10 @@ func _ready() -> void:
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_list)
 
+	# The scouts' finds arrive as a report on parchment.
 	_choice_popup = PopupPanel.new()
 	_choice_popup.theme = UIKit.make_theme()
+	_choice_popup.add_theme_stylebox_override("panel", FantasySkin.parchment_box(28.0))
 	_choice_box = UIKit.vbox(10)
 	_choice_popup.add_child(_choice_box)
 	add_child(_choice_popup)
@@ -158,7 +160,7 @@ func _show_choice(animate: bool = false) -> void:
 			if _choice_popup.visible:
 				_build_choice(pc, false))
 		_choice_box.add_child(reveal)
-		_choice_popup.popup_centered(Vector2i(980, 520))
+		UIKit.popup_fit(_choice_popup, Vector2i(980, 520))
 		return
 	_build_choice(pc, true)
 
@@ -168,8 +170,12 @@ func _build_choice(pc: Dictionary, fanfare: bool) -> void:
 		return  # already chosen
 	UIKit.clear(_choice_box)
 	var region_name: String = GameData.REGIONS[pc["region"]]["name"] if GameData.REGIONS.has(pc["region"]) else "the wilds"
-	_choice_box.add_child(UIKit.label("Your scouts return from %s" % region_name, 22, UIKit.ACCENT))
-	_choice_box.add_child(UIKit.label("Three units answered the call (+%d gold found). Recruit ONE:" % int(pc["gold"]), 15, UIKit.TEXT_DIM))
+	var t := ScrollUnroll.ink("Scout's Report: %s" % region_name, 24)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_choice_box.add_child(t)
+	var st := ScrollUnroll.ink("Three units answered the call (and %d gold was found on the way). Recruit ONE:" % int(pc["gold"]), 15, FantasySkin.INK_DIM)
+	st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_choice_box.add_child(st)
 	var row := UIKit.hbox(12)
 	_choice_box.add_child(row)
 	var best_rarity := 0
@@ -179,7 +185,7 @@ func _build_choice(pc: Dictionary, fanfare: bool) -> void:
 		best_rarity = maxi(best_rarity, int(GameData.RARITIES[GameData.UNITS[opt["unit"]]["rarity"]]["order"]))
 	if best_rarity >= 3 and fanfare:
 		Audio.play_sfx("roar")
-	_choice_popup.popup_centered(Vector2i(980, 520))
+	UIKit.popup_fit(_choice_popup, Vector2i(980, 520))
 
 
 func _make_choice_card(index: int, id: String, shards: int, guaranteed: bool = false) -> Control:
@@ -234,8 +240,8 @@ func _make_choice_card(index: int, id: String, shards: int, guaranteed: bool = f
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	v.add_child(spacer)
-	var b := UIKit.button("Recruit %s" % def["name"], func(): _choose(index))
-	b.custom_minimum_size = Vector2(0, 40)
+	var b := ScrollUnroll.seal_button("Recruit %s" % def["name"], func(): _choose(index))
+	b.custom_minimum_size = Vector2(0, 42)
 	v.add_child(b)
 	return p
 

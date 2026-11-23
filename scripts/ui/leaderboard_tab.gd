@@ -7,6 +7,8 @@ const REFRESH_AFTER_MS := 30000
 var _status: Label
 var _me: Label
 var _table: VBoxContainer
+var _scroll: ScrollUnroll
+var _shown_key := ""
 var _waiting := false
 var _stale := false
 
@@ -28,9 +30,10 @@ func _ready() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(scroll)
-	_table = UIKit.vbox(4)
-	_table.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_table)
+	# The rankings are a hall-of-fame scroll.
+	_scroll = ScrollUnroll.new()
+	scroll.add_child(_scroll)
+	_table = _scroll.content
 
 	Party.leaderboard_received.connect(_show)
 	# Signing in or out changes "your rank": fetch again (now, or when shown).
@@ -78,32 +81,54 @@ func _show(top: Array, me: Dictionary) -> void:
 		_status.text = "Not loaded yet."
 		return
 	_status.text = "Top %d players by rating%s." % [top.size(), "" if top.size() > 0 else " (nobody has played a ranked battle yet)"]
+	var title := ScrollUnroll.ink("Hall of Heroes", 26, FantasySkin.INK)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_table.add_child(title)
 	if top.is_empty():
-		return
-	_table.add_child(_row(["#", "Player", "Rating", "Wins", "Losses", "Win rate"], UIKit.TEXT_DIM, false))
+		var none := ScrollUnroll.ink("No names are written here yet. Fight a ranked battle to be the first.", 15, FantasySkin.INK_DIM)
+		none.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_table.add_child(none)
+	else:
+		_table.add_child(_row(["", "Commander", "Rating", "Wins", "Losses", "Win rate"], FantasySkin.INK_DIM, false, 13))
+		_table.add_child(ScrollUnroll.rule())
 	for e in top:
 		var rank := int(e["rank"])
-		var color := Color.WHITE
+		# Gold, silver and bronze ink for the top three.
+		var color := FantasySkin.INK
 		if rank == 1:
-			color = Color("ffd76a")
+			color = Color("8a6410")
 		elif rank == 2:
-			color = Color("d7dde6")
+			color = Color("5b6068")
 		elif rank == 3:
-			color = Color("e0a06a")
+			color = Color("7e4a20")
 		var w := int(e["wins"])
 		var l := int(e["losses"])
 		var you := me_name != "" and str(e["name"]).to_lower() == me_name.to_lower()
-		_table.add_child(_row([str(rank), str(e["name"]) + ("  (you)" if you else ""), str(int(e["rating"])), str(w), str(l),
-			"%d%%" % roundi(100.0 * float(w) / maxf(1.0, float(w + l)))], UIKit.GOOD if you else color, you))
+		var medal := "★" if rank <= 3 else ""
+		_table.add_child(_row(["%s %d" % [medal, rank], str(e["name"]) + ("  (you)" if you else ""), str(int(e["rating"])), str(w), str(l),
+			"%d%%" % roundi(100.0 * float(w) / maxf(1.0, float(w + l)))], FantasySkin.INK_GOOD if you else color, you, 19 if rank <= 3 else 16))
+	# Unroll when the list changes (not on every quiet refresh).
+	var key := JSON.stringify(top)
+	if key != _shown_key:
+		_shown_key = key
+		_scroll.unroll(0.6)
 
 
-func _row(cells: Array, color: Color, highlight: bool) -> Control:
-	var p := UIKit.panel(Color("2f3f2f") if highlight else UIKit.PANEL_LIGHT)
+func _row(cells: Array, color: Color, highlight: bool, size: int = 16) -> Control:
+	var p := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.3, 0.5, 0.2, 0.18) if highlight else Color(0, 0, 0, 0)
+	sb.set_corner_radius_all(4)
+	sb.content_margin_left = 6
+	sb.content_margin_right = 6
+	sb.content_margin_top = 2
+	sb.content_margin_bottom = 2
+	p.add_theme_stylebox_override("panel", sb)
 	var h := UIKit.hbox(8)
 	p.add_child(h)
-	var widths := [50, 0, 90, 70, 70, 90]
+	var widths := [56, 0, 90, 70, 70, 90]
 	for i in cells.size():
-		var l := UIKit.label(cells[i], 15, color)
+		var l := ScrollUnroll.ink(cells[i], size if i < 2 else mini(size, 16), color)
 		if widths[i] > 0:
 			l.custom_minimum_size = Vector2(widths[i], 0)
 		else:

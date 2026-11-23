@@ -52,47 +52,48 @@ func refresh() -> void:
 		_list.add_child(_make_card(c, my_power))
 
 
+## A challenge as a quest notice pinned up on parchment, written in ink.
 func _make_card(c: Dictionary, my_power: float) -> Control:
 	var id: String = c["id"]
 	var unlocked := Profile.challenge_unlocked(id)
 	var cleared := Profile.challenge_cleared(id)
-	var p := UIKit.panel(UIKit.PANEL_LIGHT if unlocked else UIKit.PANEL)
-	var h := UIKit.hbox(12)
+	var p := UIKit.parchment_panel(20.0)
+	if not unlocked:
+		p.modulate = Color(0.62, 0.58, 0.52)   # a faded notice: not posted yet
+	var h := UIKit.hbox(14)
 	p.add_child(h)
 	var map_def := BattleMaps.get_map(c["map"])
 	var tile := UIKit.icon(GameData.tile_texture(map_def["tile"]), 64)
 	tile.tooltip_text = "%s: %s" % [map_def["name"], map_def["desc"]]
-	if not unlocked:
-		tile.modulate = Color(0.5, 0.5, 0.5)
 	h.add_child(tile)
 
 	var v := UIKit.vbox(4)
 	v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var title := UIKit.hbox(8)
-	title.add_child(UIKit.label(c["name"], 18, (UIKit.GOOD if cleared else UIKit.ACCENT) if unlocked else UIKit.TEXT_DIM))
+	var title := UIKit.hbox(10)
+	title.add_child(ScrollUnroll.ink(c["name"], 20, FantasySkin.INK))
 	if cleared:
-		title.add_child(UIKit.label("✓ Cleared", 13, UIKit.GOOD))
+		title.add_child(ScrollUnroll.ink("✓ Cleared", 14, FantasySkin.INK_GOOD))
 	elif not unlocked:
-		title.add_child(UIKit.label("Locked: clear the previous challenge", 13, UIKit.TEXT_DIM))
+		title.add_child(ScrollUnroll.ink("Clear the previous challenge to take this one", 13, FantasySkin.INK_DIM))
 	v.add_child(title)
-	var desc := UIKit.label(c["desc"], 13, UIKit.TEXT_DIM if unlocked else Color(UIKit.TEXT_DIM, 0.6))
+	var desc := ScrollUnroll.ink(c["desc"], 14, FantasySkin.INK)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(desc)
 
 	if unlocked:
 		var row := UIKit.hbox(12)
-		row.add_child(UIKit.squad_strip(Challenges.enemy_squads(id), 28))
+		row.add_child(UIKit.squad_strip(Challenges.enemy_squads(id), 28, FantasySkin.INK_DIM))
 		var bosses: Array = []
 		for sq in c["enemy"]:
 			if sq.has("title"):
 				bosses.append("%s (%s)" % [sq["title"], GameData.UNITS[sq["unit"]]["name"]])
 		if not bosses.is_empty():
-			row.add_child(UIKit.label("Boss: " + ", ".join(PackedStringArray(bosses)), 13, UIKit.BAD))
+			row.add_child(ScrollUnroll.ink("Boss: " + ", ".join(PackedStringArray(bosses)), 14, FantasySkin.INK_BAD))
 		v.add_child(row)
 		var rec := Challenges.recommended(id)
 		var mine := roundi(my_power / 10.0)
-		var info := UIKit.label("Battlefield: %s   ·   Recommended power %d   ·   Your army %d" % [map_def["name"], rec, mine], 12,
-			UIKit.GOOD if mine >= rec else (UIKit.ACCENT if mine >= rec * 0.75 else UIKit.BAD))
+		var info := ScrollUnroll.ink("Battlefield: %s   ·   Recommended power %d   ·   Your army %d" % [map_def["name"], rec, mine], 13,
+			FantasySkin.INK_GOOD if mine >= rec else (FantasySkin.INK_ACCENT if mine >= rec * 0.75 else FantasySkin.INK_BAD))
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		v.add_child(info)
 	v.add_child(_reward_row(c["reward"], cleared))
@@ -100,11 +101,11 @@ func _make_card(c: Dictionary, my_power: float) -> Control:
 
 	var side := UIKit.vbox(6)
 	side.alignment = BoxContainer.ALIGNMENT_CENTER
-	var b := UIKit.button("Replay" if cleared else "Fight", func(): _start(id))
+	var b := ScrollUnroll.seal_button("Replay" if cleared else "Fight", func(): _start(id))
+	b.custom_minimum_size = Vector2(120, 44)
+	b.disabled = not unlocked
 	if unlocked and not cleared:
 		UIKit.tut(b, "challenge_fight")
-	b.custom_minimum_size = Vector2(120, 40)
-	b.disabled = not unlocked
 	side.add_child(b)
 	h.add_child(side)
 	return p
@@ -112,24 +113,24 @@ func _make_card(c: Dictionary, my_power: float) -> Control:
 
 func _reward_row(reward: Dictionary, cleared: bool) -> Control:
 	var h := UIKit.hbox(8)
-	h.add_child(UIKit.label("Reward claimed:" if cleared else "Reward:", 13, UIKit.TEXT_DIM if cleared else Color.WHITE))
+	h.add_child(ScrollUnroll.ink("Reward claimed:" if cleared else "Reward:", 14, FantasySkin.INK_DIM if cleared else FantasySkin.INK))
 	if int(reward.get("gold", 0)) > 0:
-		h.add_child(UIKit.label("%d gold" % int(reward["gold"]), 13, Color("ffd76a")))
+		h.add_child(ScrollUnroll.ink("%d gold" % int(reward["gold"]), 14, FantasySkin.INK_ACCENT))
 	if int(reward.get("maps", 0)) > 0:
-		h.add_child(UIKit.label("%d map%s" % [int(reward["maps"]), "" if int(reward["maps"]) == 1 else "s"], 13, Color("9fd3ff")))
+		h.add_child(ScrollUnroll.ink("%d map%s" % [int(reward["maps"]), "" if int(reward["maps"]) == 1 else "s"], 14, Color("2e4f7a")))
 	var t := str(reward.get("trinket", ""))
 	if Trinkets.exists(t):
 		var ic := UIKit.icon(Trinkets.texture(t), 22)
 		ic.tooltip_text = "%s: %s" % [Trinkets.ALL[t]["name"], Trinkets.ALL[t]["desc"]]
 		h.add_child(ic)
-		h.add_child(UIKit.label(Trinkets.ALL[t]["name"], 13, GameData.rarity_color(Trinkets.rarity_of(t))))
+		h.add_child(ScrollUnroll.ink(Trinkets.ALL[t]["name"], 14, GameData.rarity_color(Trinkets.rarity_of(t)).darkened(0.45)))
 	var u := str(reward.get("unit", ""))
 	if GameData.UNITS.has(u):
 		h.add_child(UIKit.unit_icon(u, 22))
 		var owned := Profile.owns(u)
-		h.add_child(UIKit.label(GameData.UNITS[u]["name"] + (" (+%d shards: owned)" % Challenges.DUPLICATE_UNIT_SHARDS if owned and not cleared else ""), 13, GameData.rarity_color(GameData.UNITS[u]["rarity"])))
+		h.add_child(ScrollUnroll.ink(GameData.UNITS[u]["name"] + (" (+%d shards: owned)" % Challenges.DUPLICATE_UNIT_SHARDS if owned and not cleared else ""), 14, GameData.rarity_color(GameData.UNITS[u]["rarity"]).darkened(0.45)))
 	if cleared:
-		h.modulate = Color(1, 1, 1, 0.55)
+		h.modulate = Color(1, 1, 1, 0.6)
 	return h
 
 

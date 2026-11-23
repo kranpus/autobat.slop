@@ -146,6 +146,21 @@ static func accent_button(text: String, callback: Callable, font_size: int = 18)
 	return b
 
 
+## Show a popup centred, then centre it again once its content has settled
+## (wrapped text can make it taller a frame later), keeping it on screen.
+static func popup_fit(popup: Popup, min_size: Vector2i) -> void:
+	popup.popup_centered(min_size)
+	var recentre := func():
+		if not is_instance_valid(popup) or not popup.visible:
+			return
+		var view := Vector2i(popup.get_parent().get_viewport().get_visible_rect().size)
+		popup.reset_size()   # shrink to the content (it may have been bigger before)
+		popup.size = Vector2i(mini(maxi(popup.size.x, min_size.x), view.x - 16), mini(popup.size.y, view.y - 16))
+		popup.position = (view - popup.size) / 2
+	recentre.call_deferred()
+	popup.get_tree().create_timer(0.05).timeout.connect(recentre)
+
+
 ## Marks a control as a tutorial target (see scripts/ui/tutorial.gd).
 static func tut(node: Control, id: String) -> Control:
 	node.set_meta("tut", id)

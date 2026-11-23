@@ -18,6 +18,9 @@ const LIST := [
 				{"kind": "change", "text": "A fantasy look throughout: dark wood panels with gold trim, a stone backdrop, headings and tabs lettered in Cinzel, parchment tooltips and a sword for a mouse pointer."},
 				{"kind": "change", "text": "Finding ranked opponents unrolls a scroll, a Call to Arms, with each opponent written in ink and a red wax-seal Attack button."},
 				{"kind": "change", "text": "Patch notes are decrees on scrolls, and the tutorial guide speaks on parchment."},
+				{"kind": "change", "text": "Challenges are quest notices on parchment, with wax-seal Fight buttons; cleared ones are stamped."},
+				{"kind": "change", "text": "The leaderboard is a Hall of Heroes scroll, with gold, silver and bronze for the top three."},
+				{"kind": "change", "text": "Expeditions and trinket hunts come back as a Scout's (or Hunter's) Report: the finds spin in framed portraits on parchment, and you recruit with a wax seal."},
 			]},
 			{"name": "Interface", "notes": [
 				{"kind": "change", "text": "Red dots on tabs with something waiting: a squad upgrade you can afford, scouting maps piling up or a recruit to choose, a challenge your army can take, unread patch notes."},

@@ -15,6 +15,7 @@ const RARE_SUSPENSE := 0.6     # extra wait before an epic/legendary lands
 const TICK_FAST := 0.045       # seconds per unit at full speed
 const TICK_SLOW := 0.34        # ...just before stopping
 const END_PAUSE := 1.0         # admire the result before the full cards appear
+const SLOT_WOOD := Color("2a1f16")
 
 var _pool: Array = []
 var _slots: Array = []
@@ -35,7 +36,7 @@ func setup(region_id: String, options: Array, compact: bool = false) -> void:
 	for o in options:
 		opts.append({"id": o["unit"], "guaranteed": bool(o.get("guaranteed", false))})
 	var region_name: String = GameData.REGIONS[region_id]["name"] if GameData.REGIONS.has(region_id) else "the wilds"
-	_begin("Your scouts return from %s..." % region_name, pool, opts, compact)
+	_begin("Scout's Report: %s" % region_name, pool, opts, compact)
 
 
 ## Trinkets from a hunt: `ids` are the three trinkets offered.
@@ -51,7 +52,7 @@ func setup_trinkets(site_id: String, ids: Array, compact: bool = false) -> void:
 	for t in ids:
 		opts.append({"id": t, "guaranteed": false})
 	var site_name: String = Trinkets.SITES[site_id]["name"] if Trinkets.SITES.has(site_id) else "the ruins"
-	_begin("Your hunters return from %s..." % site_name, pool, opts, compact)
+	_begin("Hunter's Report: %s" % site_name, pool, opts, compact)
 
 
 func _begin(title_text: String, pool: Array, options: Array, compact: bool) -> void:
@@ -65,7 +66,7 @@ func _begin(title_text: String, pool: Array, options: Array, compact: bool) -> v
 			_pool.append(o["id"])
 	_pool.shuffle()
 
-	var title := UIKit.label(title_text, 18 if compact else 22, UIKit.ACCENT)
+	var title := ScrollUnroll.ink(title_text, 20 if compact else 24)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
 
@@ -121,13 +122,17 @@ func _owned(id: String) -> bool:
 
 
 func _make_slot(opt: Dictionary, stop_at: float) -> Dictionary:
+	# Each find is a framed portrait on the report: dark wood, with a border
+	# that takes the colour of the rarity flashing past.
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = UIKit.PANEL_LIGHT
-	style.set_corner_radius_all(8)
-	style.set_border_width_all(3)
-	style.border_color = Color(1, 1, 1, 0.15)
+	style.bg_color = SLOT_WOOD
+	style.set_corner_radius_all(4)
+	style.set_border_width_all(4)
+	style.border_color = Color(FantasySkin.GOLD_DARK, 0.8)
 	style.set_content_margin_all(12)
+	style.shadow_color = Color(0.2, 0.12, 0.05, 0.45)
+	style.shadow_size = 6
 	panel.add_theme_stylebox_override("panel", style)
 	panel.custom_minimum_size = Vector2(150, 190) if _compact else Vector2(220, 250)
 	var v := UIKit.vbox(6)
@@ -201,7 +206,7 @@ func _land(s: Dictionary) -> void:
 	var is_new := not _owned(id)
 	_show_unit(s, id, true)
 	var style: StyleBoxFlat = s["style"]
-	style.bg_color = UIKit.PANEL_LIGHT.lerp(color, 0.12 + 0.04 * order)
+	style.bg_color = SLOT_WOOD.lerp(color, 0.12 + 0.04 * order)
 	style.set_border_width_all(3 + order)
 	(s["rarity"] as Label).text = GameData.RARITIES[rarity]["name"].to_upper()
 	(s["rarity"] as Label).add_theme_color_override("font_color", color)

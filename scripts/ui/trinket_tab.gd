@@ -54,6 +54,7 @@ func _ready() -> void:
 
 	_choice_popup = PopupPanel.new()
 	_choice_popup.theme = UIKit.make_theme()
+	_choice_popup.add_theme_stylebox_override("panel", FantasySkin.parchment_box(28.0))
 	_choice_box = UIKit.vbox(10)
 	_choice_popup.add_child(_choice_box)
 	add_child(_choice_popup)
@@ -210,10 +211,10 @@ func _show_choice(animate: bool) -> void:
 			if _choice_popup.visible:
 				_build_choice(pt))
 		_choice_box.add_child(reveal)
-		_choice_popup.popup_centered(Vector2i(900, 460))
+		UIKit.popup_fit(_choice_popup, Vector2i(900, 460))
 		return
 	_build_choice(pt)
-	_choice_popup.popup_centered(Vector2i(900, 460))
+	UIKit.popup_fit(_choice_popup, Vector2i(900, 460))
 
 
 func _build_choice(pt: Dictionary) -> void:
@@ -221,8 +222,12 @@ func _build_choice(pt: Dictionary) -> void:
 		return
 	UIKit.clear(_choice_box)
 	var site_name: String = Trinkets.SITES[pt["site"]]["name"] if Trinkets.SITES.has(pt["site"]) else "the ruins"
-	_choice_box.add_child(UIKit.label("Your hunters return from %s" % site_name, 22, UIKit.ACCENT))
-	_choice_box.add_child(UIKit.label("Three trinkets were found. Keep ONE:", 15, UIKit.TEXT_DIM))
+	var t := ScrollUnroll.ink("Hunter's Report: %s" % site_name, 24)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_choice_box.add_child(t)
+	var st := ScrollUnroll.ink("Three trinkets were found. Keep ONE:", 15, FantasySkin.INK_DIM)
+	st.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_choice_box.add_child(st)
 	var row := UIKit.hbox(12)
 	_choice_box.add_child(row)
 	for i in pt["options"].size():
