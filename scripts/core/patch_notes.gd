@@ -4,16 +4,26 @@ extends RefCounted
 ## "version" matches the release version (Project Settings -> Application ->
 ## Config -> Version), which is also the "patch" the server's unit stats are
 ## kept under. Note kinds: "nerf", "buff", "change", "note".
+## Players read these: only changes they can see in the game. Server and
+## admin changes (console commands, server settings and tools, hosting) stay
+## out; they belong in HOSTING.md.
 
 const LIST := [
 	{"version": "0.9.5", "date": "2026-11-23", "title": "The Long Road",
-		"summary": "Scroll any menu by dragging on a touchscreen. New commanders start lower, training bands match your rank instead of your army, and they're worth less rating than real armies.",
+		"summary": "Scroll any menu by dragging on a touchscreen. New commanders start lower, regions are re-spaced for it, training bands match your rank instead of your army and are worth less rating than real armies, and the lobby has four more songs.",
 		"sections": [
 			{"name": "Ranked", "notes": [
-				{"kind": "change", "text": "New commanders start at 600 rating instead of 1000. Fungal Hollows (600) is open from the first day; every other region keeps its rating."},
+				{"kind": "change", "text": "New commanders start at 600 rating instead of 1000."},
 				{"kind": "change", "text": "Training bands are built for your rating, not your army: about 140 power at 600, 700 at 1500, 1,300 at 2000, 2,100 at 2500 and 3,200 at 3000 (Easy 0.9x, Even 1.1x, Hard 1.5x of that). An army ahead of its rank beats them more easily; one that's behind has catching up to do."},
 				{"kind": "nerf", "text": "Battles against training bands move your rating a quarter as much as before, and a tenth as much from 2500 rating (always at least 1 point for a win or loss). Saved player armies and live duels count in full, so the fastest climb is against other commanders."},
 				{"kind": "note", "text": "Existing ratings are unchanged."},
+			]},
+			{"name": "Regions", "notes": [
+				{"kind": "change", "text": "The starting regions (Goblin Warrens, Haunted Crypt, Badlands Camp) and the Abandoned War Camp now need 500 rating; you start above that, so they're open from day one."},
+				{"kind": "change", "text": "Fungal Hollows moves up from 600 to 800 rating: your first big step up the ladder."},
+			]},
+			{"name": "Music", "notes": [
+				{"kind": "change", "text": "Four more tavern tunes join the lobby playlist: King's Feast, Minstrel Dance, Harvest Season and Rejoicing (eight tracks in all)."},
 			]},
 			{"name": "Interface", "notes": [
 				{"kind": "change", "text": "Phones and tablets: drag anywhere on a list to scroll it (unit cards, regions, challenges, patch notes, the leaderboard...), not just on the thin scroll bar. A quick flick keeps it gliding. A tap still presses what's under your finger, and on the Army tab and in Legion Draft, dragging a card sideways still picks it up."},
@@ -102,14 +112,11 @@ const LIST := [
 			]},
 		]},
 	{"version": "0.9.1", "date": "2026-11-22", "title": "Splash Down, Again",
-		"summary": "Ranged splash takes a second nerf, and the server can now tune how hard ranked opponents and challenges are.",
+		"summary": "Ranged splash takes a second nerf.",
 		"sections": [
 			{"name": "Balance", "notes": [
 				{"kind": "nerf", "text": "Ranged splash damage again: projectiles now splash nearby enemies for 35% of the attack's damage, down from 45% in 0.9 (60% before that). The main target still takes full damage, and melee splash is unchanged at 60%."},
 				{"kind": "note", "text": "Affects the same units as in 0.9: Orc Sorcerer, Lich, Elven Mage, Cyclops, Salamander Firebrand, Stone Giant, Fire Giant, Sphinx, Phoenix, the Golden, Ice, Shadow and Storm Dragons, and ranged units given splash by trinkets or Blast Powder."},
-			]},
-			{"name": "Difficulty", "notes": [
-				{"kind": "change", "text": "The server can now adjust ranked training opponents (how strong Easy, Even and Hard are, and their rating) and the strength of challenge enemies. Any change applies to your game straight away, offline play included; challenge cards show the adjusted recommended power."},
 			]},
 			{"name": "Challenges", "notes": [
 				{"kind": "change", "text": "Rise of the Phoenix's recommended power re-measured: 2200."},

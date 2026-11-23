@@ -806,12 +806,12 @@ const UNITS := {
 # drops: unit id -> weight.
 const REGIONS := {
 	"warrens": {
-		"name": "Goblin Warrens", "tile": "warrens", "cost_maps": 1, "min_rating": 0,
+		"name": "Goblin Warrens", "tile": "warrens", "cost_maps": 1, "min_rating": 500,
 		"desc": "Damp tunnels crawling with greenskins.",
 		"drops": {"goblin": 34, "kobold_slinger": 28, "rat_swarm": 18, "orc_warrior": 12, "ogre": 6, "hill_giant": 2},
 	},
 	"crypt": {
-		"name": "Haunted Crypt", "tile": "crypt", "cost_maps": 1, "min_rating": 0,
+		"name": "Haunted Crypt", "tile": "crypt", "cost_maps": 1, "min_rating": 500,
 		"desc": "The dead do not rest here.",
 		"drops": {"skeleton": 38, "rat_swarm": 22, "gnoll_shaman": 18, "orc_sorcerer": 12, "lich": 4},
 	},
@@ -832,7 +832,7 @@ const REGIONS := {
 	},
 	# --- Locked by default (enable with the server's `unlock region` command) ---
 	"badlands": {
-		"name": "Badlands Camp", "tile": "badlands", "cost_maps": 1, "min_rating": 0, "locked": true,
+		"name": "Badlands Camp", "tile": "badlands", "cost_maps": 1, "min_rating": 500, "locked": true,
 		"desc": "A warband's camp in the scrublands: hounds, raiders and their bosses.",
 		"drops": {"jackal": 30, "hobgoblin": 30, "gnoll_raider": 26, "goblin_archer": 26, "war_hound": 16, "orc_knight": 14, "orc_warlord": 7, "cyclops": 5},
 	},
@@ -872,7 +872,7 @@ const REGIONS := {
 		"drops": {"tengu_warrior": 30, "hippogriff": 28, "sphinx": 10, "seraph": 3, "grand_avatar": 2},
 	},
 	"fungal_hollows": {
-		"name": "Fungal Hollows", "tile": "fungal_hollows", "cost_maps": 1, "min_rating": 600,
+		"name": "Fungal Hollows", "tile": "fungal_hollows", "cost_maps": 1, "min_rating": 800,
 		"desc": "Glowing caps and silk-choked tunnels under the forest floor.",
 		"drops": {"cave_spider": 34, "sporeling": 30, "ooze": 30, "giant_snail": 28, "trapdoor_spider": 18, "wolf_spider": 18, "deathcap": 16, "acid_blob": 7, "spider_matriarch": 6, "vine_stalker": 2},
 	},

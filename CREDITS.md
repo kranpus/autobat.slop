@@ -100,6 +100,10 @@ legion_helm (armor/headgear/helmet_art_1), titans_orb (misc/misc_orb).
 | old_tower_inn.ogg | [Medieval: The Old Tower Inn](https://opengameart.org/content/medieval-the-old-tower-inn) (loop version, levelled) | RandomMind | CC0 |
 | bards_tale.ogg | [Medieval: The Bard's Tale](https://opengameart.org/content/medieval-the-bards-tale) (loop version, levelled) | RandomMind | CC0 |
 | market_day.ogg | [Medieval: Market Day](https://opengameart.org/content/medieval-market-day) (loop version, levelled) | RandomMind | CC0 |
+| kings_feast.ogg | [Medieval: King's Feast](https://opengameart.org/content/medieval-kings-feast) (loop version, levelled) | RandomMind | CC0 |
+| minstrel_dance.ogg | [Medieval: Minstrel Dance](https://opengameart.org/content/medieval-minstrel-dance) (loop version, levelled) | RandomMind | CC0 |
+| harvest_season.ogg | [Medieval: Harvest Season](https://opengameart.org/content/medieval-harvest-season) (full version, levelled) | RandomMind | CC0 |
+| rejoicing.ogg | [Medieval: Rejoicing](https://opengameart.org/content/medieval-rejoicing) (loop version, levelled) | RandomMind | CC0 |
 | battle_theme_b.mp3 | [Battle Theme B for RPG](https://opengameart.org/content/battle-theme-b-for-rpg) | cynicmusic | CC0 |
 | determined_pursuit.ogg | [Determined Pursuit (epic orchestra loop)](https://opengameart.org/content/determined-pursuit-epic-orchestra-loop) (Ogg) | Emma_MA | CC0 |
 | boss_battle.ogg | [QaziJamJam (orchestral battle theme)](https://opengameart.org/content/qazijamjam-orchestral-battle-theme) (Ogg) | Emma_MA | CC0 |

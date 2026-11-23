@@ -41,7 +41,8 @@ const SFX := {
 }
 ## Each key can have several tracks; one is picked at random when it starts.
 const MUSIC := {
-	"menu": ["res://assets/music/town_theme.mp3", "res://assets/music/old_tower_inn.ogg", "res://assets/music/bards_tale.ogg", "res://assets/music/market_day.ogg"],
+	"menu": ["res://assets/music/town_theme.mp3", "res://assets/music/old_tower_inn.ogg", "res://assets/music/bards_tale.ogg", "res://assets/music/market_day.ogg",
+		"res://assets/music/kings_feast.ogg", "res://assets/music/minstrel_dance.ogg", "res://assets/music/harvest_season.ogg", "res://assets/music/rejoicing.ogg"],
 	"battle": ["res://assets/music/battle_theme_a.mp3", "res://assets/music/battle_theme_b.mp3", "res://assets/music/determined_pursuit.ogg"],
 	"boss": ["res://assets/music/boss_battle.ogg"],
 }

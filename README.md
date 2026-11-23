@@ -70,15 +70,15 @@ accounts, password hashing and encryption work.
 
 ## The gameplay loop
 
-**Rating unlocks regions.** New commanders start at **600 rating** (1000 before 0.9.5), so
-Fungal Hollows is open from the start. Each expedition region needs a ranked rating, spread out from the
-start to the top. The Expeditions tab (and the Collection's "found in") lists them in this
+**Rating unlocks regions.** New commanders start at **600 rating** (1000 before 0.9.5), just
+above the starting regions (500); Fungal Hollows at 800 is the first step up. Each expedition
+region needs a ranked rating, spread out from the start to the top. The Expeditions tab (and the Collection's "found in") lists them in this
 order, the next one to unlock always after the ones you have:
 
 | Rating | Regions |
 |---|---|
-| 0 | Badlands Camp*, Goblin Warrens, Haunted Crypt |
-| 600 | Fungal Hollows (0.9.4) |
+| 500 | Badlands Camp*, Goblin Warrens, Haunted Crypt |
+| 800 | Fungal Hollows (0.9.4) |
 | 1100 / 1200 | Sunken Marsh*, Hive Tunnels* |
 | 1300 | Whispering Forest |
 | 1400 | Tidewater Grotto (0.9.4) |
@@ -112,7 +112,7 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      `drops` command (see [HOSTING.md](HOSTING.md)).
    **Trinket hunts: Expeditions → Trinkets.**
    - **Hunting:** spend maps at one of three sites to turn up **3 trinkets** and keep **one**:
-     - **Abandoned War Camp:** 1 map, mostly common.
+     - **Abandoned War Camp:** 1 map, rating 500, mostly common.
      - **Sunken Vault:** 2 maps, rating 1050.
      - **Dragon's Trove:** 3 maps, rating 1200, best legendary odds.
    - **The collection:** there are **100 unique trinkets** to collect (30 common, 25 uncommon,
@@ -167,7 +167,7 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **The effects:** a roll of war drums and a FIGHT! banner, hit flashes, slash and spark effects,
        death puffs, shockwaves and screen shake for big splash attacks and falling giants, and
        a VICTORY / DEFEAT banner with a music sting.
-     - **Music:** the lobby plays four tracks as a playlist (never the same one twice in a row).
+     - **Music:** the lobby plays eight tracks as a playlist (never the same one twice in a row).
        Battle music varies between three tracks, and challenge bosses get their own theme.
      - **Ability sounds:** every battle ability has its own sound (zaps, ice, fire, shattering
        glass, chimes, ghostly breath...), spaced out so big battles stay calm.
@@ -230,7 +230,7 @@ Locked units don't appear anywhere: not in expeditions, draft shops or ranked op
 in army codes. Locked units you own sit out of battles.
 
 The new units come from **8 new expedition regions**, which are locked too:
-- **Opening regions (1 map):** Badlands Camp (no rating needed), Sunken Marsh (1100), Hive
+- **Opening regions (1 map):** Badlands Camp (500), Sunken Marsh (1100), Hive
   Tunnels (1200).
 - **Mid regions (2 maps):** Elven Glade (1500), Bone Fields (1700), Giant's Steps (2200).
 - **Top regions (3 maps):** Dragon's Hoard (3000), Celestial Spire (3500).

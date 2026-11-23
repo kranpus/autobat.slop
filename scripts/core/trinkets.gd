@@ -16,7 +16,7 @@ const DUPLICATE_GOLD := {"common": 60, "uncommon": 120, "rare": 250, "epic": 500
 
 ## Places to hunt for trinkets: map cost, rating needed, rarity weights.
 const SITES := {
-	"camp": {"name": "Abandoned War Camp", "cost_maps": 1, "min_rating": 0, "tile": "warrens",
+	"camp": {"name": "Abandoned War Camp", "cost_maps": 1, "min_rating": 500, "tile": "warrens",
 		"desc": "Picked-over tents and wagons. Mostly common gear, the odd rare piece.",
 		"weights": {"common": 68, "uncommon": 26, "rare": 6, "epic": 0, "legendary": 0}},
 	"vault": {"name": "Sunken Vault", "cost_maps": 2, "min_rating": 1050, "tile": "deep",

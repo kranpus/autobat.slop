@@ -832,10 +832,10 @@ func test_rank_progression() -> void:
 	var gaps_ok := true
 	var prev := -1
 	for n in needs:
-		if n > 0 and prev > 0 and n - prev < 100:
+		if n > needs[0] and prev > 0 and n - prev < 100:   # the starting regions share one rating
 			gaps_ok = false
 		prev = n
-	check(gaps_ok, "at least 100 rating between region unlocks (%s)" % [needs])
+	check(gaps_ok, "at least 100 rating between region unlocks after the starting ones (%s)" % [needs])
 	var pl := ProfileLogic.new()
 	pl.data["rating"] = 1250
 	check(pl.region_unlocked("warrens") and not pl.region_unlocked("forest") and not pl.region_unlocked("peaks"), "at 1250: Warrens open, Forest (1300) and Peaks (2500) not yet")
@@ -1457,6 +1457,10 @@ func test_new_units() -> void:
 func test_rank_scaling() -> void:
 	print("rating start, training bands by rank, AI rating (patch 0.9.5)")
 	check(int(ProfileLogic.default_profile()["rating"]) == 600, "new commanders start at 600 rating")
+	var starts: Array = ["warrens", "crypt", "badlands"].map(func(r): return int(GameData.REGIONS[r]["min_rating"]))
+	check(starts.all(func(x): return x == 500) and int(Trinkets.SITES["camp"]["min_rating"]) == 500, "the starting regions and the War Camp need 500 (below the 600 start)")
+	check(int(GameData.REGIONS["fungal_hollows"]["min_rating"]) == 800 and GameData.region_ids_by_unlock()[3] == "fungal_hollows", "Fungal Hollows at 800 is the first step up")
+	check((root.get_node("Audio").MUSIC["menu"] as Array).size() == 8, "eight lobby tracks")
 	var starter: Array = []
 	for id in GameData.STARTER_UNITS:
 		starter.append({"unit": id, "level": 1, "tier": 0, "row": GameData.default_row_for(id)})
