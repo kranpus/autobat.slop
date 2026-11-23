@@ -5,6 +5,7 @@ extends HBoxContainer
 signal battle_requested(config: Dictionary)
 
 var _opponents_box: VBoxContainer
+var _scroll: ScrollUnroll
 var _record_label: Label
 var _code_input: LineEdit
 var _status: Label
@@ -47,9 +48,10 @@ func _ready() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	lv.add_child(scroll)
-	_opponents_box = UIKit.vbox(8)
-	_opponents_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_opponents_box)
+	# Opponents are written on a scroll that unrolls when they arrive.
+	_scroll = ScrollUnroll.new()
+	scroll.add_child(_scroll)
+	_opponents_box = _scroll.content
 
 	# --- Right column: friend challenge + live duel ------------------------
 	# Right column scrolls so it also fits short (phone) screens.
@@ -144,7 +146,7 @@ func _ready() -> void:
 	Party.ranked_opponents.connect(_on_ranked_opponents)
 	Profile.changed.connect(refresh)
 	_set_friends_open(bool(Profile.settings.get("friends_open", false)))
-	_show_search_message("Three opponents near your strength: Easy, Even and Hard. Pick one to fight.")
+	_opponents_box.add_child(ScrollUnroll.ink("Three opponents near your strength: Easy, Even and Hard. Pick one to fight.", 15, FantasySkin.INK_DIM))
 	refresh()
 
 
@@ -218,46 +220,55 @@ func _on_ranked_opponents(list: Array) -> void:
 	for o in _opponents:
 		if o["player"]:
 			players += 1
-	var note := "%d real player arm%s near your rating" % [players, "y" if players == 1 else "ies"] if players > 0 else "No saved player armies near your rating yet (or the server is offline), so these are training opponents"
-	_opponents_box.add_child(UIKit.label(note + ".", 12, UIKit.TEXT_DIM))
+	var title := ScrollUnroll.ink("Call to Arms", 24, FantasySkin.INK)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_opponents_box.add_child(title)
+	var note := "%d commander%s near your rating answered" % [players, "" if players == 1 else "s"] if players > 0 else "No commanders near your rating answered, so training bands take the field"
+	var nl := ScrollUnroll.ink(note + ".", 13, FantasySkin.INK_DIM)
+	nl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_opponents_box.add_child(nl)
 	for opp in _opponents:
+		_opponents_box.add_child(ScrollUnroll.rule())
 		_opponents_box.add_child(_make_opponent_card(opp))
-	Audio.play_sfx("scroll")
+	_scroll.unroll(0.7)
 
 
 func _show_search_message(text: String) -> void:
 	_opponents.clear()
 	UIKit.clear(_opponents_box)
-	_opponents_box.add_child(UIKit.label(text, 14, UIKit.TEXT_DIM))
+	var l := ScrollUnroll.ink(text, 15, FantasySkin.INK_DIM)
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_opponents_box.add_child(l)
+	_scroll.unroll(0.3)
 
 
+## One opponent written on the scroll, with a wax-seal Attack button.
 func _make_opponent_card(opp: Dictionary) -> Control:
-	var p := UIKit.panel(UIKit.PANEL)
 	var v := UIKit.vbox(4)
-	p.add_child(v)
 	var h := UIKit.hbox(10)
 	var diff: String = opp["difficulty"]
-	var diff_color: Color = {"Easy": UIKit.GOOD, "Even": UIKit.ACCENT, "Hard": UIKit.BAD}[diff]
-	h.add_child(UIKit.label(opp["name"], 17))
-	h.add_child(UIKit.label(diff, 14, diff_color))
+	var diff_color: Color = {"Easy": FantasySkin.INK_GOOD, "Even": FantasySkin.INK_ACCENT, "Hard": FantasySkin.INK_BAD}[diff]
+	h.add_child(ScrollUnroll.ink(opp["name"], 19))
+	h.add_child(ScrollUnroll.ink(diff, 15, diff_color))
 	if opp.get("player", false):
 		var days := int((Time.get_unix_time_from_system() - float(opp.get("saved_at", 0))) / 86400.0)
-		var tag := UIKit.label("Player · saved %s" % ("today" if days < 1 else "%d day%s ago" % [days, "" if days == 1 else "s"]), 12, Color("9fd3ff"))
+		var tag := ScrollUnroll.ink("a commander's army, saved %s" % ("today" if days < 1 else "%d day%s ago" % [days, "" if days == 1 else "s"]), 12, Color("2e4f7a"))
 		tag.tooltip_text = "A real player's army, saved when they had rating %d." % int(opp["rating"])
+		tag.mouse_filter = Control.MOUSE_FILTER_PASS
 		h.add_child(tag)
 	else:
-		h.add_child(UIKit.label("Training", 12, UIKit.TEXT_DIM))
+		h.add_child(ScrollUnroll.ink("training band", 12, FantasySkin.INK_DIM))
 	h.add_child(UIKit.spacer())
-	h.add_child(UIKit.label("Rating %d · Power %s · %d units" % [int(opp["rating"]), Army.format_power(Army.army_power(opp["squads"])), Army.total_units(opp["squads"])], 13, UIKit.TEXT_DIM))
+	h.add_child(ScrollUnroll.ink("Rating %d · Power %s · %d units" % [int(opp["rating"]), Army.format_power(Army.army_power(opp["squads"])), Army.total_units(opp["squads"])], 13, FantasySkin.INK_DIM))
 	v.add_child(h)
 	var h2 := UIKit.hbox(10)
-	h2.add_child(UIKit.squad_strip(opp["squads"], 28))
+	h2.add_child(UIKit.squad_strip(opp["squads"], 30, FantasySkin.INK_DIM))
 	h2.add_child(UIKit.spacer())
-	h2.add_child(UIKit.label("on %s" % BattleMaps.get_map(opp["map"])["name"], 13, UIKit.TEXT_DIM))
+	h2.add_child(ScrollUnroll.ink("at %s" % BattleMaps.get_map(opp["map"])["name"], 13, FantasySkin.INK_DIM))
 	var win_delta := Army.elo_delta(Profile.rating(), int(opp["rating"]), 1.0)
-	h2.add_child(UIKit.tut(UIKit.button("Attack  (+%d)" % win_delta, func(): _start(opp, "ranked")), "attack"))
+	h2.add_child(UIKit.tut(ScrollUnroll.seal_button("Attack  +%d" % win_delta, func(): _start(opp, "ranked")), "attack"))
 	v.add_child(h2)
-	return p
+	return v
 
 
 func _fight_code() -> void:
@@ -278,9 +289,7 @@ func _start(opp: Dictionary, mode: String) -> void:
 		# The server simulates the battle and pays the rewards; the battle
 		# screen opens when it answers.
 		Party.request_ranked_battle(int(opp["index"]))
-		_opponents.clear()
-		UIKit.clear(_opponents_box)
-		_opponents_box.add_child(UIKit.label("Starting the battle on the server...", 14, UIKit.TEXT_DIM))
+		_show_search_message("The armies march: starting the battle on the server...")
 		return
 	battle_requested.emit({
 		"mode": mode,
@@ -297,6 +306,7 @@ func _start(opp: Dictionary, mode: String) -> void:
 	if mode == "ranked":
 		_opponents.clear()
 		UIKit.clear(_opponents_box)
+		_scroll.roll_up()
 
 
 ## "" when the player picked Random.

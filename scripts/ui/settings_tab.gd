@@ -19,6 +19,10 @@ const CREDITS := """[b]Art[/b]
 • cynicmusic: "Battle Theme A", "Battle Theme B" and "Town Theme RPG" (CC0). opengameart.org
 • Emma_MA: "Determined Pursuit" and "QaziJamJam" (CC0); celestialghost8: "Victory"; RandomMind: "Medieval: Defeat Theme" (CC0)
 
+[b]Interface[/b]
+• Cinzel font by The Cinzel Project Authors (SIL Open Font License). github.com/NDISCOVER/Cinzel
+• Sword cursor: Kenney, UI Pack RPG Expansion (CC0). kenney.nl
+
 [b]Engine[/b]
 • Godot Engine (MIT). godotengine.org
 

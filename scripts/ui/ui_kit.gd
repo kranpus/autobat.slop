@@ -6,7 +6,7 @@ const BG := Color("1b1d24")
 const PANEL := Color("262a35")
 const PANEL_LIGHT := Color("323748")
 const ACCENT := Color("e0b04a")
-const TEXT_DIM := Color("9aa0b0")
+const TEXT_DIM := Color("b3a383")   # warm, like faded ink on wood
 const GOOD := Color("6fdc6f")
 const BAD := Color("ff6b6b")
 
@@ -14,49 +14,96 @@ const BAD := Color("ff6b6b")
 static func make_theme() -> Theme:
 	var t := Theme.new()
 	t.default_font_size = 15
-	var panel := StyleBoxFlat.new()
-	panel.bg_color = PANEL
-	panel.set_corner_radius_all(6)
-	panel.set_content_margin_all(10)
-	t.set_stylebox("panel", "PanelContainer", panel)
-	var btn := StyleBoxFlat.new()
-	btn.bg_color = Color("3a4157")
-	btn.set_corner_radius_all(5)
-	btn.content_margin_left = 12
-	btn.content_margin_right = 12
-	btn.content_margin_top = 6
-	btn.content_margin_bottom = 6
-	var hover := btn.duplicate() as StyleBoxFlat
-	hover.bg_color = Color("4a5370")
-	var pressed := btn.duplicate() as StyleBoxFlat
-	pressed.bg_color = Color("5d4a1f")
-	var disabled := btn.duplicate() as StyleBoxFlat
-	disabled.bg_color = Color("2a2e3a")
-	t.set_stylebox("normal", "Button", btn)
-	t.set_stylebox("hover", "Button", hover)
-	t.set_stylebox("pressed", "Button", pressed)
-	t.set_stylebox("disabled", "Button", disabled)
+	# Wood and gold (FantasySkin draws the textures at startup).
+	t.set_stylebox("panel", "PanelContainer", FantasySkin.frame_box(0))
+	t.set_stylebox("normal", "Button", FantasySkin.frame_box(2, 8.0))
+	t.set_stylebox("hover", "Button", FantasySkin.frame_box(3, 8.0))
+	t.set_stylebox("pressed", "Button", FantasySkin.frame_box(4, 8.0))
+	t.set_stylebox("disabled", "Button", FantasySkin.frame_box(5, 8.0))
+	for state in ["normal", "hover", "pressed", "disabled"]:
+		var sb := t.get_stylebox(state, "Button") as StyleBoxTexture
+		sb.content_margin_left = 14
+		sb.content_margin_right = 14
+		sb.content_margin_top = 7
+		sb.content_margin_bottom = 7
+		t.set_stylebox(state, "OptionButton", sb)
 	t.set_stylebox("focus", "Button", StyleBoxEmpty.new())
-	t.set_color("font_disabled_color", "Button", Color("6a7080"))
-	var tab_sel := StyleBoxFlat.new()
-	tab_sel.bg_color = PANEL
-	tab_sel.set_corner_radius_all(6)
-	tab_sel.corner_radius_bottom_left = 0
-	tab_sel.corner_radius_bottom_right = 0
+	# Check boxes and switches stay plain (no wooden plate around them).
+	for cls in ["CheckBox", "CheckButton"]:
+		for state in ["normal", "hover", "pressed", "disabled", "hover_pressed", "focus"]:
+			var e := StyleBoxEmpty.new()
+			e.set_content_margin_all(4)
+			t.set_stylebox(state, cls, e)
+		t.set_color("font_color", cls, Color("e8dcc0"))
+		t.set_color("font_hover_color", cls, Color("fff4d6"))
+		t.set_color("font_pressed_color", cls, Color("e8dcc0"))
+		t.set_color("font_hover_pressed_color", cls, Color("fff4d6"))
+	t.set_color("font_color", "Button", Color("f0e2c0"))
+	t.set_color("font_hover_color", "Button", Color("fff4d6"))
+	t.set_color("font_pressed_color", "Button", ACCENT)
+	t.set_color("font_disabled_color", "Button", Color("7d7465"))
+	# Tabs: wooden tabs, the open one trimmed in gold and lettered in Cinzel.
+	var tab_sel := FantasySkin.frame_box(1, 0.0)
 	tab_sel.content_margin_left = 16
 	tab_sel.content_margin_right = 16
 	tab_sel.content_margin_top = 8
 	tab_sel.content_margin_bottom = 8
-	var tab_un := tab_sel.duplicate() as StyleBoxFlat
-	tab_un.bg_color = Color("1f222b")
-	t.set_stylebox("tab_selected", "TabContainer", tab_sel)
-	t.set_stylebox("tab_unselected", "TabContainer", tab_un)
-	t.set_stylebox("tab_hovered", "TabContainer", tab_un)
-	var tc_panel := StyleBoxFlat.new()
-	tc_panel.bg_color = PANEL
-	tc_panel.set_content_margin_all(12)
+	var tab_un := FantasySkin.frame_box(4, 0.0)
+	tab_un.content_margin_left = 16
+	tab_un.content_margin_right = 16
+	tab_un.content_margin_top = 8
+	tab_un.content_margin_bottom = 8
+	tab_un.modulate_color = Color(0.62, 0.6, 0.58)
+	for cls in ["TabContainer", "TabBar"]:
+		t.set_stylebox("tab_selected", cls, tab_sel)
+		t.set_stylebox("tab_unselected", cls, tab_un)
+		t.set_stylebox("tab_hovered", cls, tab_un)
+		t.set_font("font", cls, FantasySkin.heading_font())
+		t.set_font_size("font_size", cls, 15)
+		t.set_color("font_selected_color", cls, ACCENT)
+		t.set_color("font_unselected_color", cls, Color("a8987a"))
+		t.set_color("font_hovered_color", cls, Color("f0e2c0"))
+	var tc_panel := FantasySkin.frame_box(0, 12.0)
 	t.set_stylebox("panel", "TabContainer", tc_panel)
+	# Text fields: a dark inset.
+	var field := StyleBoxFlat.new()
+	field.bg_color = Color("17130f")
+	field.border_color = FantasySkin.GOLD_DARK
+	field.set_border_width_all(1)
+	field.set_corner_radius_all(3)
+	field.set_content_margin_all(7)
+	t.set_stylebox("normal", "LineEdit", field)
+	t.set_stylebox("read_only", "LineEdit", field)
+	var focus := field.duplicate() as StyleBoxFlat
+	focus.border_color = ACCENT
+	t.set_stylebox("focus", "LineEdit", focus)
+	# Tooltips on parchment, in ink.
+	t.set_stylebox("panel", "TooltipPanel", FantasySkin.parchment_box(10.0))
+	t.set_color("font_color", "TooltipLabel", FantasySkin.INK)
+	# Popups get the wooden frame too.
+	t.set_stylebox("panel", "PopupPanel", FantasySkin.frame_box(0, 14.0))
+	t.set_stylebox("panel", "AcceptDialog", FantasySkin.frame_box(0, 14.0))
+	t.set_stylebox("embedded_border", "Window", FantasySkin.frame_box(0, 0.0))
 	return t
+
+
+## The stone background behind the menus.
+static func background() -> TextureRect:
+	var r := TextureRect.new()
+	r.texture = FantasySkin.stone_texture()
+	r.stretch_mode = TextureRect.STRETCH_TILE
+	r.set_anchors_preset(Control.PRESET_FULL_RECT)
+	r.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return r
+
+
+## A sword for a mouse pointer (desktop and browser).
+static func apply_cursor() -> void:
+	if OS.has_feature("mobile") or DisplayServer.get_name() == "headless":
+		return
+	var tex := load("res://assets/sprites/ui/cursor_sword.png") as Texture2D
+	if tex:
+		Input.set_custom_mouse_cursor(tex, Input.CURSOR_ARROW, Vector2(2, 2))
 
 
 static func label(text: String, size: int = 15, color: Color = Color.WHITE) -> Label:
@@ -64,6 +111,9 @@ static func label(text: String, size: int = 15, color: Color = Color.WHITE) -> L
 	l.text = text
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
+	# Headings are lettered in Cinzel.
+	if size >= 18:
+		l.add_theme_font_override("font", FantasySkin.heading_font())
 	return l
 
 
@@ -78,18 +128,19 @@ static func button(text: String, callback: Callable) -> Button:
 ## A prominent call-to-action button (gold background, dark text).
 static func accent_button(text: String, callback: Callable, font_size: int = 18) -> Button:
 	var b := button(text, callback)
-	for state in ["normal", "hover", "pressed", "focus"]:
-		var sb := StyleBoxFlat.new()
-		sb.bg_color = ACCENT if state == "normal" else (ACCENT.lightened(0.15) if state == "hover" else ACCENT.darkened(0.15))
-		if state == "focus":
-			sb.bg_color = Color(0, 0, 0, 0)
-			sb.border_color = Color.WHITE
-			sb.set_border_width_all(2)
-		sb.set_corner_radius_all(6)
-		sb.set_content_margin_all(10)
-		b.add_theme_stylebox_override(state, sb)
+	# A gilded plate lettered in Cinzel.
+	var plate := FantasySkin.frame_box(6, 10.0)
+	var hover := plate.duplicate() as StyleBoxTexture
+	hover.modulate_color = Color(1.12, 1.1, 1.0)
+	var pressed := plate.duplicate() as StyleBoxTexture
+	pressed.modulate_color = Color(0.8, 0.75, 0.65)
+	b.add_theme_stylebox_override("normal", plate)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("pressed", pressed)
+	b.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		b.add_theme_color_override(c, Color("1b1d24"))
+		b.add_theme_color_override(c, Color("2a1a0c"))
+	b.add_theme_font_override("font", FantasySkin.heading_font())
 	b.add_theme_font_size_override("font_size", font_size)
 	b.custom_minimum_size = Vector2(0, 46)
 	return b
@@ -146,13 +197,27 @@ static func unit_icon(id: String, px: int, locked: bool = false) -> TextureRect:
 	return r
 
 
+## A wooden panel with gold trim (PANEL: dark, PANEL_LIGHT: a lighter card).
+## Other colours (overlays, highlights) keep a flat fill with a thin gold edge.
 static func panel(bg: Color = PANEL) -> PanelContainer:
 	var p := PanelContainer.new()
+	if bg == PANEL or bg == PANEL_LIGHT:
+		p.add_theme_stylebox_override("panel", FantasySkin.frame_box(0 if bg == PANEL else 1, 12.0))
+		return p
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = bg
-	sb.set_corner_radius_all(6)
+	sb.border_color = Color(FantasySkin.GOLD_DARK, minf(1.0, bg.a + 0.2))
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(4)
 	sb.set_content_margin_all(10)
 	p.add_theme_stylebox_override("panel", sb)
+	return p
+
+
+## Aged parchment (write on it in ink: ScrollUnroll.ink).
+static func parchment_panel(margin: float = 18.0) -> PanelContainer:
+	var p := PanelContainer.new()
+	p.add_theme_stylebox_override("panel", FantasySkin.parchment_box(margin))
 	return p
 
 
@@ -180,7 +245,7 @@ static func clear(node: Node) -> void:
 		c.queue_free()
 
 
-static func squad_strip(squads: Array, px: int = 28) -> HBoxContainer:
+static func squad_strip(squads: Array, px: int = 28, text_color: Color = TEXT_DIM) -> HBoxContainer:
 	var h := hbox(2)
 	var counts := Army.deploy_counts(squads)
 	for i in squads.size():
@@ -189,7 +254,7 @@ static func squad_strip(squads: Array, px: int = 28) -> HBoxContainer:
 		var ic := unit_icon(sq["unit"], px)
 		ic.tooltip_text = "%s  Lv %d  x%d" % [GameData.UNITS[sq["unit"]]["name"], int(sq["level"]), int(counts[i])]
 		v.add_child(ic)
-		var l := label("x%d" % int(counts[i]), 11, TEXT_DIM)
+		var l := label("x%d" % int(counts[i]), 11, text_color)
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		v.add_child(l)
 		h.add_child(v)

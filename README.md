@@ -184,6 +184,10 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Rewards:** a fixed reward for the first win: gold, maps, specific trinkets, and units
        such as the Ogre Brute, Lich, Phoenix and Golden Dragon. Replays pay nothing.
      - **Signed in:** the server runs the battle and pays the reward.
+   - **Look:** the fantasy skin (dark wood panels, gold trim, parchment, scroll rods, stone backdrop)
+     is drawn from noise at startup by `scripts/ui/fantasy_skin.gd`; headings use the Cinzel font.
+     `ScrollUnroll` (`scripts/ui/scroll_unroll.gd`) is the unrolling scroll used for ranked
+     opponents and patch notes.
    - **Tutorial:** new players are guided through the basics by doing them, with a spotlight on the
      next thing to press. It covers a first battle, a level up, an expedition, the army, a ranked
      fight and a challenge. Tips appear the first time trinkets, Legion Draft and the leaderboard are

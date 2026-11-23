@@ -7,12 +7,17 @@ extends RefCounted
 
 const LIST := [
 	{"version": "0.9.3", "date": "2026-11-23", "title": "Welcome, Commander",
-		"summary": "A guided tutorial for new players and a round of interface improvements. No balance changes.",
+		"summary": "A guided tutorial for new players, a fantasy look for the whole game and a round of interface improvements. No balance changes.",
 		"sections": [
 			{"name": "Tutorial", "notes": [
 				{"kind": "change", "text": "New players are guided through the basics by doing them: a first battle, levelling up, recruiting on an expedition, building the army, a ranked fight and a challenge. A spotlight shows the one thing to press next, with a few words; nothing to read through."},
 				{"kind": "change", "text": "Short tips the first time you open trinket hunts, Legion Draft and the leaderboard."},
 				{"kind": "note", "text": "Skip it at any time, or replay it from Settings → Tutorial."},
+			]},
+			{"name": "Look and feel", "notes": [
+				{"kind": "change", "text": "A fantasy look throughout: dark wood panels with gold trim, a stone backdrop, headings and tabs lettered in Cinzel, parchment tooltips and a sword for a mouse pointer."},
+				{"kind": "change", "text": "Finding ranked opponents unrolls a scroll, a Call to Arms, with each opponent written in ink and a red wax-seal Attack button."},
+				{"kind": "change", "text": "Patch notes are decrees on scrolls, and the tutorial guide speaks on parchment."},
 			]},
 			{"name": "Interface", "notes": [
 				{"kind": "change", "text": "Red dots on tabs with something waiting: a squad upgrade you can afford, scouting maps piling up or a recruit to choose, a challenge your army can take, unread patch notes."},

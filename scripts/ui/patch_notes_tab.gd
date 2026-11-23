@@ -1,12 +1,16 @@
 extends VBoxContainer
-## Patch notes: balance changes and other notable changes, newest first.
+## Patch notes, newest first: each patch is a decree on its own scroll,
+## unrolled when the tab is opened.
 
 const KIND_TAGS := {
-	"nerf": ["NERF", "e06a5c"],
-	"buff": ["BUFF", "7fd17a"],
-	"change": ["CHANGE", "f2c14e"],
-	"note": ["NOTE", "a0a4b8"],
+	"nerf": ["NERF", FantasySkin.INK_BAD],
+	"buff": ["BUFF", FantasySkin.INK_GOOD],
+	"change": ["CHANGE", FantasySkin.INK_ACCENT],
+	"note": ["NOTE", FantasySkin.INK_DIM],
 }
+
+var _scrolls: Array = []
+var _opened := false
 
 
 func _ready() -> void:
@@ -20,42 +24,48 @@ func _ready() -> void:
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	add_child(scroll)
-	var list := UIKit.vbox(12)
+	var list := UIKit.vbox(18)
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(list)
 	for patch in PatchNotes.LIST:
-		list.add_child(_patch_card(patch))
+		var s := _decree(patch)
+		list.add_child(s)
+		_scrolls.append(s)
+	visibility_changed.connect(func():
+		if is_visible_in_tree() and not _opened:
+			_opened = true
+			# Unroll the newest at once, the older ones just after.
+			for i in _scrolls.size():
+				get_tree().create_timer(0.15 * i).timeout.connect((_scrolls[i] as ScrollUnroll).unroll.bind(0.6)))
 
 
-func _patch_card(patch: Dictionary) -> Control:
-	var p := UIKit.panel(UIKit.PANEL_LIGHT)
-	p.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var v := UIKit.vbox(6)
-	p.add_child(v)
+func _decree(patch: Dictionary) -> ScrollUnroll:
+	var s := ScrollUnroll.new()
+	var v := s.content
 	var head := UIKit.hbox(10)
-	head.add_child(UIKit.label("Patch %s: %s" % [patch["version"], patch["title"]], 20, UIKit.ACCENT))
+	head.add_child(ScrollUnroll.ink("Patch %s: %s" % [patch["version"], patch["title"]], 22))
 	head.add_child(UIKit.spacer())
-	head.add_child(UIKit.label(str(patch["date"]), 13, UIKit.TEXT_DIM))
+	head.add_child(ScrollUnroll.ink(str(patch["date"]), 13, FantasySkin.INK_DIM))
 	v.add_child(head)
-	var summary := UIKit.label(str(patch.get("summary", "")), 14)
+	var summary := ScrollUnroll.ink(str(patch.get("summary", "")), 15)
 	summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	v.add_child(summary)
 	for section in patch["sections"]:
-		var sl := UIKit.label(str(section["name"]), 16, Color.WHITE)
-		v.add_child(sl)
+		v.add_child(ScrollUnroll.rule())
+		v.add_child(ScrollUnroll.ink(str(section["name"]), 18, FantasySkin.INK_ACCENT))
 		for note in section["notes"]:
 			v.add_child(_note_row(note))
-	return p
+	return s
 
 
 func _note_row(note: Dictionary) -> Control:
 	var h := UIKit.hbox(10)
 	var tag: Array = KIND_TAGS.get(str(note.get("kind", "note")), KIND_TAGS["note"])
-	var t := UIKit.label(tag[0], 12, Color(tag[1]))
+	var t := ScrollUnroll.ink(tag[0], 12, tag[1])
 	t.custom_minimum_size = Vector2(64, 0)
 	t.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	h.add_child(t)
-	var text := UIKit.label(str(note["text"]), 14, UIKit.TEXT_DIM if note.get("kind", "") == "note" else Color(0.92, 0.92, 0.95))
+	var text := ScrollUnroll.ink(str(note["text"]), 14, FantasySkin.INK_DIM if note.get("kind", "") == "note" else FantasySkin.INK)
 	text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	h.add_child(text)

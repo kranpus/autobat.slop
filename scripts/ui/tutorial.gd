@@ -64,20 +64,13 @@ func _ready() -> void:
 	_ring.draw.connect(_draw_ring)
 	_root.add_child(_ring)
 
+	# The guide speaks on a scrap of parchment.
 	_bubble = PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("2b3042")
-	sb.border_color = UIKit.ACCENT
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(10)
-	sb.set_content_margin_all(14)
-	sb.shadow_color = Color(0, 0, 0, 0.5)
-	sb.shadow_size = 8
-	_bubble.add_theme_stylebox_override("panel", sb)
+	_bubble.add_theme_stylebox_override("panel", FantasySkin.parchment_box(20.0))
 	_root.add_child(_bubble)
 	var v := UIKit.vbox(10)
 	_bubble.add_child(v)
-	_text = UIKit.label("", 19, Color.WHITE)
+	_text = UIKit.label("", 19, FantasySkin.INK)
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_text.custom_minimum_size = Vector2(300, 0)
 	v.add_child(_text)
@@ -86,7 +79,8 @@ func _ready() -> void:
 	_skip = UIKit.button("Skip tutorial", skip_all)
 	_skip.flat = true
 	_skip.add_theme_font_size_override("font_size", 12)
-	_skip.add_theme_color_override("font_color", UIKit.TEXT_DIM)
+	_skip.add_theme_color_override("font_color", FantasySkin.INK_DIM)
+	_skip.add_theme_color_override("font_hover_color", FantasySkin.INK)
 	row.add_child(_skip)
 	row.add_child(UIKit.spacer())
 	_action = UIKit.accent_button("OK", _on_action, 16)

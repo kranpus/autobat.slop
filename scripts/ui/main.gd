@@ -53,10 +53,8 @@ func _ready() -> void:
 	root.theme = UIKit.make_theme()
 	menu_layer.add_child(root)
 
-	var bg := ColorRect.new()
-	bg.color = UIKit.BG
-	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root.add_child(bg)
+	root.add_child(UIKit.background())
+	UIKit.apply_cursor()
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
