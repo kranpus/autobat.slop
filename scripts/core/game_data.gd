@@ -490,8 +490,8 @@ const UNITS := {
 	},
 	"sporeling": {
 		"name": "Sporeling", "rarity": "common", "role": "healer",
-		"hp": 55.0, "dmg": 4.0, "cooldown": 1.4, "range": 140.0, "speed": 50.0,
-		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 12.0, "regen": 0.0,
+		"hp": 62.0, "dmg": 4.0, "cooldown": 1.4, "range": 140.0, "speed": 50.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 14.0, "regen": 0.0,
 		"projectile": "magic", "radius": 7.0, "scale": 0.8, "flying": false,
 		"desc": "A walking mushroom whose spores soothe and cleanse.",
 		"ability": {"id": "purify", "value": 0.0},
@@ -554,7 +554,7 @@ const UNITS := {
 	},
 	"vine_stalker": {
 		"name": "Vine Stalker", "rarity": "epic", "role": "melee",
-		"hp": 1100.0, "dmg": 60.0, "cooldown": 1.0, "range": 8.0, "speed": 80.0,
+		"hp": 1250.0, "dmg": 60.0, "cooldown": 1.0, "range": 8.0, "speed": 80.0,
 		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 14.0, "scale": 1.6, "flying": false,
 		"desc": "It steps out of the undergrowth right beside you.",
@@ -646,7 +646,7 @@ const UNITS := {
 		"damage": "fire", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 6.0, "scale": 0.75, "flying": true,
 		"desc": "A cackling spark of hellfire that bursts on contact.",
-		"ability": {"id": "detonate", "value": 4.0},
+		"ability": {"id": "detonate", "value": 3.5},
 	},
 	"lemure": {
 		"name": "Lemure", "rarity": "common", "role": "tank",
@@ -694,7 +694,7 @@ const UNITS := {
 		"damage": "fire", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "fire", "radius": 10.0, "scale": 1.15, "flying": true,
 		"desc": "Calls hellfire down on anyone, anywhere.",
-		"ability": {"id": "thunderstrike", "value": 4.0},
+		"ability": {"id": "thunderstrike", "value": 5.0},
 	},
 	"balrug": {
 		"name": "Balrug", "rarity": "epic", "role": "tank",
@@ -702,7 +702,7 @@ const UNITS := {
 		"damage": "fire", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
 		"desc": "Wreathed in flame that scorches all around it.",
-		"ability": {"id": "immolate", "value": 0.25},
+		"ability": {"id": "immolate", "value": 0.2},
 	},
 	"executioner": {
 		"name": "Executioner", "rarity": "epic", "role": "melee",
@@ -786,7 +786,7 @@ const UNITS := {
 	},
 	"spectral_dragon": {
 		"name": "Spectral Dragon", "rarity": "legendary", "role": "caster",
-		"hp": 2600.0, "dmg": 80.0, "cooldown": 1.8, "range": 180.0, "speed": 85.0,
+		"hp": 2600.0, "dmg": 90.0, "cooldown": 1.8, "range": 180.0, "speed": 85.0,
 		"damage": "magic", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 22.0, "scale": 2.4, "flying": true,
 		"desc": "Half in this world, half in the next.",
@@ -798,7 +798,7 @@ const UNITS := {
 		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 22.0, "scale": 2.4, "flying": false,
 		"desc": "The mountains themselves come down at its call.",
-		"ability": {"id": "avalanche", "value": 7.0},
+		"ability": {"id": "avalanche", "value": 8.0},
 	},
 }
 

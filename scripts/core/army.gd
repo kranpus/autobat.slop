@@ -119,11 +119,11 @@ const ABILITY_TUNING := {
 	"aegis": 1.2,        # on toughness
 	# The 0.9.4 set (tuned with tools/balance_sim.gd).
 	"venom": 1.1, "purify": 0.0, "split": 1.8, "shell": 0.8, "ensnare": 0.05, "pounce": 0.0,
-	"corrode": 0.6, "spikes": 0.4, "summon": 0.25, "blink": 0.0, "block": 1.3, "volley": 1.0,
-	"evasion": 1.4, "song": 1.4, "undertow": 0.17, "frenzy": 0.3, "taunt": 0.08, "pull": 0.1,
-	"tidal_wave": 0.6, "avalanche": 0.6, "detonate": 0.4, "martyr": 0.3, "pack": 0.15, "reflect": 0.1,
-	"berserk": 0.45, "thunderstrike": 0.75, "immolate": 0.7, "execute": 0.33, "terror": 0.38, "ward": 0.4,
-	"inspire": 1.0, "frost_armor": 0.15, "frost_aura": 0.32, "entomb": 0.1, "fortify": 0.6, "phase": 0.2,
+	"corrode": 0.6, "spikes": 0.4, "summon": 0.15, "blink": 0.0, "block": 1.3, "volley": 1.3,
+	"evasion": 1.4, "song": 1.4, "undertow": 0.17, "frenzy": 0.2, "taunt": 0.08, "pull": 0.1,
+	"tidal_wave": 0.7, "avalanche": 0.8, "detonate": 0.6, "martyr": 0.3, "pack": 0.15, "reflect": 0.1,
+	"berserk": 0.45, "thunderstrike": 1.2, "immolate": 1.0, "execute": 0.33, "terror": 0.38, "ward": 0.4,
+	"inspire": 1.0, "frost_armor": 0.15, "frost_aura": 0.32, "entomb": 0.1, "fortify": 0.8, "phase": 0.0,
 }
 const CHAIN_POWER_CAP := 1.2
 
