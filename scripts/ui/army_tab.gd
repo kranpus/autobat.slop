@@ -13,9 +13,9 @@ const COLUMN_INFO := {
 
 var _summary: Label
 var _columns := {}        # row -> {"list": VBoxContainer, "header": Label}
-var _add_picker: OptionButton
-var _add_button: Button
-var _code_edit: LineEdit
+var _reserves: HBoxContainer
+var _reserve_scroll: ScrollContainer
+var _reserve_note: Label
 
 
 func _ready() -> void:
@@ -23,7 +23,7 @@ func _ready() -> void:
 	_summary = UIKit.label("", 18, UIKit.ACCENT)
 	add_child(_summary)
 	var compact := UIKit.is_compact(self)
-	var tip := UIKit.label("Every squad fights at full size. Drag squads between columns (or use ◀ ▶) to choose where they fight; ▲ ▼ set the order within a column. Your army deploys on the left of the battlefield, so the Front line column faces the enemy.", 13, UIKit.TEXT_DIM)
+	var tip := UIKit.label("Drag squads between columns (or use ◀ ▶) to choose where they fight; ▲ ▼ set the order. Your army deploys on the left, so the Front line faces the enemy.", 13, UIKit.TEXT_DIM)
 	tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	tip.visible = not compact   # phones: room goes to the columns
 	add_child(tip)
@@ -31,6 +31,7 @@ func _ready() -> void:
 	var cols := UIKit.hbox(10)
 	cols.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_child(cols)
+	UIKit.tut(cols, "army_columns")
 	for row in COLUMNS:
 		var r: String = row
 		var panel := UIKit.panel(UIKit.PANEL_LIGHT)
@@ -58,33 +59,33 @@ func _ready() -> void:
 		scroll.add_child(list)
 		_columns[r] = {"list": list, "header": header}
 
-	var add_row := UIKit.hbox(8)
-	add_row.add_child(UIKit.label("Add squad:", 15))
-	_add_picker = OptionButton.new()
-	_add_picker.custom_minimum_size = Vector2(260, 0)
-	add_row.add_child(_add_picker)
-	_add_button = UIKit.button("Add", _on_add)
-	_add_button.tooltip_text = "Added to the column that suits the unit's role; drag it elsewhere if you like."
-	add_row.add_child(_add_button)
-	add_row.add_child(UIKit.spacer())
-	add_row.add_child(UIKit.button("Auto-build" if compact else "Auto-build strongest", _auto_build))
-	if compact:
-		add_row.add_child(UIKit.button("Copy army code", func():
-			DisplayServer.clipboard_set(Profile.army_code())
-			Audio.play_sfx("scroll")))
-	add_child(add_row)
-
-	var code_row := UIKit.hbox(8)
-	code_row.add_child(UIKit.label("Army code:", 15))
-	_code_edit = LineEdit.new()
-	_code_edit.editable = false
-	_code_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	code_row.add_child(_code_edit)
-	code_row.add_child(UIKit.button("Copy", func():
-		DisplayServer.clipboard_set(_code_edit.text)
-		Audio.play_sfx("scroll")))
-	code_row.visible = not compact
-	add_child(code_row)
+	# Reserves: owned units not in the army. Tap to add, or drag into a column.
+	var res_panel := UIKit.panel(UIKit.PANEL)
+	var rv := UIKit.vbox(4)
+	res_panel.add_child(rv)
+	var rhead := UIKit.hbox(8)
+	rhead.add_child(UIKit.label("Reserves", 15, UIKit.ACCENT))
+	_reserve_note = UIKit.label("", 12, UIKit.TEXT_DIM)
+	rhead.add_child(_reserve_note)
+	rhead.add_child(UIKit.spacer())
+	var auto := UIKit.accent_button("Auto-build strongest", _auto_build, 15)
+	auto.custom_minimum_size = Vector2(0, 36)
+	auto.tooltip_text = "Fill the army with your strongest squads, each in the column that suits it."
+	UIKit.tut(auto, "auto_build")
+	rhead.add_child(auto)
+	rhead.add_child(UIKit.button("Copy army code", func():
+		DisplayServer.clipboard_set(Profile.army_code())
+		Audio.play_sfx("scroll")
+		UIKit.toast("Army code copied: friends can fight it from their Battle tab")))
+	rv.add_child(rhead)
+	var rscroll := ScrollContainer.new()
+	rscroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	rscroll.custom_minimum_size = Vector2(0, 66 if compact else 74)
+	rv.add_child(rscroll)
+	_reserve_scroll = rscroll
+	_reserves = UIKit.hbox(6)
+	rscroll.add_child(_reserves)
+	add_child(res_panel)
 
 	Profile.changed.connect(refresh)
 	refresh()
@@ -121,16 +122,23 @@ func refresh() -> void:
 		for k in indexes.size():
 			var i: int = indexes[k]
 			list.add_child(_make_card(i, squads[i], int(counts[i]), k == 0, k == indexes.size() - 1))
-	_add_picker.clear()
+	UIKit.clear(_reserves)
 	var in_army := {}
 	for sq in squads:
 		in_army[sq["unit"]] = true
+	var full := squads.size() >= GameData.MAX_SQUADS
+	var spare := 0
 	for id in GameData.unit_ids_sorted():
 		if Profile.owns(id) and not in_army.has(id) and not UnitLocks.is_locked(id):
-			_add_picker.add_item("%s  (Lv %d, x%d)" % [GameData.UNITS[id]["name"], int(Profile.unit(id)["level"]), Profile.squad_size(id)])
-			_add_picker.set_item_metadata(_add_picker.item_count - 1, id)
-	_add_button.disabled = _add_picker.item_count == 0 or squads.size() >= GameData.MAX_SQUADS
-	_code_edit.text = Profile.army_code()
+			_reserves.add_child(_make_reserve(id, full))
+			spare += 1
+	_reserve_scroll.visible = spare > 0
+	if spare == 0:
+		_reserve_note.text = "Every unit you own is in the army. Recruit more on Expeditions."
+	elif full:
+		_reserve_note.text = "Army full (%d squads): remove one (✕) to make room." % GameData.MAX_SQUADS
+	else:
+		_reserve_note.text = "Tap a unit to add it, or drag it into a column."
 
 
 func _make_card(index: int, sq: Dictionary, deployed: int, first: bool, last: bool) -> Control:
@@ -242,14 +250,20 @@ func _drag_squad(_at: Vector2, index: int) -> Variant:
 
 
 func _can_drop_squad(_at: Vector2, data: Variant) -> bool:
-	return typeof(data) == TYPE_DICTIONARY and data.has("army_index")
+	return typeof(data) == TYPE_DICTIONARY and (data.has("army_index") or data.has("reserve_unit"))
 
 
 func _drop_on_column(_at: Vector2, data: Variant, row: String) -> void:
+	if data.has("reserve_unit"):
+		_add_unit(str(data["reserve_unit"]), row)
+		return
 	_move_squad(int(data["army_index"]), row, -1)
 
 
 func _drop_on_card(_at: Vector2, data: Variant, target: int) -> void:
+	if data.has("reserve_unit"):
+		_add_unit(str(data["reserve_unit"]), str(Profile.data["army"][target]["row"]))
+		return
 	var from := int(data["army_index"])
 	if from == target:
 		return
@@ -258,15 +272,51 @@ func _drop_on_card(_at: Vector2, data: Variant, target: int) -> void:
 
 # --- adding -------------------------------------------------------------------
 
-func _on_add() -> void:
-	if _add_picker.selected < 0:
-		return
-	var id: String = _add_picker.get_item_metadata(_add_picker.selected)
+func _make_reserve(id: String, full: bool) -> Control:
+	var b := Button.new()
+	b.custom_minimum_size = Vector2(150, 0)
+	b.disabled = full
+	b.tooltip_text = "%s: Lv %d, %d units. %s" % [GameData.UNITS[id]["name"], int(Profile.unit(id)["level"]), Profile.squad_size(id), "Army full." if full else "Tap to add to the %s." % COLUMN_INFO[GameData.default_row_for(id)]["title"].to_lower()]
+	b.pressed.connect(func(): _add_unit(id, GameData.default_row_for(id)))
+	b.set_drag_forwarding(func(_at: Vector2) -> Variant:
+		if full:
+			return null
+		var preview := Control.new()
+		var ic := UIKit.unit_icon(id, 48)
+		ic.position = Vector2(-24, -24)
+		preview.add_child(ic)
+		set_drag_preview(preview)
+		return {"reserve_unit": id}, Callable(), Callable())
+	Audio.hook_button(b)
+	var h := UIKit.hbox(6)
+	h.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 4)
+	var ic := UIKit.unit_icon(id, 40)
+	ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	h.add_child(ic)
+	var v := UIKit.vbox(0)
+	v.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var n := UIKit.label(GameData.UNITS[id]["name"], 13, GameData.rarity_color(GameData.UNITS[id]["rarity"]))
+	n.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	n.custom_minimum_size = Vector2(96, 0)
+	v.add_child(n)
+	v.add_child(UIKit.label("Lv %d · x%d" % [int(Profile.unit(id)["level"]), Profile.squad_size(id)], 11, UIKit.TEXT_DIM))
+	h.add_child(v)
+	b.add_child(h)
+	b.custom_minimum_size.y = 56
+	return b
+
+
+func _add_unit(id: String, row: String) -> void:
 	var army: Array = Profile.data["army"].duplicate(true)
 	if army.size() >= GameData.MAX_SQUADS:
 		return
-	army.append({"unit": id, "row": GameData.default_row_for(id)})
+	for sq in army:
+		if sq["unit"] == id:
+			return
+	army.append({"unit": id, "row": row})
 	Profile.set_army(army)
+	Audio.play_sfx("toggle", -6.0)
 
 
 ## Greedy: pick the owned squads with the best power until the slots run out.
@@ -280,3 +330,4 @@ func _auto_build() -> void:
 	for o in options.slice(0, GameData.MAX_SQUADS):
 		army.append({"unit": o["unit"], "row": GameData.default_row_for(o["unit"])})
 	Profile.set_army(army)
+	UIKit.toast("Army built from your %d strongest squads" % army.size(), UIKit.GOOD)

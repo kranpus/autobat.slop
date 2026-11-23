@@ -150,9 +150,9 @@ func _build_hud() -> void:
 		rl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		sv.add_child(rl)
 	else:
-		var go := UIKit.button("FIGHT!", _begin)
-		go.custom_minimum_size = Vector2(200, 48)
-		go.add_theme_font_size_override("font_size", 22)
+		var go := UIKit.accent_button("FIGHT!", _begin, 22)
+		go.custom_minimum_size = Vector2(200, 52)
+		UIKit.tut(go, "battle_fight")
 		go.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		sv.add_child(go)
 
@@ -297,8 +297,8 @@ func _on_finished(winner: int) -> void:
 	if mode == "live":
 		_verify_label = UIKit.label("Verifying result with opponent...", 13, UIKit.TEXT_DIM)
 		v.add_child(_verify_label)
-	var cont := UIKit.button("Continue", func(): closed.emit())
-	cont.custom_minimum_size = Vector2(0, 40)
+	var cont := UIKit.accent_button("Continue", func(): closed.emit(), 17)
+	UIKit.tut(cont, "battle_continue")
 	v.add_child(cont)
 	# The finish: a big banner and music sting, then the results.
 	_banner(title_text, title_color, 0.6)
@@ -318,6 +318,9 @@ func _show_rewards(summary: Dictionary, mode: String) -> void:
 	UIKit.clear(_rewards_box)
 	if mode in ["challenge", "challenge_online"]:
 		_show_challenge_rewards(summary, mode)
+		return
+	if mode == "tutorial":
+		_rewards_box.add_child(UIKit.label("Training battle%s" % ("" if Profile.online else ": +%d gold" % int(summary.get("gold", 0))), 16, Color("ffd76a")))
 		return
 	if Profile.online and mode in ["practice", "live"]:
 		_rewards_box.add_child(UIKit.label("While signed in, only ranked battles and Legion Draft earn rewards.", 13, UIKit.TEXT_DIM))

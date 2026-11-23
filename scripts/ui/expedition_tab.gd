@@ -118,6 +118,7 @@ func _make_region(rid: String) -> Control:
 	side.add_child(UIKit.label("Cost: %d map%s" % [cost, "s" if cost > 1 else ""], 14))
 	var b := UIKit.button("Explore", func(): _explore(rid))
 	b.custom_minimum_size = Vector2(130, 40)
+	UIKit.tut(b, "explore")
 	if not unlocked:
 		b.text = "Needs %d rating" % int(region["min_rating"])
 		b.disabled = true

@@ -104,7 +104,7 @@ func _ready() -> void:
 	srow.add_child(_conn_label)
 	net_box.add_child(srow)
 	var orow := UIKit.hbox(8)
-	orow.add_child(UIKit.button("Quick Match", func(): Party.online_quick(Profile.player_name(), _settings())))
+	orow.add_child(UIKit.tut(UIKit.button("Quick Match", func(): Party.online_quick(Profile.player_name(), _settings())), "draft_quick"))
 	orow.add_child(UIKit.button("Create Match", func(): Party.online_create(Profile.player_name(), _settings(), not _private.button_pressed)))
 	_private = CheckBox.new()
 	_private.text = "Private (code only)"

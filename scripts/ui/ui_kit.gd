@@ -75,6 +75,60 @@ static func button(text: String, callback: Callable) -> Button:
 	return b
 
 
+## A prominent call-to-action button (gold background, dark text).
+static func accent_button(text: String, callback: Callable, font_size: int = 18) -> Button:
+	var b := button(text, callback)
+	for state in ["normal", "hover", "pressed", "focus"]:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = ACCENT if state == "normal" else (ACCENT.lightened(0.15) if state == "hover" else ACCENT.darkened(0.15))
+		if state == "focus":
+			sb.bg_color = Color(0, 0, 0, 0)
+			sb.border_color = Color.WHITE
+			sb.set_border_width_all(2)
+		sb.set_corner_radius_all(6)
+		sb.set_content_margin_all(10)
+		b.add_theme_stylebox_override(state, sb)
+	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(c, Color("1b1d24"))
+	b.add_theme_font_size_override("font_size", font_size)
+	b.custom_minimum_size = Vector2(0, 46)
+	return b
+
+
+## Marks a control as a tutorial target (see scripts/ui/tutorial.gd).
+static func tut(node: Control, id: String) -> Control:
+	node.set_meta("tut", id)
+	node.add_to_group("tut")
+	return node
+
+
+## A short message that pops up at the top of the screen and fades
+## ("Goblin Skirmisher reached level 2"). Main hosts them.
+static func toast(text: String, color: Color = Color.WHITE) -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var host := tree.get_first_node_in_group("toast_host")
+	if host:
+		host.call("show_toast", text, color)
+
+
+static var _dot: Texture2D
+
+
+## The small red dot on tabs that have something waiting.
+static func badge_dot() -> Texture2D:
+	if _dot == null:
+		var img := Image.create(14, 14, false, Image.FORMAT_RGBA8)
+		for y in 14:
+			for x in 14:
+				var d := Vector2(x - 6.5, y - 6.5).length()
+				var a := clampf(6.5 - d, 0.0, 1.0)
+				img.set_pixel(x, y, Color(1.0, 0.3, 0.28, a) if d < 5.0 else Color(1, 1, 1, a))
+		_dot = ImageTexture.create_from_image(img)
+	return _dot
+
+
 static func icon(tex: Texture2D, px: int) -> TextureRect:
 	var r := TextureRect.new()
 	r.texture = tex

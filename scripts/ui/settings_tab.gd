@@ -115,6 +115,15 @@ func _ready() -> void:
 	add_child(reset)
 	_build_account()
 
+	add_child(UIKit.label("Tutorial", 18, UIKit.ACCENT))
+	var tut_row := UIKit.hbox(10)
+	tut_row.add_child(UIKit.button("Replay tutorial", func():
+		var main := get_tree().get_first_node_in_group("toast_host")
+		if main and main.get("tutorial"):
+			main.tutorial.replay()))
+	tut_row.add_child(UIKit.label("A short guided tour of the basics: battles, upgrades, recruiting, your army and challenges.", 13, UIKit.TEXT_DIM))
+	add_child(tut_row)
+
 	add_child(UIKit.label("Autobat Legions %s" % Party.build_version(), 13, UIKit.TEXT_DIM))
 	add_child(UIKit.label("Credits", 18, UIKit.ACCENT))
 	var credits := RichTextLabel.new()

@@ -15,6 +15,8 @@ var _map_picker: OptionButton
 var _map_desc: Label
 var _opponents: Array = []
 var _searching := false
+var _friends_toggle: Button
+var _friends_panel: Control
 
 
 func _ready() -> void:
@@ -26,13 +28,21 @@ func _ready() -> void:
 	add_child(left)
 	var lv := UIKit.vbox(8)
 	left.add_child(lv)
-	lv.add_child(UIKit.label("Ranked Arena", 20, UIKit.ACCENT))
+	var head := UIKit.hbox(10)
+	head.add_child(UIKit.label("Ranked Arena", 20, UIKit.ACCENT))
+	head.add_child(UIKit.spacer())
+	_friends_toggle = UIKit.button("", _toggle_friends)
+	_friends_toggle.tooltip_text = "Friend challenges (army codes) and live duels."
+	head.add_child(_friends_toggle)
+	lv.add_child(head)
 	_record_label = UIKit.label("", 14, UIKit.TEXT_DIM)
 	lv.add_child(_record_label)
-	var info := UIKit.label("Find Opponents saves your army on the server and matches you against armies other players saved at a similar rating. Stronger opponents give more rating and gold; wins also grant a scouting map.", 13, UIKit.TEXT_DIM)
+	var info := UIKit.label("Fight armies other players saved near your rating. Harder opponents pay more rating and gold; every win also brings a scouting map.", 13, UIKit.TEXT_DIM)
 	info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	lv.add_child(info)
-	lv.add_child(UIKit.button("Find Opponents", _find_opponents))
+	var find := UIKit.accent_button("Find Opponents", _find_opponents)
+	UIKit.tut(find, "find_opponents")
+	lv.add_child(find)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -44,6 +54,7 @@ func _ready() -> void:
 	# --- Right column: friend challenge + live duel ------------------------
 	# Right column scrolls so it also fits short (phone) screens.
 	var right_scroll := ScrollContainer.new()
+	_friends_panel = right_scroll
 	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	right_scroll.custom_minimum_size = Vector2(380 if UIKit.is_compact(self) else 420, 0)
 	add_child(right_scroll)
@@ -86,7 +97,8 @@ func _ready() -> void:
 	frow.add_child(UIKit.button("Fight", _fight_code))
 	frow.add_child(UIKit.button("Copy my code", func():
 		DisplayServer.clipboard_set(Profile.army_code())
-		Audio.play_sfx("scroll")))
+		Audio.play_sfx("scroll")
+		UIKit.toast("Army code copied: send it to a friend")))
 	fv.add_child(frow)
 
 	var np := UIKit.panel(UIKit.PANEL_LIGHT)
@@ -131,7 +143,21 @@ func _ready() -> void:
 
 	Party.ranked_opponents.connect(_on_ranked_opponents)
 	Profile.changed.connect(refresh)
+	_set_friends_open(bool(Profile.settings.get("friends_open", false)))
+	_show_search_message("Three opponents near your strength: Easy, Even and Hard. Pick one to fight.")
 	refresh()
+
+
+## Friend challenges and live duels fold away so ranked stays front and centre.
+func _toggle_friends() -> void:
+	_set_friends_open(not _friends_panel.visible)
+	Profile.settings["friends_open"] = _friends_panel.visible
+	Profile.save_settings()
+
+
+func _set_friends_open(open: bool) -> void:
+	_friends_panel.visible = open
+	_friends_toggle.text = "Play with friends  ◀" if open else "Play with friends  ▶"
 
 
 func refresh() -> void:
@@ -229,7 +255,7 @@ func _make_opponent_card(opp: Dictionary) -> Control:
 	h2.add_child(UIKit.spacer())
 	h2.add_child(UIKit.label("on %s" % BattleMaps.get_map(opp["map"])["name"], 13, UIKit.TEXT_DIM))
 	var win_delta := Army.elo_delta(Profile.rating(), int(opp["rating"]), 1.0)
-	h2.add_child(UIKit.button("Attack  (+%d)" % win_delta, func(): _start(opp, "ranked")))
+	h2.add_child(UIKit.tut(UIKit.button("Attack  (+%d)" % win_delta, func(): _start(opp, "ranked")), "attack"))
 	v.add_child(h2)
 	return p
 

@@ -14,6 +14,7 @@ const TrinketTab := preload("res://scripts/ui/trinket_tab.gd")
 const LeaderboardTab := preload("res://scripts/ui/leaderboard_tab.gd")
 const ChallengesTab := preload("res://scripts/ui/challenges_tab.gd")
 const PatchNotesTab := preload("res://scripts/ui/patch_notes_tab.gd")
+const TutorialScript := preload("res://scripts/ui/tutorial.gd")
 
 var menu_layer: CanvasLayer
 var tabs: TabContainer
@@ -31,6 +32,11 @@ var login_layer: CanvasLayer
 var _account_label: Label
 var _fullscreen_button: Button
 var _update_dialog: AcceptDialog
+var tutorial: CanvasLayer
+var _toast_box: VBoxContainer
+var _last_gold := -1
+var _rotate_layer: CanvasLayer
+var _gold_float_parent: Control
 
 
 func _ready() -> void:
@@ -102,19 +108,21 @@ func _ready() -> void:
 	settings_tab.name = "Settings"
 	tabs.add_child(settings_tab)
 	tabs.tab_changed.connect(func(_i): Audio.play_sfx("toggle", -8.0))
-	# Marks the Patch Notes tab until this version's notes have been opened.
+	# Opening the Patch Notes tab marks this version's notes as read.
 	var notes_index := notes_tab.get_index()
-	if str(Profile.settings.get("seen_patch", "")) != PatchNotes.latest():
-		tabs.set_tab_title(notes_index, "Patch Notes (new)")
 	tabs.tab_changed.connect(func(i: int):
 		if i == notes_index and str(Profile.settings.get("seen_patch", "")) != PatchNotes.latest():
 			Profile.settings["seen_patch"] = PatchNotes.latest()
 			Profile.save_settings()
-			tabs.set_tab_title(notes_index, "Patch Notes"))
+		_refresh_badges())
 
 	Profile.changed.connect(_refresh_top_bar)
+	Profile.changed.connect(_refresh_badges)
 	Net.match_ready.connect(start_battle)
 	_refresh_top_bar()
+	_refresh_badges()
+	_build_toasts()
+	_build_rotate_prompt()
 
 	# Legion Draft: full-screen shop layer shown while in a match.
 	draft_layer = CanvasLayer.new()
@@ -143,10 +151,19 @@ func _ready() -> void:
 	add_child(login_layer)
 	Party.session_changed.connect(_refresh_top_bar)
 	Party.update_required.connect(_on_update_required)
+	# The tutorial waits until the player is in (signed in or offline).
+	tutorial = TutorialScript.new()
+	tutorial.main = self
+	add_child(tutorial)
+	var login_open := false
 	if (Profile.settings.has("account") or not bool(Profile.settings.get("start_offline", false))):
 		var screen := show_login()
 		if not screen.auto_login() and bool(Profile.settings.get("start_offline", false)):
 			screen.queue_free()
+		else:
+			login_open = true
+	if not login_open:
+		tutorial.start_if_new.call_deferred()
 
 	# Check in with the server for unit/region locks and gold settings now and
 	# every 5 minutes while idle in the menus (quietly skipped if unreachable,
@@ -210,6 +227,9 @@ func _refresh_top_bar() -> void:
 	if _fullscreen_button:
 		_fullscreen_button.text = "Windowed" if UIKit.is_fullscreen() else "Fullscreen"
 	_gold_label.text = "Gold: %d" % Profile.gold()
+	if _last_gold >= 0 and Profile.gold() > _last_gold and menu_layer.visible:
+		_float_gold(Profile.gold() - _last_gold)
+	_last_gold = Profile.gold()
 	var next := Profile.seconds_to_next_map()
 	var timer_text := ""
 	if next >= 0:
@@ -223,6 +243,146 @@ func _refresh_top_bar() -> void:
 	else:
 		_account_label.text = "Guest (offline)"
 		_account_label.add_theme_color_override("font_color", UIKit.TEXT_DIM)
+
+
+## "+120" rising from the gold counter when gold comes in.
+func _float_gold(amount: int) -> void:
+	var l := UIKit.label("+%d" % amount, 18, Color("ffd76a"))
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	menu_layer.add_child(l)
+	l.global_position = _gold_label.global_position + Vector2(0, 18)
+	var tw := l.create_tween().set_parallel(true)
+	tw.tween_property(l, "global_position:y", l.global_position.y + 34.0, 1.1).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 0.0, 1.1).set_delay(0.4)
+	tw.chain().tween_callback(l.queue_free)
+	Audio.play_sfx("coins", -10.0)
+
+
+# --- toasts and tab badges --------------------------------------------------------
+
+func _build_toasts() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 15
+	add_child(layer)
+	var anchor := Control.new()
+	anchor.set_anchors_preset(Control.PRESET_FULL_RECT)
+	anchor.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	anchor.theme = UIKit.make_theme()
+	layer.add_child(anchor)
+	# Toasts rise from the bottom centre, clear of the tabs and top bar.
+	_toast_box = UIKit.vbox(6)
+	_toast_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_box.alignment = BoxContainer.ALIGNMENT_END
+	_toast_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	_toast_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_toast_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_toast_box.offset_bottom = -70.0
+	anchor.add_child(_toast_box)
+	add_to_group("toast_host")
+
+
+func show_toast(text: String, color: Color = Color.WHITE) -> void:
+	if _toast_box == null:
+		return
+	var p := PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.09, 0.1, 0.14, 0.92)
+	sb.border_color = Color(color, 0.7)
+	sb.border_width_left = 4
+	sb.set_corner_radius_all(6)
+	sb.set_content_margin_all(10)
+	p.add_theme_stylebox_override("panel", sb)
+	p.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	p.add_child(UIKit.label(text, 16, color))
+	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_toast_box.add_child(p)
+	while _toast_box.get_child_count() > 3:
+		_toast_box.get_child(0).queue_free()
+	p.modulate.a = 0.0
+	var tw := p.create_tween()
+	tw.tween_property(p, "modulate:a", 1.0, 0.15)
+	tw.tween_interval(2.2)
+	tw.tween_property(p, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(p.queue_free)
+
+
+## A red dot on tabs with something waiting: a squad upgrade you can afford,
+## scouting maps piling up, a challenge your army can take, unread notes.
+func _refresh_badges() -> void:
+	if tabs == null:
+		return
+	var power := Army.army_power(Profile.battle_squads()) / 10.0
+	for i in tabs.get_tab_count():
+		var dot := false
+		match str(tabs.get_tab_control(i).name):
+			"Collection":
+				for id in Profile.data["units"]:
+					if Profile.can_tier_up(id):
+						dot = true
+						break
+			"Expeditions":
+				dot = Profile.maps() >= Profile.MAX_MAPS or Profile.has_pending_choice() or Profile.has_pending_trinket()
+			"Challenges":
+				for c in Challenges.LIST:
+					if Profile.challenge_unlocked(c["id"]) and not Profile.challenge_cleared(c["id"]) and power >= Challenges.recommended(c["id"]):
+						dot = true
+						break
+			"Patch Notes":
+				dot = str(Profile.settings.get("seen_patch", "")) != PatchNotes.latest()
+		tabs.set_tab_icon(i, UIKit.badge_dot() if dot else null)
+
+
+# --- phones held upright ------------------------------------------------------------
+
+## The game is laid out for landscape. A phone browser held upright gets a
+## friendly prompt to turn it (the app itself is locked to landscape).
+func _build_rotate_prompt() -> void:
+	_rotate_layer = CanvasLayer.new()
+	_rotate_layer.layer = 30
+	_rotate_layer.visible = false
+	add_child(_rotate_layer)
+	var bg := ColorRect.new()
+	bg.color = UIKit.BG
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_rotate_layer.add_child(bg)
+	var c := CenterContainer.new()
+	c.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_rotate_layer.add_child(c)
+	var v := UIKit.vbox(16)
+	c.add_child(v)
+	var icon := UIKit.label("↻", 96, UIKit.ACCENT)
+	icon.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(icon)
+	var t := UIKit.label("Turn your phone sideways", 40, Color.WHITE)
+	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(t)
+	var s := UIKit.label("Autobat Legions plays in landscape.", 26, UIKit.TEXT_DIM)
+	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(s)
+	get_viewport().size_changed.connect(_update_rotate_prompt)
+	_update_rotate_prompt()
+
+
+func _update_rotate_prompt() -> void:
+	var size := get_viewport().get_visible_rect().size
+	var upright := UIKit.is_mobile() and size.y > size.x * 1.1
+	if "--portrait-test" in OS.get_cmdline_user_args():
+		upright = size.y > size.x * 1.1
+	_rotate_layer.visible = upright
+
+
+# --- tutorial -----------------------------------------------------------------------
+
+## The tutorial's first fight: your army against a small pack of rats.
+func start_tutorial_battle() -> void:
+	tabs.current_tab = 0
+	start_battle({
+		"mode": "tutorial", "seed": 7, "map": "open_arena",
+		"squads_a": Profile.battle_squads(),
+		"squads_b": [{"unit": "rat_swarm", "level": 1, "count": 18, "row": "front"}],
+		"name_a": Profile.player_name(), "name_b": "Rat Pack",
+		"rating_a": Profile.rating(), "rating_b": 0, "local_team": 0,
+	})
 
 
 ## The server (or LAN host) runs a different version of the game.
@@ -264,6 +424,9 @@ func show_login() -> Control:
 		c.queue_free()
 	var screen := LoginScreen.new()
 	login_layer.add_child(screen)
+	screen.finished.connect(func():
+		if tutorial:
+			tutorial.start_if_new())
 	return screen
 
 

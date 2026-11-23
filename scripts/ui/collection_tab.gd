@@ -148,8 +148,11 @@ func _build_detail() -> void:
 		lvl_box.add_child(UIKit.label("Next level: HP %d → %d, Damage %d → %d" % [roundi(cur["hp"]), roundi(nxt["hp"]), roundi(cur["dmg"]), roundi(nxt["dmg"])], 13, UIKit.TEXT_DIM))
 		var b := UIKit.button("Level Up  (%d gold)" % Profile.level_up_cost(id), func():
 			if Profile.level_up(id):
-				Audio.play_sfx("coins"))
+				Audio.play_sfx("coins")
+				UIKit.toast("%s reached level %d" % [GameData.UNITS[id]["name"], level + 1], UIKit.GOOD))
 		b.disabled = not Profile.can_level_up(id)
+		b.custom_minimum_size = Vector2(0, 40)
+		UIKit.tut(b, "level_up")
 		lvl_box.add_child(b)
 	else:
 		lvl_box.add_child(UIKit.label("Level cap reached. Upgrade the squad tier to raise it (+%d levels)." % GameData.LEVELS_PER_TIER, 13, UIKit.TEXT_DIM))
@@ -171,7 +174,8 @@ func _build_detail() -> void:
 		tier_box.add_child(shard_bar)
 		var b2 := UIKit.button("Upgrade Squad → %d units  (%d shards, %d gold)" % [size_next, int(cost["shards"]), int(cost["gold"])], func():
 			if Profile.tier_up(id):
-				Audio.play_sfx("gem"))
+				Audio.play_sfx("gem")
+				UIKit.toast("%s squad grows to %d units" % [GameData.UNITS[id]["name"], size_next], UIKit.ACCENT))
 		b2.disabled = not Profile.can_tier_up(id)
 		tier_box.add_child(b2)
 	else:

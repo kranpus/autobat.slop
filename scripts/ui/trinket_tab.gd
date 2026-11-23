@@ -122,6 +122,7 @@ func _make_site(site_id: String) -> Control:
 	side.add_child(UIKit.label("Cost: %d map%s" % [cost, "s" if cost > 1 else ""], 14))
 	var b := UIKit.button("Hunt", func(): _hunt(site_id))
 	b.custom_minimum_size = Vector2(130, 40)
+	UIKit.tut(b, "trinket_hunt")
 	if not unlocked:
 		b.text = "Needs %d rating" % int(site["min_rating"])
 		b.disabled = true

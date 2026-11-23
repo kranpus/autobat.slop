@@ -101,6 +101,8 @@ func _make_card(c: Dictionary, my_power: float) -> Control:
 	var side := UIKit.vbox(6)
 	side.alignment = BoxContainer.ALIGNMENT_CENTER
 	var b := UIKit.button("Replay" if cleared else "Fight", func(): _start(id))
+	if unlocked and not cleared:
+		UIKit.tut(b, "challenge_fight")
 	b.custom_minimum_size = Vector2(120, 40)
 	b.disabled = not unlocked
 	side.add_child(b)
