@@ -344,6 +344,9 @@ obstacles (x/y as fractions of the map; anything left of centre is mirrored auto
   smaller (`Army.CASTER_COUNT_MULT`), in your army and in Legion Draft. The damage cut doesn't
   lower their Strength (the simulator had them winning 55% at equal Strength); the smaller
   squads count less as usual.
+  On top of that, every caster still winning over 53% at equal Strength got a standalone damage
+  cut in proportion (`Army.UNIT_DMG_MULT`): Orc Sorcerer -23%, Spider Matriarch -11%, Quasit
+  -10%, Sphinx -8%, Hellion -7%, Golden Dragon -6%, Electric Eel and Ice Dragon -4%.
 - **Battle abilities** (patch 0.9.2, 40 more in 0.9.4): 63 units have one, including every epic and legendary,
   each with an ability no other epic or legendary shares. They're shown on each unit's card and
   simulated in `BattleSim` (`Ab`); see `GameData.ABILITIES`.

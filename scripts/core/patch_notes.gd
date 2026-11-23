@@ -10,13 +10,17 @@ extends RefCounted
 
 const LIST := [
 	{"version": "0.9.6", "date": "2026-11-23", "title": "Silenced Spells",
-		"summary": "A heavy, across-the-board nerf to casters below epic: 15% less damage and squads 30% smaller.",
+		"summary": "A heavy, across-the-board nerf to casters below epic (15% less damage, squads 30% smaller), plus standalone nerfs to the Orc Sorcerer and every other caster still winning too often.",
 		"sections": [
 			{"name": "Balance", "notes": [
 				{"kind": "nerf", "text": "Every common, uncommon and rare caster deals 15% less damage, with its spells and its spell abilities alike: Orc Sorcerer, Elven Mage, Salamander Firebrand, Deathcap, Spider Matriarch, Electric Eel, Merfolk Aquamancer, Quasit, Hellion and Blizzard Demon."},
 				{"kind": "nerf", "text": "Their squads are 30% smaller at every tier, in your army and in Legion Draft: a rare caster squad is 4 at tier 0 and 25 at tier 10 (was 6 and 36), an uncommon one 11 and 67 (was 15 and 95)."},
 				{"kind": "note", "text": "The damage cut doesn't lower their Strength: in thousands of simulated battles, armies with these casters won about 55% of fights at equal Strength, more than any other kind of unit, so they were stronger than their Strength showed. The smaller squads do count less, as usual."},
-				{"kind": "note", "text": "Epic and legendary casters (the Lich, Phoenix, dragons and others) are unchanged."},
+			]},
+			{"name": "Standalone nerfs", "notes": [
+				{"kind": "nerf", "text": "Orc Sorcerer: 23% less damage, on top of the caster nerf (about 65% of its old damage in all), and its squads are smaller like every caster below epic. It was winning 69% of fights at equal Strength even after the caster nerf."},
+				{"kind": "nerf", "text": "Every other caster still winning more than 53% loses damage in proportion: Spider Matriarch -11%, Quasit -10%, Sphinx -8%, Hellion -7%, Golden Dragon -6%, Electric Eel -4%, Ice Dragon -4%. For the Spider Matriarch, Quasit, Hellion and Electric Eel this stacks with the caster nerf."},
+				{"kind": "note", "text": "Other epic and legendary casters (the Lich, Phoenix, Storm and Shadow Dragons and others) are unchanged. As with the caster nerf, these cuts don't lower Strength."},
 			]},
 		]},
 	{"version": "0.9.5", "date": "2026-11-23", "title": "The Long Road",

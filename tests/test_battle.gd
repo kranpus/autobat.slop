@@ -1070,7 +1070,8 @@ func test_ranged_splash_nerf() -> void:
 ## Unit power with the pre-0.9 splash formula (every splash counted fully).
 func _old_power(unit_id: String) -> float:
 	var s := Army.unit_stats(unit_id, 1)
-	var dps: float = (float(s["dmg"]) * (1.0 + minf(float(s["aoe"]), 60.0) / 40.0) + float(s["heal"]) * 1.5) / float(s["cooldown"]) + float(s["regen"])
+	var dmg := float(s["dmg"]) / Army.dmg_nerf(unit_id)   # before any damage nerfs
+	var dps: float = (dmg * (1.0 + minf(float(s["aoe"]), 60.0) / 40.0) + float(s["heal"]) * 1.5) / float(s["cooldown"]) + float(s["regen"])
 	return sqrt(float(s["hp"]) * dps * (1.0 + minf(float(s["range"]), 260.0) / 520.0)) * float(GameData.RARITIES[s["rarity"]]["power_mult"])
 
 
@@ -1565,10 +1566,14 @@ func test_caster_nerf() -> void:
 	check(not Army.caster_nerfed("lich") and not Army.caster_nerfed("storm_dragon") and not Army.caster_nerfed("elf_archer"), "epic and legendary casters and other roles aren't")
 	var s := Army.unit_stats("orc_sorcerer", 5)
 	var raw := float(GameData.UNITS["orc_sorcerer"]["dmg"]) * Army.level_mult(5)
-	check(is_equal_approx(float(s["dmg"]), raw * 0.85), "their damage is 85%% (%.1f of %.1f)" % [float(s["dmg"]), raw])
+	check(is_equal_approx(float(Army.unit_stats("elf_mage", 5)["dmg"]), float(GameData.UNITS["elf_mage"]["dmg"]) * Army.level_mult(5) * 0.85), "their damage is 85%")
+	check(is_equal_approx(float(s["dmg"]), raw * 0.85 * 0.77), "the Orc Sorcerer's standalone nerf stacks on top (%.1f of %.1f, x0.65)" % [float(s["dmg"]), raw])
+	var over: Array = Army.UNIT_DMG_MULT.keys()
+	check(over.size() == 8 and over.all(func(u): return GameData.UNITS[u]["role"] == "caster" and float(Army.UNIT_DMG_MULT[u]) < 1.0), "8 casters over 53% get a standalone damage nerf, epics and legendaries included")
+	check(is_equal_approx(Army.dmg_nerf("sphinx"), 0.92) and is_equal_approx(Army.dmg_nerf("lich"), 1.0), "Sphinx (epic) deals 92%; the Lich is untouched")
 	var sim := BattleSim.new()
 	sim.setup([{"unit": "orc_sorcerer", "level": 5, "tier": 0, "row": "back"}], [{"unit": "goblin", "level": 1, "tier": 0, "row": "front"}], 1, "open_arena")
-	check(is_equal_approx(sim.dmg[0], raw * 0.85), "...in battle too")
+	check(is_equal_approx(sim.dmg[0], raw * 0.85 * 0.77), "...in battle too")
 	# Strength stays what it was before the nerf.
 	var s_full := s.duplicate()
 	s_full["dmg"] = raw
@@ -1576,6 +1581,8 @@ func test_caster_nerf() -> void:
 	var splash := minf(float(s_full["aoe"]), 60.0) / 40.0 * BattleSim.RANGED_SPLASH_MULT / Army.SPLASH_POWER_REF
 	var dps := raw * (1.0 + splash) / cd + float(s_full["regen"])
 	var ab := Army.ability_power(s_full)
+	var s_sph := Army.unit_stats("sphinx", 5)
+	check(is_equal_approx(float(s_sph["dmg"]), float(GameData.UNITS["sphinx"]["dmg"]) * Army.level_mult(5) * 0.92), "the Sphinx hits 8% softer")
 	var before := sqrt(float(s_full["hp"]) * ab.x * dps * ab.y * (1.0 + minf(float(s_full["range"]), 260.0) / 520.0)) * float(GameData.RARITIES["rare"]["power_mult"])
 	check(absf(Army.unit_power("orc_sorcerer", 5) / before - 1.0) < 0.001, "each one's Strength is unchanged by the damage cut")
 	check(Army.squad_size("orc_sorcerer", 0) == 4 and Army.squad_size("orc_sorcerer", 10) == 25 and Army.squad_size("ogre", 10) == 36, "their squads are 70%% the size (Orc Sorcerer %d at tier 10, Ogre Brute 36)" % Army.squad_size("orc_sorcerer", 10))

@@ -36,8 +36,7 @@ static func unit_stats(unit_id: String, level: int, mods: Dictionary = {}) -> Di
 	var s := base.duplicate()
 	s["hp"] = float(base["hp"]) * m * float(mods.get("hp_mult", 1.0))
 	s["dmg"] = float(base["dmg"]) * m * float(mods.get("dmg_mult", 1.0))
-	if caster_nerfed(unit_id):
-		s["dmg"] = float(s["dmg"]) * CASTER_DMG_MULT
+	s["dmg"] = float(s["dmg"]) * dmg_nerf(unit_id)
 	s["heal"] = float(base["heal"]) * m * float(mods.get("dmg_mult", 1.0))
 	s["regen"] = float(base["regen"]) * m + float(s["hp"]) * float(mods.get("regen_pct", 0.0))
 	s["speed"] = float(base["speed"]) * float(mods.get("speed_mult", 1.0))
@@ -82,7 +81,7 @@ static func unit_power(unit_id: String, level: int, mods: Dictionary = {}) -> fl
 	# as efficiently), so rarer units carry a calibrated multiplier.
 	var rarity_mult: float = GameData.RARITIES[s["rarity"]]["power_mult"]
 	var ab := ability_power(s)
-	var keep := 1.0 / sqrt(CASTER_DMG_MULT) if caster_nerfed(unit_id) else 1.0
+	var keep := 1.0 / sqrt(dmg_nerf(unit_id))   # damage nerfs don't lower Strength
 	return sqrt(float(s["hp"]) * ab.x * dps * ab.y * reach_bonus) * rarity_mult * keep
 
 
@@ -97,6 +96,28 @@ static func unit_power(unit_id: String, level: int, mods: Dictionary = {}) -> fl
 const CASTER_DMG_MULT := 0.85
 const CASTER_COUNT_MULT := 0.7
 const CASTER_NERF_RARITIES := ["common", "uncommon", "rare"]
+
+
+## Patch 0.9.6 standalone nerfs: every caster still winning over 53% at
+## equal Strength in the simulator after the caster nerf loses damage in
+## proportion (about 1.2% per point over 50%). Like the caster nerf, Strength
+## ignores these (the simulator showed the units were worth more than it said).
+const UNIT_DMG_MULT := {
+	"orc_sorcerer": 0.77,      # 69%
+	"spider_matriarch": 0.89,  # 59%
+	"quasit": 0.9,             # 58%
+	"sphinx": 0.92,            # 57%
+	"hellion": 0.93,           # 56%
+	"golden_dragon": 0.94,     # 55%
+	"electric_eel": 0.96,      # 53.4%
+	"ice_dragon": 0.96,        # 53.1%
+}
+
+
+## The share of its damage a unit deals after balance nerfs (caster nerf and
+## standalone nerfs together).
+static func dmg_nerf(unit_id: String) -> float:
+	return (CASTER_DMG_MULT if caster_nerfed(unit_id) else 1.0) * float(UNIT_DMG_MULT.get(unit_id, 1.0))
 
 
 static func caster_nerfed(unit_id: String) -> bool:
