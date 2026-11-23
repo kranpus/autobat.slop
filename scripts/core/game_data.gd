@@ -554,7 +554,7 @@ const UNITS := {
 	},
 	"vine_stalker": {
 		"name": "Vine Stalker", "rarity": "epic", "role": "melee",
-		"hp": 1400.0, "dmg": 72.0, "cooldown": 1.0, "range": 8.0, "speed": 80.0,
+		"hp": 1500.0, "dmg": 82.0, "cooldown": 1.0, "range": 8.0, "speed": 80.0,
 		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 14.0, "scale": 1.6, "flying": false,
 		"desc": "It steps out of the undergrowth right beside you.",
@@ -646,7 +646,7 @@ const UNITS := {
 		"damage": "fire", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 6.0, "scale": 0.75, "flying": true,
 		"desc": "A cackling spark of hellfire that bursts on contact.",
-		"ability": {"id": "detonate", "value": 3.5},
+		"ability": {"id": "detonate", "value": 2.5},
 	},
 	"lemure": {
 		"name": "Lemure", "rarity": "common", "role": "tank",
@@ -798,7 +798,7 @@ const UNITS := {
 		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 22.0, "scale": 2.4, "flying": false,
 		"desc": "The mountains themselves come down at its call.",
-		"ability": {"id": "avalanche", "value": 8.0},
+		"ability": {"id": "avalanche", "value": 9.0},
 	},
 }
 

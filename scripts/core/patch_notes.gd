@@ -16,6 +16,7 @@ const LIST := [
 				{"kind": "change", "text": "Abyssal Rift (2000): exploding Imps, Lemures whose deaths enrage their allies, Hell Hounds that hunt in packs, withering Quasits, the Rakshasa that reflects arrows and spells, the berserk Hairy Devil, the Hellion's hellfire from the sky, the Balrug's burning aura, the Executioner and the Pit Fiend, whose blows send whole ranks fleeing."},
 				{"kind": "change", "text": "Frostfell Wastes (2800): fire-proof Yaks, howling Wargs that rally the pack, Ice Beasts, the frost-armoured Ice Devil, the Blizzard Demon, the Polar Bear, the Ice Fiend that freezes foes solid, the Crystal Golem that hardens as the battle drags on, the Spectral Dragon that fades out of reach and the Rime Lindwurm's avalanches."},
 				{"kind": "note", "text": "Each new unit's ability is on its card in the Collection, and each has its own Legion Draft ability too."},
+				{"kind": "note", "text": "Their Strength was tuned over thousands of simulated battles, so an army with new units is matched as fairly as one without."},
 			]},
 			{"name": "Regions", "notes": [
 				{"kind": "change", "text": "Expeditions, trinket hunts and the Collection list regions in the order you unlock them, from the starting camps to the Celestial Spire."},
