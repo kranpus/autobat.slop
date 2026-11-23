@@ -558,7 +558,7 @@ const UNITS := {
 		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 14.0, "scale": 1.6, "flying": false,
 		"desc": "It steps out of the undergrowth right beside you.",
-		"ability": {"id": "blink", "value": 2.5},
+		"ability": {"id": "blink", "value": 3.0},
 	},
 	"snapping_turtle": {
 		"name": "Snapping Turtle", "rarity": "common", "role": "tank",
@@ -566,7 +566,7 @@ const UNITS := {
 		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 8.0, "scale": 0.85, "flying": false,
 		"desc": "A shell like a shield and a bite like a trap.",
-		"ability": {"id": "block", "value": 0.35},
+		"ability": {"id": "block", "value": 0.3},
 	},
 	"merfolk_javelineer": {
 		"name": "Merfolk Javelineer", "rarity": "common", "role": "ranged",
@@ -606,7 +606,7 @@ const UNITS := {
 		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 8.0, "scale": 0.9, "flying": false,
 		"desc": "A living lightning bolt from the deep.",
-		"ability": {"id": "stun", "value": 0.4},
+		"ability": {"id": "stun", "value": 0.5},
 	},
 	"shark": {
 		"name": "Shark", "rarity": "rare", "role": "melee",
@@ -670,7 +670,7 @@ const UNITS := {
 		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 6.0, "scale": 0.8, "flying": true,
 		"desc": "A spiteful little demon that saps strength.",
-		"ability": {"id": "weaken", "value": 3.0},
+		"ability": {"id": "weaken", "value": 4.0},
 	},
 	"rakshasa": {
 		"name": "Rakshasa", "rarity": "rare", "role": "melee",
@@ -678,7 +678,7 @@ const UNITS := {
 		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 10.0, "scale": 1.15, "flying": false,
 		"desc": "Its hide turns arrows and spells back on the shooter.",
-		"ability": {"id": "reflect", "value": 0.4},
+		"ability": {"id": "reflect", "value": 0.5},
 	},
 	"hairy_devil": {
 		"name": "Hairy Devil", "rarity": "rare", "role": "melee",
@@ -702,7 +702,7 @@ const UNITS := {
 		"damage": "fire", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
 		"desc": "Wreathed in flame that scorches all around it.",
-		"ability": {"id": "immolate", "value": 0.3},
+		"ability": {"id": "immolate", "value": 0.25},
 	},
 	"executioner": {
 		"name": "Executioner", "rarity": "epic", "role": "melee",
@@ -790,7 +790,7 @@ const UNITS := {
 		"damage": "magic", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "magic", "radius": 22.0, "scale": 2.4, "flying": true,
 		"desc": "Half in this world, half in the next.",
-		"ability": {"id": "phase", "value": 6.0},
+		"ability": {"id": "phase", "value": 5.0},
 	},
 	"rime_lindwurm": {
 		"name": "Rime Lindwurm", "rarity": "legendary", "role": "tank",
@@ -989,7 +989,7 @@ const ABILITIES := {
 	"pack": {"name": "Pack Hunter", "text": "+%s%% damage for each other Hell Hound nearby (up to 5)."},
 	"reflect": {"name": "Mirror Hide", "text": "%s%% of the damage from arrows, stones and spells is reflected back at the shooter."},
 	"berserk": {"name": "Berserk", "text": "Deals up to +%s%% damage as its health drops."},
-	"thunderstrike": {"name": "Hellfire", "text": "Every %ss hellfire rains on a random enemy anywhere on the field (3x damage)."},
+	"thunderstrike": {"name": "Hellfire", "text": "Every %ss hellfire rains on a random enemy anywhere on the field (2.5x damage)."},
 	"immolate": {"name": "Burning Aura", "text": "Enemies near it take %s%% of its damage as fire every second."},
 	"execute": {"name": "Execute", "text": "+%s%% damage against enemies below 30%% health."},
 	"terror": {"name": "Terror", "text": "Its blows send the target and the enemies around it fleeing for %ss."},
@@ -997,9 +997,9 @@ const ABILITIES := {
 	"inspire": {"name": "Howl", "text": "Allies near it deal %s%% more damage."},
 	"frost_armor": {"name": "Frost Armour", "text": "Melee attackers are chilled for %ss."},
 	"frost_aura": {"name": "Blizzard", "text": "Enemies near it are chilled (half speed).%s"},
-	"entomb": {"name": "Entomb", "text": "Every fourth spell freezes the target solid for %ss (taking half damage) and chills the enemies around it."},
+	"entomb": {"name": "Entomb", "text": "Every third spell freezes the target solid for %ss (taking half damage) and chills the enemies around it."},
 	"fortify": {"name": "Fortify", "text": "Takes %s%% less damage for every second of battle (up to 40%%)."},
-	"phase": {"name": "Phase Shift", "text": "Every %ss it fades from this world, untouchable for 1.5s."},
+	"phase": {"name": "Phase Shift", "text": "Every %ss it fades from this world, untouchable for 2s."},
 	"avalanche": {"name": "Avalanche", "text": "Every %ss an avalanche buries its target's ranks: up to 12 enemies take heavy damage and are chilled."},
 }
 ## Values shown as percentages in the text.

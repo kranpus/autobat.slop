@@ -117,13 +117,13 @@ const ABILITY_TUNING := {
 	"rising_storm": 0.3,  # on damage (the cap is reached after ~20 blows)
 	"resurrect": 0.35,    # on toughness and damage
 	"aegis": 1.2,        # on toughness
-	# The 0.9.4 set (first estimates, then tuned with the simulator).
-	"venom": 2.0, "purify": 0.15, "split": 1.2, "shell": 0.4, "ensnare": 0.15, "pounce": 0.15,
-	"corrode": 0.6, "spikes": 0.5, "summon": 0.25, "blink": 0.1, "block": 0.6, "volley": 0.7,
-	"evasion": 1.0, "song": 1.0, "undertow": 0.1, "frenzy": 0.3, "taunt": 0.15, "pull": 0.1,
-	"tidal_wave": 0.3, "avalanche": 0.3, "detonate": 0.25, "martyr": 0.1, "pack": 0.5, "reflect": 0.5,
-	"berserk": 0.35, "thunderstrike": 0.5, "immolate": 0.5, "execute": 0.25, "terror": 0.3, "ward": 0.5,
-	"inspire": 1.0, "frost_armor": 0.15, "frost_aura": 0.2, "entomb": 0.3, "fortify": 0.6, "phase": 1.0,
+	# The 0.9.4 set (tuned with tools/balance_sim.gd).
+	"venom": 1.1, "purify": 0.0, "split": 1.8, "shell": 0.8, "ensnare": 0.05, "pounce": 0.0,
+	"corrode": 0.6, "spikes": 0.4, "summon": 0.25, "blink": 0.0, "block": 1.3, "volley": 1.0,
+	"evasion": 1.4, "song": 1.4, "undertow": 0.17, "frenzy": 0.3, "taunt": 0.08, "pull": 0.1,
+	"tidal_wave": 0.6, "avalanche": 0.6, "detonate": 0.4, "martyr": 0.3, "pack": 0.15, "reflect": 0.1,
+	"berserk": 0.45, "thunderstrike": 0.75, "immolate": 0.7, "execute": 0.33, "terror": 0.38, "ward": 0.4,
+	"inspire": 1.0, "frost_armor": 0.15, "frost_aura": 0.32, "entomb": 0.1, "fortify": 0.6, "phase": 0.2,
 }
 const CHAIN_POWER_CAP := 1.2
 
@@ -219,7 +219,7 @@ static func ability_power(s: Dictionary) -> Vector2:
 		"detonate":
 			return Vector2(0.7, 1.0 + ABILITY_TUNING["detonate"] * v)
 		"entomb":
-			var e := 1.0 + ABILITY_TUNING["entomb"] * minf(v / (cd * 4.0), 1.0)
+			var e := 1.0 + ABILITY_TUNING["entomb"] * minf(v / (cd * float(BattleSim.ENTOMB_EVERY)), 1.0)
 			return Vector2(e, e)
 		"fortify":
 			return Vector2(1.0 + ABILITY_TUNING["fortify"] * BattleSim.FORTIFY_MAX, 1.0)
