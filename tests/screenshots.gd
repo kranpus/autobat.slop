@@ -102,13 +102,13 @@ func _process(_delta: float) -> bool:
 			main.tabs.current_tab = 1
 		2:
 			_shot("02_army")
-			main.tabs.current_tab = 2
+			main.tabs.current_tab = 3
 		3:
 			_shot("03_expeditions")
-			main.tabs.current_tab = 3
+			main.tabs.current_tab = 4
 		4:
 			_shot("04_battle_tab")
-			main.tabs.current_tab = 7
+			main.tabs.current_tab = 8
 		5:
 			_shot("05_legion_draft_tab")
 			_battle("twin_fords")
@@ -127,7 +127,7 @@ func _process(_delta: float) -> bool:
 		24:
 			_shot("09_battle_fight_forest")
 			main._battle.closed.emit()
-			main.tabs.current_tab = 2
+			main.tabs.current_tab = 3
 		25:
 			_shot("10_expeditions_pity")
 			var party = root.get_node("Party")
@@ -135,7 +135,7 @@ func _process(_delta: float) -> bool:
 				"use_lives": false, "use_wins": false, "use_timer": false, "max_rounds": 10})
 			for i in 3:
 				party.add_bot()
-			main.tabs.current_tab = 7
+			main.tabs.current_tab = 8
 		26:
 			_shot("11_draft_lobby")
 			root.get_node("Party").start_match()

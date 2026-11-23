@@ -43,20 +43,56 @@ const CLASSES := {
 		"damage": "magic", "armor": "light", "projectile": "magic"},
 }
 
-## Champion abilities: each is a battle ability the simulator already knows
-## ("ab", "value"), on a champion with a much wider reach (see BattleSim).
-## "army": what it adds to the Strength of the rest of the army.
+## Champion abilities. A champion equips up to ABILITY_SLOTS at once. Each is a
+## list of effects the battle runs for it (BattleSim._champion_effects):
+##   damage / haste / guard / regen: allies within "radius" px (0: the whole
+##     field) deal more damage / attack faster / take 20% less / regenerate
+##     "amount" of their max HP per second. "only": just allies of one armour
+##     type (beast, undead...) or role (ranged, caster, tank, melee).
+##   weaken / chill: enemies within "radius" deal 35% less / are chilled.
+##   summon: "count" units of "unit" appear beside the champion every "every" s.
+##   meteor: every "every" s a meteor hits a random enemy for "mult" x damage.
+##   rebirth: the champion rises once; lifesteal: it heals "amount" of its damage.
+## "army": what it adds to the Strength of the rest of the army (a rough guess
+## for now; to be balanced with the simulator).
+const ABILITY_SLOTS := 3
 const ABILITIES := {
-	"rally": {"name": "Rallying Cry", "ab": "inspire", "value": 0.2, "army": 0.06, "text": "Allies around the champion deal 20% more damage."},
-	"bulwark": {"name": "Bulwark", "ab": "aegis", "value": 0.0, "army": 0.06, "text": "Allies around the champion take 20% less damage."},
-	"warsong": {"name": "War Song", "ab": "song", "value": 0.25, "army": 0.06, "text": "Allies around the champion attack 25% faster."},
-	"dread": {"name": "Dreadful Presence", "ab": "dread", "value": 0.0, "army": 0.06, "text": "Enemies around the champion deal 35% less damage."},
-	"winter": {"name": "Winter's Breath", "ab": "frost_aura", "value": 0.0, "army": 0.05, "text": "Enemies around the champion are chilled: half speed."},
-	"meteor": {"name": "Meteor", "ab": "thunderstrike", "value": 4.0, "army": 0.0, "text": "Every 4s a meteor strikes an enemy anywhere on the field."},
-	"quake": {"name": "Earthshaker", "ab": "avalanche", "value": 7.0, "army": 0.0, "text": "Every 7s the ground buries the enemy ranks it faces: up to 8 enemies hit and chilled."},
-	"resurgence": {"name": "Resurgence", "ab": "rebirth", "value": 1.0, "army": 0.0, "text": "The first time the champion falls, it rises again at full health."},
-	"lifedrinker": {"name": "Lifedrinker", "ab": "devour", "value": 0.5, "army": 0.0, "text": "Heals for half the damage it deals."},
-	"storm": {"name": "Storm Call", "ab": "chain", "value": 4.0, "army": 0.0, "text": "Its attacks arc to 4 more enemies."},
+	"rally": {"name": "Rallying Cry", "army": 0.05, "text": "Allies within 300 px deal 20% more damage.",
+		"effects": [{"type": "damage", "radius": 300.0, "amount": 0.2}]},
+	"bulwark": {"name": "Bulwark", "army": 0.05, "text": "Allies within 300 px take 20% less damage.",
+		"effects": [{"type": "guard", "radius": 300.0}]},
+	"warsong": {"name": "War Song", "army": 0.05, "text": "Allies within 300 px attack 20% faster.",
+		"effects": [{"type": "haste", "radius": 300.0, "amount": 0.2}]},
+	"dread": {"name": "Dreadful Presence", "army": 0.05, "text": "Enemies within 300 px deal 35% less damage.",
+		"effects": [{"type": "weaken", "radius": 300.0}]},
+	"winter": {"name": "Winter's Breath", "army": 0.04, "text": "Enemies within 250 px are chilled: half speed.",
+		"effects": [{"type": "chill", "radius": 250.0}]},
+	"meteor": {"name": "Meteor", "army": 0.03, "text": "Every 6 s a meteor hits an enemy anywhere for 3x the champion's damage.",
+		"effects": [{"type": "meteor", "every": 6.0, "mult": 3.0}]},
+	"resurgence": {"name": "Resurgence", "army": 0.0, "text": "The first time the champion falls, it rises again at full health.",
+		"effects": [{"type": "rebirth"}]},
+	"lifedrinker": {"name": "Lifedrinker", "army": 0.0, "text": "The champion heals for half the damage it deals.",
+		"effects": [{"type": "lifesteal", "amount": 0.5}]},
+	"rat_king": {"name": "Rat King", "army": 0.03, "text": "Every 30 s, 5 giant rats swarm out beside the champion.",
+		"effects": [{"type": "summon", "unit": "rat_swarm", "count": 5, "every": 30.0}]},
+	"bone_lord": {"name": "Bone Lord", "army": 0.04, "text": "Every 25 s, 4 skeleton warriors rise beside the champion.",
+		"effects": [{"type": "summon", "unit": "skeleton", "count": 4, "every": 25.0}]},
+	"call_of_the_wild": {"name": "Call of the Wild", "army": 0.04, "text": "Every 30 s, 3 dire wolves answer the champion's call.",
+		"effects": [{"type": "summon", "unit": "dire_wolf", "count": 3, "every": 30.0}]},
+	"beastmaster": {"name": "Beastmaster", "army": 0.05, "text": "Every beast in your army attacks 25% faster.",
+		"effects": [{"type": "haste", "radius": 0.0, "amount": 0.25, "only": "beast"}]},
+	"blessed_ground": {"name": "Blessed Ground", "army": 0.05, "text": "Allies within 500 px regenerate 1% of their health every second.",
+		"effects": [{"type": "regen", "radius": 500.0, "amount": 0.01}]},
+	"captain_of_archers": {"name": "Captain of Archers", "army": 0.05, "text": "Every ranged unit in your army deals 20% more damage.",
+		"effects": [{"type": "damage", "radius": 0.0, "amount": 0.2, "only": "ranged"}]},
+	"shield_wall": {"name": "Shield Wall", "army": 0.05, "text": "Every tank in your army takes 20% less damage.",
+		"effects": [{"type": "guard", "radius": 0.0, "only": "tank"}]},
+	"arcane_mastery": {"name": "Arcane Mastery", "army": 0.05, "text": "Every caster in your army attacks 20% faster.",
+		"effects": [{"type": "haste", "radius": 0.0, "amount": 0.2, "only": "caster"}]},
+	"lord_of_the_dead": {"name": "Lord of the Dead", "army": 0.05, "text": "Every undead unit in your army deals 20% more damage.",
+		"effects": [{"type": "damage", "radius": 0.0, "amount": 0.2, "only": "undead"}]},
+	"warlords_fury": {"name": "Warlord's Fury", "army": 0.05, "text": "Melee allies within 400 px deal 15% more damage.",
+		"effects": [{"type": "damage", "radius": 400.0, "amount": 0.15, "only": "melee"}]},
 }
 const START_ABILITY := "rally"
 
@@ -164,7 +200,7 @@ static func new_champion(name: String = "Champion") -> Dictionary:
 	return {
 		"name": name, "stats": {"might": 0, "vitality": 0, "haste": 0, "swiftness": 0, "focus": 0},
 		"items": STARTER_ITEMS.duplicate(), "equipped": {"weapon": "short_sword", "armor": "leather"},
-		"abilities": [START_ABILITY], "ability": START_ABILITY,
+		"abilities": [START_ABILITY], "slots": [START_ABILITY, "", ""],
 		"looks": looks, "look": {"race": "human_male", "hair": "short_black", "beard": "", "halo": ""},
 		"row": "", "rolls": 0, "last_roll": {},
 	}
@@ -202,7 +238,7 @@ static func sanitize(c) -> Dictionary:
 	if not abilities.has(START_ABILITY):
 		abilities.push_front(START_ABILITY)
 	out["abilities"] = abilities
-	out["ability"] = str(c.get("ability", START_ABILITY)) if abilities.has(str(c.get("ability", ""))) else START_ABILITY
+	out["slots"] = clean_slots(c.get("slots", [c.get("ability", START_ABILITY)]), abilities)
 	var raw_looks = c.get("looks", {})
 	for part in LOOKS:
 		var owned: Array = STARTER_LOOKS[part].duplicate()
@@ -222,6 +258,23 @@ static func sanitize(c) -> Dictionary:
 	out["rolls"] = maxi(0, int(c.get("rolls", 0)))
 	out["last_roll"] = c.get("last_roll", {}) if typeof(c.get("last_roll")) == TYPE_DICTIONARY else {}
 	return out
+
+
+## ABILITY_SLOTS ability ids ("" for an empty slot), each owned and used once.
+static func clean_slots(raw, owned = null) -> Array:
+	var out: Array = []
+	var list: Array = raw if typeof(raw) == TYPE_ARRAY else []
+	for k in ABILITY_SLOTS:
+		var id := str(list[k]) if k < list.size() else ""
+		if ABILITIES.has(id) and not out.has(id) and (owned == null or (owned as Array).has(id)):
+			out.append(id)
+		else:
+			out.append("")
+	return out
+
+
+static func equipped_abilities(c: Dictionary) -> Array:
+	return (c.get("slots", []) as Array).filter(func(a): return str(a) != "")
 
 
 static func clean_name(n: String) -> String:
@@ -259,6 +312,10 @@ static func mods(c: Dictionary) -> Dictionary:
 		"range_add": 6.0 * int(st.get("focus", 0)) if cls != "melee" else 0.0,
 		"lifesteal": 0.0, "thorns": 0.0, "regen_pct": 0.0,
 	}
+	for a in c.get("slots", []):
+		for fx in ABILITIES.get(str(a), {}).get("effects", []):
+			if fx["type"] == "lifesteal":
+				m["lifesteal"] = float(m["lifesteal"]) + float(fx["amount"])
 	for slot in c.get("equipped", {}):
 		var id := str(c["equipped"][slot])
 		if not ITEMS.has(id):
@@ -278,7 +335,7 @@ static func mods(c: Dictionary) -> Dictionary:
 ## store): no unlock lists, just how it looks and fights.
 static func battle_data(c: Dictionary, commander_level: int) -> Dictionary:
 	return {"name": c.get("name", "Champion"), "level": stat_level(commander_level), "stats": c.get("stats", {}).duplicate(),
-		"equipped": c.get("equipped", {}).duplicate(), "ability": c.get("ability", START_ABILITY),
+		"equipped": c.get("equipped", {}).duplicate(), "slots": (c.get("slots", []) as Array).duplicate(),
 		"look": c.get("look", {}).duplicate(), "row": row_of(c)}
 
 
@@ -287,7 +344,7 @@ static func sanitize_battle(d) -> Dictionary:
 	if typeof(d) != TYPE_DICTIONARY:
 		return {}
 	var out := {"name": clean_name(str(d.get("name", "Champion"))), "level": clampi(int(d.get("level", 11)), 11, 40),
-		"stats": {}, "equipped": {}, "ability": START_ABILITY, "look": {}, "row": "front"}
+		"stats": {}, "equipped": {}, "slots": [], "look": {}, "row": "front"}
 	for k in STATS:
 		out["stats"][k] = clampi(int(d.get("stats", {}).get(k, 0)) if typeof(d.get("stats")) == TYPE_DICTIONARY else 0, 0, MAX_STAT)
 	if typeof(d.get("equipped")) == TYPE_DICTIONARY:
@@ -295,8 +352,7 @@ static func sanitize_battle(d) -> Dictionary:
 			var id := str(d["equipped"].get(slot, ""))
 			if ITEMS.has(id) and ITEMS[id]["slot"] == slot:
 				out["equipped"][slot] = id
-	if ABILITIES.has(str(d.get("ability", ""))):
-		out["ability"] = str(d["ability"])
+	out["slots"] = clean_slots(d.get("slots", [d.get("ability", START_ABILITY)]))
 	for part in LOOKS:
 		var v := str(d.get("look", {}).get(part, "")) if typeof(d.get("look")) == TYPE_DICTIONARY else ""
 		out["look"][part] = v if LOOKS[part].has(v) else ("human_male" if part == "race" else "")
@@ -321,14 +377,22 @@ static func register(bd: Dictionary) -> String:
 	if not _registry.has(id):
 		var cls := weapon_class(bd)
 		var base: Dictionary = CLASSES[cls]
-		var ab: Dictionary = ABILITIES.get(str(bd.get("ability", START_ABILITY)), ABILITIES[START_ABILITY])
+		var effects: Array = []
+		var rebirth := false
+		for a in bd.get("slots", []):
+			for fx in ABILITIES.get(str(a), {}).get("effects", []):
+				if fx["type"] == "rebirth":
+					rebirth = true
+				elif fx["type"] != "lifesteal":
+					effects.append(fx)
 		_registry[id] = {
 			"name": str(bd.get("name", "Champion")), "rarity": "legendary", "role": base["role"],
 			"hp": base["hp"], "dmg": base["dmg"], "cooldown": base["cooldown"], "range": base["range"], "speed": base["speed"],
 			"damage": base["damage"], "armor": base["armor"], "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 			"projectile": base["projectile"], "radius": 13.0, "scale": 1.9, "flying": false,
 			"desc": "%s, champion of the army." % bd.get("name", "Champion"),
-			"ability": {"id": ab["ab"], "value": ab["value"]}, "champion": true, "battle_data": bd,
+			"ability": {"id": "rebirth", "value": 1.0} if rebirth else {}, "champion": true, "battle_data": bd,
+			"effects": effects,
 		}
 	return id
 
@@ -344,7 +408,10 @@ static func is_champion(unit_id: String) -> bool:
 ## Strength the champion adds to the rest of its army (its ability's reach),
 ## on top of its own unit power.
 static func army_share(bd: Dictionary) -> float:
-	return float(ABILITIES.get(str(bd.get("ability", "")), {}).get("army", 0.0))
+	var t := 0.0
+	for a in bd.get("slots", []):
+		t += float(ABILITIES.get(str(a), {}).get("army", 0.0))
+	return t
 
 
 # --- training bands ---------------------------------------------------------------------------
@@ -368,7 +435,13 @@ static func for_rating(rating: int, rng: RandomNumberGenerator) -> Dictionary:
 			and (slot != "weapon" or ITEMS[id]["class"] == cls))
 		if not pool.is_empty():
 			c["equipped"][slot] = pool[rng.randi_range(0, pool.size() - 1)]
-	c["ability"] = ABILITIES.keys()[rng.randi_range(0, ABILITIES.size() - 1)]
+	var pool: Array = ABILITIES.keys()
+	var n_ab := 1 if rating < 1800 else (2 if rating < 2800 else 3)
+	c["slots"] = ["", "", ""]
+	for k in n_ab:
+		var a: String = pool[rng.randi_range(0, pool.size() - 1)]
+		pool.erase(a)
+		c["slots"][k] = a
 	c["look"]["race"] = LOOKS["race"][rng.randi_range(0, LOOKS["race"].size() - 1)]
 	c["look"]["hair"] = LOOKS["hair"][rng.randi_range(0, LOOKS["hair"].size() - 1)]
 	c["look"]["beard"] = LOOKS["beard"][rng.randi_range(0, LOOKS["beard"].size() - 1)] if rng.randf() < 0.4 else ""

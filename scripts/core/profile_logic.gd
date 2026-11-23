@@ -1071,10 +1071,19 @@ func champion_equip(slot: String, id: String) -> bool:
 	return true
 
 
-func champion_set_ability(id: String) -> bool:
-	if not has_champion() or not (data["champion"]["abilities"] as Array).has(id):
+## Put an owned ability in slot 0-2 ("" empties it). An ability already in
+## another slot moves here.
+func champion_set_slot(slot: int, id: String) -> bool:
+	if not has_champion() or slot < 0 or slot >= Champion.ABILITY_SLOTS:
 		return false
-	data["champion"]["ability"] = id
+	var slots: Array = data["champion"]["slots"]
+	if id != "" and not (data["champion"]["abilities"] as Array).has(id):
+		return false
+	if id != "":
+		var at := slots.find(id)
+		if at >= 0:
+			slots[at] = ""
+	slots[slot] = id
 	return true
 
 

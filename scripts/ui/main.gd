@@ -15,6 +15,7 @@ const LeaderboardTab := preload("res://scripts/ui/leaderboard_tab.gd")
 const ChallengesTab := preload("res://scripts/ui/challenges_tab.gd")
 const PatchNotesTab := preload("res://scripts/ui/patch_notes_tab.gd")
 const QuestsTab := preload("res://scripts/ui/quests_tab.gd")
+const ChampionTab := preload("res://scripts/ui/champion_tab.gd")
 const TutorialScript := preload("res://scripts/ui/tutorial.gd")
 
 var menu_layer: CanvasLayer
@@ -79,6 +80,9 @@ func _ready() -> void:
 	var army_tab := ArmyTab.new()
 	army_tab.name = "Army"
 	tabs.add_child(army_tab)
+	var champion_tab := ChampionTab.new()
+	champion_tab.name = "Champion"
+	tabs.add_child(champion_tab)
 	# Expeditions has two sub-tabs: regions (units) and trinket hunts.
 	var exp_tabs := TabContainer.new()
 	_exp_tabs = exp_tabs

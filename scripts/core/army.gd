@@ -561,10 +561,16 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int,
 	# From 1000 rating, training bands are led by a champion (0.9.9). It's
 	# added last and never upgraded or sent home.
 	var champ := Champion.for_rating(rating, rng) if with_champion else {}
-	var with_champ := func() -> Array: return squads + ([Champion.to_squad(champ)] if not champ.is_empty() else [])
+	var champ_sq: Array = [Champion.to_squad(champ)] if not champ.is_empty() else []
+	var with_champ := func() -> Array: return squads + champ_sq
+	# The champion's own power and its share, worked out once: the loops below
+	# call this a lot.
+	var c_power := army_power(champ_sq) if not champ.is_empty() else 0.0
+	var c_share := Champion.army_share(champ) if not champ.is_empty() else 0.0
+	var total := func() -> float: return army_power(squads) * (1.0 + c_share) + c_power
 	# Rarer units start strong (0.9.7): if the fresh army is already over the
 	# target, send home its strongest squads first.
-	while squads.size() > 1 and army_power(with_champ.call()) > target_power:
+	while squads.size() > 1 and float(total.call()) > target_power:
 		var strongest := 0
 		for k in squads.size():
 			if army_power([squads[k]]) > army_power([squads[strongest]]):
@@ -573,7 +579,7 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int,
 		squads.remove_at(strongest)
 	# Upgrade random squads until we reach the target power.
 	var guard := 0
-	while army_power(with_champ.call()) < target_power and guard < 2000:
+	while float(total.call()) < target_power and guard < 2000:
 		guard += 1
 		var sq: Dictionary = squads[rng.randi_range(0, squads.size() - 1)]
 		if rng.randf() < 0.55 and int(sq["level"]) < max_level(sq["unit"], int(sq["tier"])):

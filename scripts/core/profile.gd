@@ -240,8 +240,8 @@ func champion_equip(slot: String, id: String) -> bool:
 	return _champion_action(["champion_equip", slot, id], logic.champion_equip.bind(slot, id))
 
 
-func champion_set_ability(id: String) -> bool:
-	return _champion_action(["champion_ability", id], logic.champion_set_ability.bind(id))
+func champion_set_slot(slot: int, id: String) -> bool:
+	return _champion_action(["champion_ability", slot, id], logic.champion_set_slot.bind(slot, id))
 
 
 func champion_set_look(part: String, v: String) -> bool:

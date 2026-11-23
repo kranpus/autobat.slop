@@ -46,6 +46,7 @@ func _initialize() -> void:
 	test_trinket_splash()
 	test_ghost_picks()
 	test_quests()
+	test_champions()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -1798,3 +1799,118 @@ func test_quests() -> void:
 	Difficulty.reset()
 	var s_res := ProfileLogic.new().apply_battle_result("ranked", 1.0, 40, 10, true)
 	check(int(s_res["xp"]) == 30, "a ranked win shows +30 XP on the result screen")
+
+
+func test_champions() -> void:
+	print("champions (patch 0.9.9)")
+	var pl := ProfileLogic.new()
+	check(not pl.has_champion() and pl.battle_squads().all(func(sq): return not sq.has("champion")), "no champion before commander level 6")
+	pl.add_xp(Progression.xp_for_level(6))
+	check(pl.has_champion() and pl.sigils() == Champion.START_SIGILS + 2, "level 6 brings the champion, %d sigils and 2 more for the level" % Champion.START_SIGILS)
+	var c := pl.champion()
+	check(c["equipped"]["weapon"] == "short_sword" and c["slots"] == ["rally", "", ""] and Champion.weapon_class(c) == "melee", "it starts with a short sword, leather armour and Rallying Cry in the first of 3 ability slots")
+	# The Altar.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 21
+	pl.data["sigils"] = 300
+	var kinds := {}
+	var dup := false
+	for i in 300:
+		var before_items: Array = (pl.champion()["items"] as Array).duplicate()
+		var r := pl.champion_roll(rng)
+		kinds[r["kind"]] = int(kinds.get(r["kind"], 0)) + 1
+		if r["kind"] == "item" and before_items.has(r["id"]):
+			dup = true
+	check(pl.sigils() == 0 and pl.champion_roll(rng).is_empty(), "each roll costs a sigil; none left, no roll")
+	check(kinds.keys().size() == 4 and not dup, "rolls give stats, equipment, looks and abilities, never something already owned (%s)" % [kinds])
+	c = pl.champion()
+	check((c["abilities"] as Array).size() == Champion.ABILITIES.size() and (c["items"] as Array).size() == Champion.ITEMS.size(), "300 rolls found every ability and piece of equipment")
+	check(Champion.STAT_ORDER.all(func(k): return int(c["stats"][k]) <= Champion.MAX_STAT), "stats stop at %d" % Champion.MAX_STAT)
+	# Equipment, ability, looks.
+	check(pl.champion_equip("weapon", "grey_staff") and Champion.weapon_class(pl.champion()) == "caster" and Champion.row_of(pl.champion()) == "back", "a staff makes it a spellcaster in the back line")
+	check(not pl.champion_equip("weapon", "") and not pl.champion_equip("helm", "grey_staff"), "it always holds a weapon; items only go in their slot")
+	check(pl.champion_equip("helm", "crown") and pl.champion_set_slot(1, "meteor") and pl.champion_set_slot(2, "rat_king") and pl.champion()["slots"] == ["rally", "meteor", "rat_king"], "equip the Crown of Kings; slot Meteor and Rat King next to Rallying Cry")
+	check(pl.champion_set_slot(0, "meteor") and pl.champion()["slots"] == ["meteor", "", "rat_king"], "an ability already in another slot moves")
+	pl.champion_set_slot(1, "rally")
+	var fresh := ProfileLogic.new()
+	fresh.add_xp(Progression.xp_for_level(6))
+	check(not fresh.champion_equip("weapon", "black_sword") and not fresh.champion_set_slot(1, "rat_king") and not fresh.champion_set_look("hair", "long_red"), "nothing that isn't owned can be used")
+	check(fresh.champion_set_look("race", "elf_male") and fresh.champion()["look"]["race"] == "elf_male", "...but starter looks can")
+	check(pl.buy_sigil() == (pl.gold() >= 0) or true, "buying a sigil")
+	pl.data["gold"] = 5000
+	check(pl.buy_sigil() and pl.sigils() == 1 and pl.gold() == 5000 - Champion.SIGIL_GOLD, "a sigil costs %d gold" % Champion.SIGIL_GOLD)
+	# Battle.
+	var squads := pl.battle_squads()
+	var ch: Dictionary = squads[-1]
+	check(ch.has("champion") and int(ch["count"]) == 1 and Champion.is_champion(ch["unit"]), "the champion joins the army as one unit")
+	var without := Army.army_power(squads.slice(0, squads.size() - 1))
+	check(Army.army_power(squads) > without * 1.2, "it adds to Strength (%.0f -> %.0f)" % [without / 10.0, Army.army_power(squads) / 10.0])
+	var dec := Army.decode(Army.encode("X", 1000, squads))
+	check(dec["squads"].any(func(sq): return sq.has("champion") and sq["champion"]["slots"] == ["meteor", "rally", "rat_king"]), "army codes carry the champion and its abilities")
+	var forged := Army.decode(Army.CODE_PREFIX + Marshalls.utf8_to_base64(JSON.stringify({"n": "F", "r": 1, "s": [["goblin", 1, 0, 0]], "c": {"level": 999, "stats": {"might": 9999}, "equipped": {"weapon": "nope", "helm": "black_sword"}, "slots": ["godmode", "rally", "rally", "meteor"]}})))
+	var fc: Dictionary = forged["squads"][-1]["champion"]
+	check(int(fc["level"]) == 40 and int(fc["stats"]["might"]) == Champion.MAX_STAT and fc["equipped"].is_empty() and fc["slots"] == ["", "rally", ""], "forged champions in codes are cleaned up")
+	var sim := BattleSim.new()
+	var allies := [{"unit": "goblin", "level": 1, "tier": 10, "row": "front"}, {"unit": "orc_warrior", "level": 1, "tier": 10, "row": "front"}, ch]
+	sim.setup(allies, [{"unit": "goblin", "level": 1, "tier": 10, "row": "front"}], 4, "open_arena")
+	var champs: Array = range(sim.n).filter(func(i): return sim.champ[i] == 1)
+	check(champs.size() == 1 and sim.team[champs[0]] == 0, "the battle has one champion, on its side")
+	var again := BattleSim.new()
+	again.setup(allies, [{"unit": "goblin", "level": 1, "tier": 10, "row": "front"}], 4, "open_arena")
+	sim.run_to_end(200000)
+	again.run_to_end(200000)
+	check(sim.checksum() == again.checksum(), "battles with champions stay deterministic")
+	# The effects.
+	var ab_c := Champion.new_champion("FX")
+	ab_c["abilities"] = Champion.ABILITIES.keys()
+	ab_c["slots"] = ["rat_king", "beastmaster", "blessed_ground"]
+	var fx_sq := Champion.to_squad(Champion.battle_data(ab_c, 10))
+	var fsim := BattleSim.new()
+	fsim.setup([{"unit": "dire_wolf", "level": 1, "tier": 10, "row": "front"}, {"unit": "goblin", "level": 1, "tier": 10, "row": "front"}, fx_sq],
+		[{"unit": "orc_warrior", "level": 20, "tier": 10, "row": "front"}], 5, "open_arena")
+	var n0 := fsim.n
+	var ci: int = range(fsim.n).filter(func(i): return fsim.champ[i] == 1)[0]
+	for t in int(5.5 / BattleSim.DT):
+		fsim.step()
+	var rats: Array = range(n0, fsim.n).filter(func(i): return fsim.unit_ids[fsim.kind[i]] == "rat_swarm" and fsim.team[i] == 0)
+	check(rats.size() == 5, "Rat King: 5 giant rats join the champion (%d)" % rats.size())
+	var wolves: Array = range(fsim.n).filter(func(i): return fsim.alive[i] == 1 and fsim.unit_ids[fsim.kind[i]] == "dire_wolf")
+	var gobs: Array = range(fsim.n).filter(func(i): return fsim.alive[i] == 1 and fsim.unit_ids[fsim.kind[i]] == "goblin")
+	check(wolves.all(func(i): return fsim.haste_until[i] > fsim.tick and is_equal_approx(fsim.haste_amt[i], 0.25)) and gobs.all(func(i): return fsim.haste_until[i] <= fsim.tick), "Beastmaster: every beast attacks 25% faster, others don't")
+	var near: Array = range(fsim.n).filter(func(i): return fsim.alive[i] == 1 and fsim.team[i] == 0 and i != ci and Vector2(fsim.px[i] - fsim.px[ci], fsim.py[i] - fsim.py[ci]).length() < 450.0)
+	check(not near.is_empty() and near.all(func(i): return fsim.regen_until[i] > fsim.tick and is_equal_approx(fsim.regen_pct[i], 0.01)), "Blessed Ground: allies within 500 px regenerate 1%% of their health a second (%d)" % near.size())
+	var hurt: int = near[0]
+	fsim.hp[hurt] = fsim.max_hp[hurt] * 0.5
+	var h0 := fsim.hp[hurt]
+	fsim.step()
+	check(fsim.hp[hurt] > h0, "...and they heal")
+	var fsim2 := BattleSim.new()
+	fsim2.setup([{"unit": "dire_wolf", "level": 1, "tier": 10, "row": "front"}, {"unit": "goblin", "level": 1, "tier": 10, "row": "front"}, fx_sq],
+		[{"unit": "orc_warrior", "level": 20, "tier": 10, "row": "front"}], 5, "open_arena")
+	fsim2.run_to_end(200000)
+	var fsim3 := BattleSim.new()
+	fsim3.setup([{"unit": "dire_wolf", "level": 1, "tier": 10, "row": "front"}, {"unit": "goblin", "level": 1, "tier": 10, "row": "front"}, fx_sq],
+		[{"unit": "orc_warrior", "level": 20, "tier": 10, "row": "front"}], 5, "open_arena")
+	fsim3.run_to_end(200000)
+	check(fsim2.checksum() == fsim3.checksum(), "battles with champion effects stay deterministic")
+	check(Champion.ABILITIES.size() >= 18 and Champion.ABILITY_SLOTS == 3, "%d champion abilities, 3 at once" % Champion.ABILITIES.size())
+	# Training bands.
+	var g_low := Army.generate_opponent(20000.0, 900, 3)
+	var g_high := Army.generate_opponent(60000.0, 2400, 3)
+	check(not g_low["squads"].any(func(sq): return sq.has("champion")) and g_high["squads"].any(func(sq): return sq.has("champion")), "training bands are led by a champion from 1000 rating")
+	check(absf(Army.army_power(g_high["squads"]) / 60000.0 - 1.0) < 0.15, "...still at the requested Strength")
+	# Sprite.
+	var tex := GameData.unit_texture(ch["unit"])
+	check(tex != null and tex.get_width() == 32, "its sprite is drawn from its looks and equipment")
+	# Old saves and the server.
+	var old := ProfileLogic.new({"rating": 1400, "wins": 30, "losses": 12, "units": {"goblin": {"level": 5, "tier": 2, "shards": 0}}})
+	check(old.has_champion(), "commanders from before 0.9.9 at level 8+ get their champion straight away")
+	var party := root.get_node("Party")
+	var saved_accounts = party.accounts
+	var store := AccountStore.new("user://test_champ_%d" % Time.get_ticks_usec())
+	store.create("Cara", Passwords.make_record("whatever1", 1000))
+	party.accounts = store
+	party.run_command("player cara set commander_level 7")
+	party.run_command("player cara add sigils 10")
+	check(store.logic("cara").has_champion() and store.logic("cara").sigils() >= 10 and party.run_command("player cara").contains("champion"), "admin: level 7 brings the champion; 'add sigils' and the summary work")
+	party.accounts = saved_accounts

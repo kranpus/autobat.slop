@@ -50,6 +50,8 @@ const AURA_RADIUS := 150.0        # dread and divine aegis
 const AURA_TICKS := 10            # auras refresh twice a second
 const CHAMPION_AURA_MULT := 1.8    # a champion's aura radius (x AURA_RADIUS)
 const CHAMPION_AURA_CAP := 160     # ...and how many it reaches
+const CHAMPION_FX_CAP := 600       # how many units one champion effect reaches
+const CHAMPION_FIRST_SUMMON := 5.0 # the first summoned wave comes after this many seconds
 const AEGIS_MULT := 0.8           # allies under divine aegis take 20% less damage
 const HARVEST_MAX_STACKS := 5     # soul harvest: +10% damage per kill, up to +50%
 const STORM_MAX_STACKS := 20      # rising storm: up to 20 stacks
@@ -165,6 +167,9 @@ var entomb_until := PackedInt32Array()
 var taunt_until := PackedInt32Array()
 var taunt_src := PackedInt32Array()
 var _periodic: Array = []             # units with timed abilities
+var _champions: Array = []            # {"i", "fx": effects, "next": per-effect tick} (0.9.9)
+var regen_until := PackedInt32Array() # champion's healing ground: extra regeneration...
+var regen_pct := PackedFloat32Array() # ...as a share of max HP per second
 var raised := PackedInt32Array()      # 1 for units raised from the dead mid-battle
 var _raise_templates: Array = []      # resolved stats of the units raise dead creates
 
@@ -381,7 +386,17 @@ func _resolve(uid: String, s: Dictionary) -> Dictionary:
 		# The brood hatches at the matriarch's level.
 		r["tpl"] = _raise_templates.size()
 		_raise_templates.append(_resolve(SUMMON_UNIT, Army.unit_stats(SUMMON_UNIT, int(s.get("level", 1)))))
-	elif r["ab"] == Ab.SPLIT:
+	if s.has("effects"):
+		# A champion (0.9.9): its ability effects, with templates for what it summons.
+		var fxs: Array = []
+		for fx in s["effects"]:
+			var f: Dictionary = fx.duplicate()
+			if f["type"] == "summon" and GameData.UNITS.has(str(f["unit"])):
+				f["tpl"] = _raise_templates.size()
+				_raise_templates.append(_resolve(str(f["unit"]), Army.unit_stats(str(f["unit"]), int(s.get("level", 1)))))
+			fxs.append(f)
+		r["champ_fx"] = fxs
+	if r["ab"] == Ab.SPLIT:
 		# The halves: weaker copies that don't split again.
 		var half := s.duplicate()
 		half["hp"] = float(s["hp"]) * r["ab_val"]
@@ -462,6 +477,13 @@ func _add_resolved(r: Dictionary, t: int, x: float, y: float) -> void:
 		_periodic.append(i)
 	if r["ab"] in [Ab.SONG, Ab.INSPIRE, Ab.IMMOLATE, Ab.FROST_AURA]:
 		_aura_units.append(i)
+	regen_until.append(0)
+	regen_pct.append(0.0)
+	if r.has("champ_fx"):
+		var nexts: Array = []
+		for fx in r["champ_fx"]:
+			nexts.append(int(CHAMPION_FIRST_SUMMON / DT) if fx["type"] == "summon" else int(float(fx.get("every", 0.0)) / DT))
+		_champions.append({"i": i, "fx": r["champ_fx"], "next": nexts})
 	poison_stacks.append(0)
 	poison_until.append(0)
 	poison_dps.append(0.0)
@@ -499,6 +521,8 @@ func step() -> void:
 		_rebuild_team_lists()
 	if not _aura_units.is_empty() and tick % AURA_TICKS == 1:
 		_apply_auras()
+	if not _champions.is_empty():
+		_champion_effects()
 	for i in _resurrectors:
 		if alive[i] == 1 and tick >= ab_used[i]:
 			_try_resurrect(i)
@@ -512,6 +536,8 @@ func step() -> void:
 			continue
 		if regen[i] > 0.0 and hp[i] < max_hp[i]:
 			hp[i] = minf(max_hp[i], hp[i] + regen[i] * DT)
+		if regen_until[i] > tick and hp[i] < max_hp[i]:
+			hp[i] = minf(max_hp[i], hp[i] + max_hp[i] * regen_pct[i] * DT)
 		if burn_until[i] > tick:
 			hp[i] -= burn_dps[i] * DT
 			if hp[i] <= 0.0:
@@ -1209,6 +1235,90 @@ func _apply_auras() -> void:
 						chill_until[k] = maxi(chill_until[k], until)
 		if tick % (AURA_TICKS * 4) == 1:
 			events.append([Ev.AURA, px[i], py[i], i])
+
+
+## Champion abilities (0.9.9): auras every AURA_TICKS, summons and meteors on
+## their timers. See Champion.ABILITIES.
+func _champion_effects() -> void:
+	for ch in _champions:
+		var i: int = ch["i"]
+		if alive[i] == 0:
+			continue
+		var fxs: Array = ch["fx"]
+		var nexts: Array = ch["next"]
+		var aura_tick := tick % AURA_TICKS == 1
+		for k in fxs.size():
+			var fx: Dictionary = fxs[k]
+			match str(fx["type"]):
+				"summon":
+					if tick >= int(nexts[k]) and fx.has("tpl"):
+						nexts[k] = tick + int(float(fx["every"]) / DT)
+						for c in int(fx["count"]):
+							var u := n
+							var side := 20.0 if team[i] == 0 else -20.0
+							_add_resolved(_raise_templates[int(fx["tpl"])], team[i], clampf(px[i] + side + rng.randf_range(-8.0, 8.0), 8.0, map_w - 8.0),
+								clampf(py[i] + rng.randf_range(-22.0, 22.0), 8.0, map_h - 8.0))
+							raised[u] = 1
+							cd_t[u] = cooldown[u]
+							events.append([Ev.RAISE, px[u], py[u], u])
+						events.append([Ev.ABILITY, px[i], py[i], Ab.SUMMON])
+				"meteor":
+					if tick >= int(nexts[k]):
+						nexts[k] = tick + int(float(fx["every"]) / DT)
+						var foes: PackedInt32Array = team_lists[1 - team[i]]
+						for _try in 6:
+							if foes.is_empty():
+								break
+							var e := foes[rng.randi_range(0, foes.size() - 1)]
+							if alive[e] == 1:
+								events.append([Ev.STRIKE, px[e], py[e], i])
+								_damage_unit(e, dmg[i] * float(fx.get("mult", 3.0)), dtype[i], false, i)
+								break
+				_:
+					if aura_tick:
+						_champion_aura(i, fx)
+		if aura_tick and tick % (AURA_TICKS * 4) == 1:
+			events.append([Ev.AURA, px[i], py[i], i])
+
+
+func _champion_aura(i: int, fx: Dictionary) -> void:
+	var kind_s := str(fx["type"])
+	var allies := kind_s in ["damage", "haste", "guard", "regen"]
+	var r := float(fx.get("radius", 0.0))
+	var until := tick + AURA_TICKS + 1
+	var targets: PackedInt32Array
+	if r <= 0.0:
+		targets = team_lists[team[i] if allies else 1 - team[i]]
+	else:
+		targets = _enemies_near(px[i], py[i], r, team[i], allies, CHAMPION_FX_CAP)
+	var only := str(fx.get("only", ""))
+	var only_armor := GameData.ARMOR_TYPES.find(only)
+	var only_role := GameData.ROLES.find(only)
+	var amount := float(fx.get("amount", 0.0))
+	for k in targets:
+		if alive[k] == 0:
+			continue
+		if only_armor >= 0 and armor[k] != only_armor:
+			continue
+		if only_role >= 0 and role[k] != only_role:
+			continue
+		match kind_s:
+			"damage":
+				inspire_until[k] = maxi(inspire_until[k], until)
+				inspire_amt[k] = maxf(inspire_amt[k], amount)
+			"haste":
+				haste_until[k] = maxi(haste_until[k], until)
+				haste_amt[k] = maxf(haste_amt[k], amount)
+			"guard":
+				aegis_until[k] = maxi(aegis_until[k], until)
+			"regen":
+				regen_until[k] = maxi(regen_until[k], until)
+				regen_pct[k] = maxf(regen_pct[k], amount)
+			"weaken":
+				weaken_until[k] = maxi(weaken_until[k], until)
+			"chill":
+				if ab_id[k] != Ab.UNSTOPPABLE:
+					chill_until[k] = maxi(chill_until[k], until)
 
 
 ## Seraph: brings back the most recently fallen ally nearby, every few seconds.

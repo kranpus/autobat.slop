@@ -141,7 +141,7 @@ func _collection_tap() -> void:
 
 
 func _expedition_drag() -> void:
-	main.tabs.current_tab = 2
+	main.tabs.current_tab = 3
 	await process_frame
 	await process_frame
 	var scroll: ScrollContainer = null
@@ -159,10 +159,10 @@ func _expedition_drag() -> void:
 
 
 func _patch_notes_drag() -> void:
-	main.tabs.current_tab = 8
+	main.tabs.current_tab = 9
 	await create_timer(1.5).timeout   # the scrolls unroll
 	var scroll: ScrollContainer = null
-	for s in main.tabs.get_child(8).find_children("*", "ScrollContainer", true, false):
+	for s in main.tabs.get_child(9).find_children("*", "ScrollContainer", true, false):
 		if s.is_visible_in_tree() and _ts._can_scroll_v(s):
 			scroll = s
 	check(scroll != null, "the patch notes scroll")

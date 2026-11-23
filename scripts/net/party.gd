@@ -2708,8 +2708,8 @@ func _rq_profile_action(action: Array) -> void:
 			if action.size() == 3:
 				pl.champion_equip(str(action[1]), str(action[2]))
 		"champion_ability":
-			if action.size() == 2:
-				pl.champion_set_ability(str(action[1]))
+			if action.size() == 3:
+				pl.champion_set_slot(int(action[1]), str(action[2]))
 		"champion_look":
 			if action.size() == 3:
 				pl.champion_set_look(str(action[1]), str(action[2]))
@@ -2892,7 +2892,7 @@ func _player_summary(user: String, pl: ProfileLogic) -> String:
 	if pl.has_champion():
 		var ch := pl.champion()
 		lines.append("  champion %s: %s, %s, stats %s, %d of %d items, %d abilities, %d rolls" % [ch["name"], Champion.weapon_class(ch),
-			Champion.ABILITIES[ch["ability"]]["name"], ch["stats"], (ch["items"] as Array).size(), Champion.ITEMS.size(), (ch["abilities"] as Array).size(), int(ch["rolls"])])
+			", ".join(PackedStringArray(Champion.equipped_abilities(ch).map(func(a): return Champion.ABILITIES[a]["name"]))), ch["stats"], (ch["items"] as Array).size(), Champion.ITEMS.size(), (ch["abilities"] as Array).size(), int(ch["rolls"])])
 	lines.append("  rating %d%s, wins %d, losses %d, gold %d, maps %d, Legion Draft %d wins of %d" % [pl.rating(),
 		(" (#%d of %d)" % [int(rank["rank"]), int(rank["of"])]) if int(rank.get("rank", 0)) > 0 else "", int(d["wins"]), int(d["losses"]),
 		pl.gold(), pl.maps(), int(d.get("draft_wins", 0)), int(d.get("draft_played", 0))])
