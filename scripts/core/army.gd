@@ -501,7 +501,8 @@ static func fill_ghosts(offers: Array, rating: int, rng: RandomNumberGenerator) 
 
 
 ## trinkets: false leaves them out (the balance simulator measures bare units).
-static func generate_opponent(target_power: float, rating: int, seed_value: int, trinkets: bool = true) -> Dictionary:
+## weighted: false gives the old purely random unit picks (for comparisons).
+static func generate_opponent(target_power: float, rating: int, seed_value: int, trinkets: bool = true, weighted: bool = true) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed_value
 	# Higher ratings unlock rarer units for ghosts.
@@ -521,8 +522,8 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int,
 	var squads: Array = []
 	var used := {}
 	for i in squad_count:
-		var id: String = pool[rng.randi_range(0, pool.size() - 1)]
-		if used.has(id):
+		var id := _ghost_pick(pool, used, rng, weighted)
+		if id == "" or used.has(id):
 			continue
 		used[id] = true
 		squads.append({"unit": id, "level": 1, "tier": 0, "row": GameData.default_row_for(id)})
@@ -550,10 +551,9 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int,
 			sq["level"] = int(sq["level"]) + 1
 		elif squads.size() < GameData.MAX_SQUADS and squads.all(func(q): return int(q["tier"]) >= GameData.MAX_TIER and int(q["level"]) >= max_level(q["unit"], int(q["tier"]))):
 			# Everything is maxed: very strong targets get extra squads.
-			var spare: Array = pool.filter(func(u): return not used.has(u))
-			if spare.is_empty():
+			var extra := _ghost_pick(pool, used, rng, weighted)
+			if extra == "":
 				break
-			var extra: String = spare[rng.randi_range(0, spare.size() - 1)]
 			used[extra] = true
 			squads.append({"unit": extra, "level": 1, "tier": 0, "row": GameData.default_row_for(extra)})
 	return {
@@ -561,6 +561,36 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int,
 		"rating": rating,
 		"squads": squads,
 	}
+
+
+## 0.9.7: training bands pick units that fight well more often, like a player
+## would (weight e^(GHOST_PICK_STRENGTH x (win rate - 0.5)), win rates from the
+## balance simulator in GhostScores): a 65% unit is about 4x as likely as an
+## average one, a 35% unit about 4x less. Measured at equal Strength, these
+## bands beat the old purely random ones 57-77% of the time.
+const GHOST_PICK_STRENGTH := 10.0
+
+
+static func _ghost_pick(pool: Array, used: Dictionary, rng: RandomNumberGenerator, weighted: bool = true) -> String:
+	var total := 0.0
+	var weights: Array = []
+	for u in pool:
+		var w := 0.0
+		if not used.has(u):
+			w = exp(GHOST_PICK_STRENGTH * (float(GhostScores.WIN_RATE.get(u, 0.5)) - 0.5)) if weighted else 1.0
+		weights.append(w)
+		total += w
+	if total <= 0.0:
+		return ""
+	var roll := rng.randf() * total
+	for k in pool.size():
+		roll -= float(weights[k])
+		if roll <= 0.0 and float(weights[k]) > 0.0:
+			return pool[k]
+	for k in range(pool.size() - 1, -1, -1):
+		if float(weights[k]) > 0.0:
+			return pool[k]
+	return ""
 
 
 ## Higher-rated ghosts carry trinkets (more, and rarer, as rating rises).
