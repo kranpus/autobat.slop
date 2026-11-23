@@ -196,6 +196,11 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
        3000 and 4,600 at 3500. Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× of that by default (the
        server can change this with `difficulty`). An army stronger than its rating beats them
        more easily; one that's behind has to catch up.
+     - **Composition (0.9.7):** they favour units that fight well, weighted by each unit's win
+       rate at equal Strength in the balance simulator (`scripts/core/ghost_scores.gd`). After a
+       balance change, refresh it from new simulator results:
+       `python3 tools/ghost_scores.py balance-results/balance_armies_*.csv` (several runs with
+       `--all-units` average out the noise).
      - **Rating:** they are rated 40 below, 60 above and 150 above you. Harder wins pay more
        rating, but less than the odds would suggest, so no difficulty is a free climb.
      - **Less rating than real armies from 1000:** up to 1000 rating, training bands count in

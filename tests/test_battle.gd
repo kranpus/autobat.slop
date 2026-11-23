@@ -44,6 +44,7 @@ func _initialize() -> void:
 	test_caster_nerf()
 	test_rarity_levels()
 	test_trinket_splash()
+	test_ghost_picks()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -1656,3 +1657,30 @@ func test_trinket_splash() -> void:
 	check(float(mage["aoe"]) == 0.0, "an Elven Mage with the Rod of Storms and Sunfire Orb has no splash")
 	check(is_equal_approx(float(Trinkets.ALL["rod_of_storms"]["mods"]["cooldown_mult"]), 0.8), "the Rod of Storms makes attacks faster instead")
 	check(float(Army.unit_stats("orc_sorcerer", 20)["aoe"]) > 0.0, "units that splash by nature still do")
+
+
+func test_ghost_picks() -> void:
+	print("training bands pick strong units (patch 0.9.7)")
+	check(GhostScores.WIN_RATE.size() >= 90, "the score table covers the units (%d)" % GhostScores.WIN_RATE.size())
+	var good := 0.0
+	var good_old := 0.0
+	var n := 0
+	for seed_i in 60:
+		for sq in Army.generate_opponent(40000.0, 3500, seed_i, false)["squads"]:
+			good += float(GhostScores.WIN_RATE.get(sq["unit"], 0.5))
+			n += 1
+	var n_old := 0
+	for seed_i in 60:
+		for sq in Army.generate_opponent(40000.0, 3500, seed_i, false, false)["squads"]:
+			good_old += float(GhostScores.WIN_RATE.get(sq["unit"], 0.5))
+			n_old += 1
+	good /= float(n)
+	good_old /= float(n_old)
+	check(good > good_old + 0.03, "their units average a %.0f%% simulator win rate (purely random picks: %.0f%%)" % [good * 100.0, good_old * 100.0])
+	var names := {}
+	for seed_i in 60:
+		for sq in Army.generate_opponent(40000.0, 3500, seed_i, false)["squads"]:
+			names[sq["unit"]] = true
+	check(names.size() >= 40, "...and still vary (%d different units across 60 bands)" % names.size())
+	var g := Army.generate_opponent(40000.0, 3500, 4)
+	check(absf(Army.army_power(g["squads"]) / 40000.0 - 1.0) < 0.1, "at the requested Strength")
