@@ -10,7 +10,7 @@ extends RefCounted
 
 const LIST := [
 	{"version": "0.9.7", "date": "2026-11-24", "title": "Steady Hands",
-		"summary": "Rarer units now have fewer levels but start stronger, splash trinkets on ranged units are toned down, training bands are better led, plus bug fixes.",
+		"summary": "Rarer units now have fewer levels but start stronger, trinkets no longer give splash, training bands are better led, plus bug fixes.",
 		"sections": [
 			{"name": "Levels by rarity", "notes": [
 				{"kind": "change", "text": "Rarer units have fewer levels, but start further up: Common 50 levels, Uncommon 40, Rare 30, Epic 20, Legendary 10. Level 1 of an uncommon is as strong as a common at level 11, a rare as a level 21 common, an epic level 31 and a legendary level 41."},
@@ -19,8 +19,10 @@ const LIST := [
 				{"kind": "note", "text": "Your units have been moved to the new levels without losing any strength (a rare unit at level 26 is now level 6). Units that were below their rarity's new starting strength got stronger. Legion Draft is unchanged."},
 			]},
 			{"name": "Splash trinkets", "notes": [
-				{"kind": "nerf", "text": "Splash from trinkets on archers, casters and other ranged units: half the radius, and units with no splash of their own now hit at most 2 enemies around their target (it was 6). A swarm of mages with the Rod of Storms could shred armies half again their Strength."},
-				{"kind": "note", "text": "Melee units and units that splash by nature (Orc Sorcerer, Hill Giant, Cyclops and others) keep their splash; on them a splash trinket still adds radius (half of it for ranged splashers). Strength counts the smaller splash."},
+				{"kind": "change", "text": "No trinket gives splash any more. A swarm of mages with the Rod of Storms could shred armies half again their Strength. Each former splash trinket keeps its theme with a new bonus instead:"},
+				{"kind": "change", "text": "Lantern: +5% damage, +10 range. Volatile Flask: +12% damage. Copper Rod: +5% damage, +20 range. Burning Pentacle: +18% damage. Brass Wand: +12% damage, fire. Orb of Flame: +20% damage, attacks 5% faster, fire. Ember Lamp: +15% damage, regenerates 1.2% HP per second. Sunfire Orb: +40% damage, fire. Rod of Storms: +15% damage, attacks 25% faster."},
+				{"kind": "change", "text": "Legion Draft: Blast Powder now gives +20% damage and 10% faster attacks instead of splash."},
+				{"kind": "note", "text": "Units that splash by nature (Orc Sorcerer, Hill Giant, Cyclops, Fire Giant, Golden Dragon, Grand Avatar) are unchanged."},
 			]},
 			{"name": "Fixes", "notes": [
 				{"kind": "fix", "text": "The game froze when a fourth message popped up while three were already on screen (for example levelling up several units quickly). Now the oldest message makes way."},

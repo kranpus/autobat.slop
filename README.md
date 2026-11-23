@@ -119,8 +119,8 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Dragon's Trove:** 3 maps, rating 1200, best legendary odds.
    - **The collection:** there are **100 unique trinkets** to collect (30 common, 25 uncommon,
      20 rare, 15 epic, 10 legendary). Examples: +HP, +damage, faster attacks, speed, range,
-     splash, regeneration, lifesteal, thorns, extra units in the squad, damage/armor type
-     changes, and flying.
+     regeneration, lifesteal, thorns, extra units in the squad, damage/armor type changes, and
+     flying. No trinket gives splash (since 0.9.7).
    - **Duplicates:** hunts prefer trinkets you don't own yet. A trinket you already have is sold
      for gold.
    - The sub-tab shows each site's odds and your whole collection.
@@ -287,7 +287,7 @@ collection: everyone drafts an army from scratch each match.
   after a win or loss. Examples: Rats breed +2 units each turn, the Golden Dragon earns gold, and
   the Lich grows stronger whenever you sell an ally.
 - **Trinkets:** 18 across 6 tiers. Held trinkets change how a squad fights: lifesteal, thorns,
-  splash, flying, magic damage, faster attacks, +50% units, and more. Consumables give permanent
+  flying, magic damage, faster attacks, +50% units, and more. Consumables give permanent
   boosts or an extra copy toward the next level.
 - **Shop tier:** rises every 3 battles, from 1 to 6. Tier 2 unlocks uncommon units, 3 rare, 4 epic
   and 5 legendary, and each tier adds stronger trinkets and more shop slots.
@@ -351,7 +351,7 @@ obstacles (x/y as fractions of the map; anything left of centre is mirrored auto
 - Splash damage (capped at 6 targets per hit), healers, regeneration, and flying units (melee hits
   them for only 60%).
   - **Who splashes:** only six units splash (patch 0.9.2): Orc Sorcerer, Hill Giant, Cyclops, Fire
-    Giant, Golden Dragon and Grand Avatar.
+    Giant, Golden Dragon and Grand Avatar. Trinkets don't add splash (0.9.7).
   - **Melee splash** hits nearby enemies for 45% of the blow (60% before 0.9.2).
   - **Projectile splash** (stones, magic, fire) hits them for 35% (60% before patch 0.9, 45% in
     0.9).

@@ -162,7 +162,7 @@ const TRINKETS := {
 	"spiked_shield":    {"name": "Spiked Shield",    "tier": 2, "kind": "equip",   "desc": "Melee attackers take 25% of the damage they deal.", "mods": {"thorns": 0.25}},
 	"war_horn":         {"name": "War Horn",         "tier": 2, "kind": "consume", "desc": "Permanently +4 units in this squad.", "effect": {"count": 4}},
 	"blood_amulet":     {"name": "Blood Amulet",     "tier": 3, "kind": "equip",   "desc": "Heals for 20% of damage dealt.", "mods": {"lifesteal": 0.2}},
-	"blast_powder":     {"name": "Blast Powder",     "tier": 3, "kind": "equip",   "desc": "Attacks splash +30 px (or gain a small splash).", "mods": {"aoe_add": 30.0}},
+	"blast_powder":     {"name": "Blast Powder",     "tier": 3, "kind": "equip",   "desc": "+20% damage and attacks 10% faster.", "mods": {"dmg_mult": 1.2, "cooldown_mult": 0.9}},
 	"training_manual":  {"name": "Training Manual",  "tier": 3, "kind": "consume", "desc": "Counts as one extra copy toward the next level.", "effect": {"xp": 1}},
 	"dragonhide":       {"name": "Dragonhide",       "tier": 4, "kind": "equip",   "desc": "+40% HP and heavy armor.", "mods": {"hp_mult": 1.4, "armor": "heavy"}},
 	"rune_blade":       {"name": "Rune Blade",       "tier": 4, "kind": "equip",   "desc": "Damage becomes magic and +20% damage.", "mods": {"dmg_mult": 1.2, "damage": "magic"}},
