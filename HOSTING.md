@@ -456,6 +456,7 @@ online, sent to their game at once. Unit, trinket and challenge names can be ids
 | `player <user> add <stat> <n>` | Add to one (a minus number takes away), e.g. `player bob add gold 500`. |
 | `player <user> set xp <n>` / `add xp <n>` | Commander XP. Levels reached this way pay their usual rewards. |
 | `player <user> set commander_level <n>` | Jump to the start of a commander level (1-30). The levels skipped pay no rewards. |
+| `player <user> set sigils <n>` / `add sigils <n>` | Champion Altar sigils (0.9.9). The player summary also shows their champion: weapon class, abilities, stats and how many items and abilities they've found. |
 | `player <user> name <new name>` | Change their commander name (shown on the leaderboard and to opponents). |
 | `player <user> unit <unit> [level <n>] [tier <n>] [shards <n>]` | Give them a unit, or change one they own, e.g. `player bob unit Storm Dragon level 20 tier 4`. Levels are capped by the tier, like in the game. Works for locked units too (they sit out of battles until unlocked). |
 | `player <user> unit <unit> remove` | Take a unit away (and out of their army). |

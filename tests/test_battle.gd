@@ -446,11 +446,11 @@ func test_unit_locks() -> void:
 	check(dec["squads"].size() == 1 and dec["squads"][0]["unit"] == "goblin", "army codes drop locked units")
 	profile.data["units"]["storm_dragon"] = {"level": 1, "tier": 0, "shards": 0}
 	profile.data["army"] = [{"unit": "storm_dragon", "row": "back"}, {"unit": "goblin", "row": "front"}]
-	check(profile.army_squads().size() == 2 and profile.battle_squads().size() == 1, "an owned locked unit stays in the army but doesn't deploy")
+	check(profile.army_squads().size() == 2 and profile.battle_squads().filter(func(sq): return not sq.has("champion")).size() == 1, "an owned locked unit stays in the army but doesn't deploy")
 	# Server commands.
 	party.run_command("unlock Storm Dragon")
 	check(not UnitLocks.is_locked("storm_dragon") and GameData.region_drops("dragons_hoard").has("storm_dragon"), "'unlock Storm Dragon' makes it available (in the Dragon's Hoard drop table)")
-	check(profile.battle_squads().size() == 2, "unlocked unit deploys again")
+	check(profile.battle_squads().filter(func(sq): return not sq.has("champion")).size() == 2, "unlocked unit deploys again")
 	party.run_command("lock goblin")
 	check(UnitLocks.is_locked("goblin") and not DraftData.units_for_tier(1, UnitLocks.as_dict()).has("goblin"), "'lock goblin' removes an original unit from shops")
 	check(party.run_command("lock nosuchunit").contains("Unknown"), "unknown names are reported")
@@ -1836,7 +1836,6 @@ func test_champions() -> void:
 	fresh.add_xp(Progression.xp_for_level(6))
 	check(not fresh.champion_equip("weapon", "black_sword") and not fresh.champion_set_slot(1, "rat_king") and not fresh.champion_set_look("hair", "long_red"), "nothing that isn't owned can be used")
 	check(fresh.champion_set_look("race", "elf_male") and fresh.champion()["look"]["race"] == "elf_male", "...but starter looks can")
-	check(pl.buy_sigil() == (pl.gold() >= 0) or true, "buying a sigil")
 	pl.data["gold"] = 5000
 	check(pl.buy_sigil() and pl.sigils() == 1 and pl.gold() == 5000 - Champion.SIGIL_GOLD, "a sigil costs %d gold" % Champion.SIGIL_GOLD)
 	# Battle.

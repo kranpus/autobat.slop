@@ -9,6 +9,24 @@ extends RefCounted
 ## out; they belong in HOSTING.md.
 
 const LIST := [
+	{"version": "0.9.9", "date": "2026-11-25", "title": "Champions",
+		"summary": "Every commander gains a champion to lead the army: a hero with its own looks, stats, equipment and three abilities, all won at the Altar.",
+		"sections": [
+			{"name": "Your champion", "notes": [
+				{"kind": "change", "text": "At commander level 6 a champion joins you (commanders already at level 6 or higher get theirs straight away). It fights at the head of your army as one powerful unit, grows with your commander level, and its abilities strengthen the whole army."},
+				{"kind": "change", "text": "New Champion tab: name your champion, choose its race, hair, beard and halo, dress it in champion-only equipment, set its stats and pick which line it fights in."},
+				{"kind": "change", "text": "Equipment: 53 pieces in 7 slots (weapon, off-hand, armour, helm, boots, gloves, cloak), from common to legendary, each drawn on your champion. The weapon decides how it fights: swords and axes up close, bows from range, staves with spells."},
+				{"kind": "change", "text": "Abilities: equip three at once from 18, such as Rallying Cry (allies nearby deal 20% more damage), Beastmaster (every beast attacks 25% faster), Blessed Ground (allies within 500 px regenerate), Rat King (5 giant rats every 30 seconds), Bone Lord, Meteor and Resurgence."},
+			]},
+			{"name": "The Altar", "notes": [
+				{"kind": "change", "text": "Everything for your champion is won at the Altar: offer a sigil for a random stat point, piece of equipment, look or ability. It never gives what you already have."},
+				{"kind": "change", "text": "Sigils come from commander levels (2 each from level 6), daily quests (1), weekly quests (3) and story quests (2, or 5 for every fifth), or 1,500 gold each. New daily and weekly quests ask you to visit the Altar."},
+			]},
+			{"name": "Battles", "notes": [
+				{"kind": "change", "text": "Army codes and the armies other commanders fight in Ranked carry your champion. From 1,000 rating, training bands are led by champions too."},
+				{"kind": "note", "text": "Champions count toward Strength. Their balance will be tuned in coming patches."},
+			]},
+		]},
 	{"version": "0.9.7", "date": "2026-11-24", "title": "The Commander's Ledger",
 		"summary": "Commander levels and a quest log with daily, weekly and 50 story quests; rarer units have fewer levels but start stronger; trinkets no longer give splash; training bands pick better units; plus bug fixes.",
 		"sections": [

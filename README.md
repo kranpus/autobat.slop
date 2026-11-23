@@ -68,6 +68,31 @@ progress, or press **Play offline (guest)** to keep a local profile on this devi
 switch later in **Settings → Account**. See [HOSTING.md](HOSTING.md#accounts-and-security) for how
 accounts, password hashing and encryption work.
 
+## Champions (0.9.9)
+
+From commander level 6 every commander has a **champion**: one hero unit that leads the army
+into ranked battles, challenges and friend challenges (not Legion Draft). Rules and every item,
+ability and look: `scripts/core/champion.gd`; the Champion tab: `scripts/ui/champion_tab.gd`.
+
+- **Looks:** paper-doll layers from the Dungeon Crawl Stone Soup tiles
+  (`assets/sprites/champion/`): race, hair, beard and halo, plus the equipment it wears, drawn
+  into one sprite (`Champion.texture`).
+- **Stats:** points in Might (+4% damage), Vitality (+5% HP), Haste (2% faster attacks),
+  Swiftness (+3% speed) and Focus (+6 range, or +2% damage with melee weapons), up to 30 each.
+  Base stats grow with the commander level (`Champion.stat_level`).
+- **Equipment:** 53 champion-only pieces in 7 slots. The weapon sets how it fights (melee,
+  ranged or spells).
+- **Abilities:** 3 slots, 18 abilities, each a list of effects the battle runs for the champion
+  (`BattleSim._champion_effects`): auras by radius or for one unit type (damage, attack speed,
+  damage taken, regeneration, weaken or chill enemies), summons, meteors, rebirth, lifesteal.
+- **The Altar:** a sigil buys a random stat point (45%), item (30%, rarity weighted), look (15%)
+  or ability (10%), never one already owned. Sigils: 2 per commander level from 6, quests
+  (daily 1, weekly 3, story 2 / 5), or 1,500 gold.
+- **In battle:** a squad with `"count": 1` and a `"champion"` key holding its battle data; the
+  unit type is registered at run time (`Champion.register`, `GameData.unit`). Army codes carry it
+  (`"c"`), so saved ranked armies have their champions; training bands get one from 1,000 rating.
+  Strength counts the champion and a share of the army for its abilities (rough for now).
+
 ## Commander level and quest log (0.9.7)
 
 - **Commander level:** XP from battles (15, +15 for a ranked win), expeditions (10), unit level-ups (5),
