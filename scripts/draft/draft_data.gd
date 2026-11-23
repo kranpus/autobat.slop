@@ -232,7 +232,10 @@ static func entry_level(e: Dictionary) -> int:
 static func entry_count(e: Dictionary) -> int:
 	var lvl := entry_level(e)
 	var base: int = BASE_COUNT[GameData.UNITS[e["unit"]]["rarity"]]
-	var c := float(base) * float(LEVEL_COUNT_MULT[lvl - 1]) + float(e.get("count_b", 0))
+	var c := float(base) * float(LEVEL_COUNT_MULT[lvl - 1])
+	if Army.caster_nerfed(str(e["unit"])):
+		c *= Army.CASTER_COUNT_MULT   # patch 0.9.6
+	c += float(e.get("count_b", 0))
 	var t := str(e.get("trinket", ""))
 	if TRINKETS.has(t):
 		c *= float(TRINKETS[t].get("mods", {}).get("count_mult", 1.0))

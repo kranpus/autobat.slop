@@ -19,7 +19,10 @@ static func level_mult(level: int) -> float:
 
 static func squad_size(unit_id: String, tier: int) -> int:
 	var r: Dictionary = GameData.RARITIES[GameData.UNITS[unit_id]["rarity"]]
-	return int(r["squad_base"]) + int(r["squad_step"]) * tier
+	var n := int(r["squad_base"]) + int(r["squad_step"]) * tier
+	if caster_nerfed(unit_id):
+		n = maxi(1, roundi(float(n) * CASTER_COUNT_MULT))
+	return n
 
 
 ## Stats of a single unit at a given level, optionally changed by modifiers
@@ -83,12 +86,16 @@ static func unit_power(unit_id: String, level: int, mods: Dictionary = {}) -> fl
 	return sqrt(float(s["hp"]) * ab.x * dps * ab.y * reach_bonus) * rarity_mult * keep
 
 
-## Patch 0.9.6: casters below epic (common, uncommon and rare) deal this much
-## of their damage, spells and spell abilities alike (hellfire, burning aura,
-## chain lightning...). Their Strength stays where it was: the simulator had
-## them winning 55% of battles at equal Strength (every other group 46-51%),
-## so they were worth more than it said, and the nerf closes that gap.
+## Patch 0.9.6, a heavy nerf to casters below epic (common, uncommon and
+## rare):
+## - they deal CASTER_DMG_MULT of their damage, spells and spell abilities
+##   alike (hellfire, burning aura, chain lightning...). Strength ignores
+##   this part: the simulator had them winning 55% of battles at equal
+##   Strength (every other group 46-51%), so they were worth more than it said.
+## - their squads are CASTER_COUNT_MULT the size, in your army and in Legion
+##   Draft. Strength counts the smaller squads as usual.
 const CASTER_DMG_MULT := 0.85
+const CASTER_COUNT_MULT := 0.7
 const CASTER_NERF_RARITIES := ["common", "uncommon", "rare"]
 
 

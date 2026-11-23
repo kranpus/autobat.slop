@@ -10,11 +10,12 @@ extends RefCounted
 
 const LIST := [
 	{"version": "0.9.6", "date": "2026-11-23", "title": "Silenced Spells",
-		"summary": "An across-the-board nerf to casters below epic: they deal 15% less damage.",
+		"summary": "A heavy, across-the-board nerf to casters below epic: 15% less damage and squads 30% smaller.",
 		"sections": [
 			{"name": "Balance", "notes": [
 				{"kind": "nerf", "text": "Every common, uncommon and rare caster deals 15% less damage, with its spells and its spell abilities alike: Orc Sorcerer, Elven Mage, Salamander Firebrand, Deathcap, Spider Matriarch, Electric Eel, Merfolk Aquamancer, Quasit, Hellion and Blizzard Demon."},
-				{"kind": "note", "text": "Their Strength stays the same: in thousands of simulated battles, armies with these casters won about 55% of fights at equal Strength, more than any other kind of unit, so they were stronger than their Strength showed."},
+				{"kind": "nerf", "text": "Their squads are 30% smaller at every tier, in your army and in Legion Draft: a rare caster squad is 4 at tier 0 and 25 at tier 10 (was 6 and 36), an uncommon one 11 and 67 (was 15 and 95)."},
+				{"kind": "note", "text": "The damage cut doesn't lower their Strength: in thousands of simulated battles, armies with these casters won about 55% of fights at equal Strength, more than any other kind of unit, so they were stronger than their Strength showed. The smaller squads do count less, as usual."},
 				{"kind": "note", "text": "Epic and legendary casters (the Lich, Phoenix, dragons and others) are unchanged."},
 			]},
 		]},
