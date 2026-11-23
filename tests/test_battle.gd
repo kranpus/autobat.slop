@@ -42,6 +42,7 @@ func _initialize() -> void:
 	test_rank_scaling()
 	test_player_command()
 	test_caster_nerf()
+	test_rarity_levels()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -72,7 +73,7 @@ func test_army_code_roundtrip() -> void:
 	check(Army.decode("garbage").is_empty(), "invalid code rejected")
 	var cheat := Army.encode("Cheater", 1000, [{"unit": "titan", "level": 999, "tier": 99, "row": "front"}])
 	var c := Army.decode(cheat)
-	check(int(c["squads"][0]["tier"]) == GameData.MAX_TIER and int(c["squads"][0]["level"]) == Army.max_level_for_tier(GameData.MAX_TIER), "out-of-range values clamped")
+	check(int(c["squads"][0]["tier"]) == GameData.MAX_TIER and int(c["squads"][0]["level"]) == Army.max_level("titan", GameData.MAX_TIER), "out-of-range values clamped")
 
 
 func test_no_unit_cap() -> void:
@@ -711,7 +712,7 @@ func test_trinkets() -> void:
 	check(Army.army_power([geared]) > Army.army_power([plain]) * 1.5, "trinkets raise army power")
 	var sim := BattleSim.new()
 	sim.setup([geared], [plain], 3, "open_arena")
-	var base_hp: float = Army.unit_stats("orc_warrior", 5)["hp"]
+	var base_hp: float = Army.unit_stats("orc_warrior", Army.stat_level("orc_warrior", 5))["hp"]
 	check(is_equal_approx(sim.max_hp[0], base_hp * 1.25), "the sim applies trinket HP (%.1f vs %.1f)" % [sim.max_hp[0], base_hp * 1.25])
 	var a := BattleSim.new()
 	a.setup([geared], [plain], 11, "open_arena")
@@ -1262,7 +1263,7 @@ func test_abilities() -> void:
 	check(range(sim.n).any(func(i): return sim.ab_id[i] == BattleSim.Ab.SOUL_HARVEST and sim.ab_used[i] > 0 and sim.ab_used[i] <= 5), "Bone Dragon harvests souls (up to 5 stacks)")
 	r = _ability_battle(one.call("grand_avatar") + [{"unit": "orc_warrior", "level": 8, "tier": 6, "row": "front"}], foes)
 	check(int(r["ev"].get(BattleSim.Ev.AURA, 0)) > 0, "Grand Avatar shields its allies")
-	r = _ability_battle(one.call("fire_giant"), [{"unit": "goblin", "level": 10, "tier": 10, "row": "front"}])
+	r = _ability_battle(one.call("fire_giant"), [{"unit": "goblin", "level": 30, "tier": 10, "row": "front"}])
 	sim = r["sim"]
 	check(range(sim.n).any(func(i): return sim.ab_id[i] == BattleSim.Ab.DEATH_BLAST and sim.alive[i] == 0), "Fire Giants fall (and erupt)")
 	var s4 := BattleSim.new()
@@ -1543,11 +1544,13 @@ func test_player_command() -> void:
 	check(pl.rating() == 0, "rating can't go below 0")
 	party.run_command("player bob name Lord Bob")
 	check(str(pl.data["name"]) == "Lord Bob", "renames the commander")
-	party.run_command("player bob unit Storm Dragon level 12 tier 2 shards 30")
-	var u: Dictionary = pl.data["units"].get("storm_dragon", {})
+	party.run_command("player bob unit Orc Warrior level 12 tier 2 shards 30")
+	var u: Dictionary = pl.data["units"].get("orc_warrior", {})
 	check(int(u.get("level", 0)) == 12 and int(u.get("tier", 0)) == 2 and int(u.get("shards", 0)) == 30, "gives a unit by name with level, tier and shards")
-	party.run_command("player bob unit storm_dragon level 999")
-	check(int(pl.data["units"]["storm_dragon"]["level"]) == Army.max_level_for_tier(2), "levels are capped by the tier")
+	party.run_command("player bob unit orc_warrior level 999")
+	check(int(pl.data["units"]["orc_warrior"]["level"]) == Army.max_level("orc_warrior", 2), "levels are capped by the tier")
+	party.run_command("player bob unit storm_dragon level 999 tier 10")
+	check(int(pl.data["units"]["storm_dragon"]["level"]) == 10, "a legendary tops out at level 10")
 	party.run_command("player bob unit goblin remove")
 	check(not pl.data["units"].has("goblin") and pl.data["army"].all(func(sq): return sq["unit"] != "goblin"), "takes a unit away, out of the army too")
 	party.run_command("player bob units all level 5")
@@ -1583,7 +1586,7 @@ func test_caster_nerf() -> void:
 	check(is_equal_approx(Army.dmg_nerf("sphinx"), 0.92) and is_equal_approx(Army.dmg_nerf("lich"), 1.0), "Sphinx (epic) deals 92%; the Lich is untouched")
 	var sim := BattleSim.new()
 	sim.setup([{"unit": "orc_sorcerer", "level": 5, "tier": 0, "row": "back"}], [{"unit": "goblin", "level": 1, "tier": 0, "row": "front"}], 1, "open_arena")
-	check(is_equal_approx(sim.dmg[0], raw * 0.85 * 0.77), "...in battle too")
+	check(is_equal_approx(sim.dmg[0], float(Army.unit_stats("orc_sorcerer", Army.stat_level("orc_sorcerer", 5))["dmg"])) and is_equal_approx(float(Army.unit_stats("orc_sorcerer", 9)["dmg"]), float(GameData.UNITS["orc_sorcerer"]["dmg"]) * Army.level_mult(9) * 0.85 * 0.77), "...in battle too")
 	# Strength stays what it was before the nerf.
 	var s_full := s.duplicate()
 	s_full["dmg"] = raw
@@ -1600,3 +1603,43 @@ func test_caster_nerf() -> void:
 	check(DraftData.entry_count({"unit": "orc_sorcerer", "xp": 1}) < DraftData.entry_count({"unit": "ogre", "xp": 1}) and DraftData.entry_count({"unit": "elf_mage", "xp": 1}) == roundi(float(DraftData.BASE_COUNT["uncommon"]) * 0.7), "Legion Draft squads shrink the same way")
 	var deployed: Array = Army.deploy_counts([{"unit": "orc_sorcerer", "level": 1, "tier": 10, "row": "back"}])
 	check(int(deployed[0]) == 25, "and so do the squads that deploy in battle")
+
+
+func test_rarity_levels() -> void:
+	print("levels by rarity (patch 0.9.7)")
+	var caps := ["goblin", "orc_warrior", "ogre", "lich", "golden_dragon"].map(func(u): return Army.max_level(u, GameData.MAX_TIER))
+	check(caps == [50, 40, 30, 20, 10], "fully upgraded caps: common 50, uncommon 40, rare 30, epic 20, legendary 10 (%s)" % [caps])
+	var caps0 := ["goblin", "orc_warrior", "ogre", "lich", "golden_dragon"].map(func(u): return Army.max_level(u, 0))
+	check(caps0 == [10, 8, 6, 4, 2], "at tier 0 a fifth of that (%s)" % [caps0])
+	check(Army.stat_level("goblin", 1) == 1 and Army.stat_level("orc_warrior", 1) == 11 and Army.stat_level("ogre", 1) == 21 and Army.stat_level("lich", 1) == 31 and Army.stat_level("golden_dragon", 1) == 41, "level 1 of each rarity is as strong as a common at 1, 11, 21, 31 and 41")
+	var same_top := true
+	for u in GameData.UNITS:
+		if Army.stat_level(u, Army.max_level(u, GameData.MAX_TIER)) != Army.STAT_MAX_LEVEL:
+			same_top = false
+	check(same_top, "every unit's top level has exactly the stats it had at level 50 before")
+	var lich1 := float(Army.unit_stats("lich", Army.stat_level("lich", 1))["hp"])
+	check(is_equal_approx(lich1, float(GameData.UNITS["lich"]["hp"]) * Army.level_mult(31)), "a level 1 Lich has %.0f HP (x%.1f its base)" % [lich1, Army.level_mult(31)])
+	var a := Army.army_power([{"unit": "ogre", "level": 1, "tier": 0, "row": "front"}])
+	var b := Army.army_power([{"unit": "ogre", "level": 21, "tier": 0, "row": "front", "count": Army.squad_size("ogre", 0)}])
+	check(absf(a / b - 1.0) < 0.001, "Strength follows the stat level")
+	# Old saves and codes.
+	var old := ProfileLogic.new({"rating": 900, "units": {"goblin": {"level": 17, "tier": 3, "shards": 0}, "ogre": {"level": 26, "tier": 5, "shards": 2},
+		"golden_dragon": {"level": 12, "tier": 2, "shards": 0}}, "army": [{"unit": "ogre", "row": "front"}]})
+	var lv: Array = ["goblin", "ogre", "golden_dragon"].map(func(u): return int(old.data["units"][u]["level"]))
+	check(lv == [17, 6, 1] and int(old.data["levels_version"]) == 2, "old saves move to the new levels without losing strength (%s)" % [lv])
+	var again := ProfileLogic.new(old.data.duplicate(true))
+	check(int(again.data["units"]["ogre"]["level"]) == 6, "...only once")
+	var fresh := ProfileLogic.new()
+	fresh.data["gold"] = 1000000
+	fresh.data["units"]["ogre"] = {"level": 1, "tier": 0, "shards": 0}
+	check(fresh.level_up_cost("ogre") == roundi(40.0 * pow(21.0, 1.6) * 2.5), "a rare's first level costs what a common's 21st did (x the rare price)")
+	var old_code := "AB1:" + Marshalls.utf8_to_base64(JSON.stringify({"n": "Old", "r": 1500, "s": [["ogre", 26, 5, 0], ["goblin", 17, 3, 0]]}))
+	var dec := Army.decode(old_code)
+	check(not dec.is_empty() and int(dec["squads"][0]["level"]) == 6 and int(dec["squads"][1]["level"]) == 17, "army codes from before 0.9.7 still work, converted")
+	check(Army.encode("X", 1, [{"unit": "goblin", "level": 3, "tier": 0, "row": "front"}]).begins_with("AB2:"), "new codes are AB2")
+	var proto: String = root.get_node("Party").GAME_VERSION
+	check(proto == "legion-draft-20", "protocol bumped (%s)" % proto)
+	# Legion Draft and challenges keep the stat scale.
+	var d_sq: Dictionary = DraftData.board_to_squads([DraftData.new_entry("golden_dragon")])[0]
+	check(Army.squad_stat_level(d_sq) == int(d_sq["level"]), "Legion Draft squads aren't shifted")
+	check(Challenges.enemy_squads("golden_wyrm").all(func(sq): return Army.squad_stat_level(sq) == int(sq["level"])), "nor challenge enemies")

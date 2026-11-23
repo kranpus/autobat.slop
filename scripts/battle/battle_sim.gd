@@ -317,8 +317,9 @@ func _spawn_army(squads: Array, t: int) -> void:
 			var sq: Dictionary = squads[i]
 			var cols: int = depth_cols[m]
 			var spacing := _spacing(sq["unit"])
-			var stats := Army.unit_stats(sq["unit"], int(sq["level"]), Army.squad_mods(sq))
-			stats["level"] = int(sq["level"])
+			var lvl := Army.squad_stat_level(sq)
+			var stats := Army.unit_stats(sq["unit"], lvl, Army.squad_mods(sq))
+			stats["level"] = lvl
 			var front_x := map_w * 0.5 - float(row_x[row])
 			for u in int(counts[i]):
 				var c := u % cols

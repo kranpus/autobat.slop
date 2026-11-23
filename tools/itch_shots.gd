@@ -54,7 +54,8 @@ func _initialize() -> void:
 	rng.seed = 5
 	for id in OWNED:
 		var tier := rng.randi_range(3, 9)
-		d["units"][id] = {"level": mini(Army.max_level_for_tier(tier), rng.randi_range(12, 30)), "tier": tier, "shards": rng.randi_range(0, 40), "trinkets": []}
+		var cap := Army.max_level(id, tier)
+		d["units"][id] = {"level": rng.randi_range(maxi(1, cap / 2), cap), "tier": tier, "shards": rng.randi_range(0, 40), "trinkets": []}
 	d["army"] = []
 	for id in ["orc_warrior", "snapping_turtle", "ogre", "hell_hound", "elf_archer", "mermaid", "golden_dragon", "pit_fiend"]:
 		d["army"].append({"unit": id, "row": GameData.default_row_for(id)})

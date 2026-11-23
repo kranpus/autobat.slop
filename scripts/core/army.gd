@@ -6,11 +6,63 @@ extends RefCounted
 ## A "squad" is a Dictionary: {"unit": String, "level": int, "tier": int, "row": String}
 ## plus optionally "trinkets": [ids] (main game), or "mods" + "count" (Legion Draft).
 
-const CODE_PREFIX := "AB1:"
+const CODE_PREFIX := "AB2:"
+## Army codes from before 0.9.7 (levels on the old scale); still accepted.
+const OLD_CODE_PREFIX := "AB1:"
 
 
+## The stat scale: a level here is what unit_stats() takes. It runs from 1 to
+## STAT_MAX_LEVEL; Legion Draft and challenge enemies use it directly.
 static func max_level_for_tier(tier: int) -> int:
 	return GameData.BASE_MAX_LEVEL + GameData.LEVELS_PER_TIER * tier
+
+
+const STAT_MAX_LEVEL := 50
+
+
+## Patch 0.9.7: the levels you see on your units. Rarer units have fewer of
+## them, but start further up the stat scale: level 1 of a rarity has the
+## stats of a common at level 1 + its offset, and every rarity's top level is
+## STAT_MAX_LEVEL, so a fully levelled unit is exactly as strong as before.
+##   common 50 levels (offset 0), uncommon 40 (+10), rare 30 (+20),
+##   epic 20 (+30), legendary 10 (+40)
+## The cap grows with the squad tier like before: a fifth of the levels at
+## tier 0, all of them at tier 10.
+const RARITY_LEVELS := {"common": 50, "uncommon": 40, "rare": 30, "epic": 20, "legendary": 10}
+
+
+static func rarity_levels(unit_id: String) -> int:
+	return int(RARITY_LEVELS.get(str(GameData.UNITS.get(unit_id, {}).get("rarity", "common")), STAT_MAX_LEVEL))
+
+
+## How far up the stat scale this unit's level 1 is.
+static func level_offset(unit_id: String) -> int:
+	return STAT_MAX_LEVEL - rarity_levels(unit_id)
+
+
+## A collection unit's level cap at a squad tier.
+static func max_level(unit_id: String, tier: int) -> int:
+	return maxi(1, roundi(float(rarity_levels(unit_id)) * float(max_level_for_tier(tier)) / float(STAT_MAX_LEVEL)))
+
+
+## A collection level on the stat scale.
+static func stat_level(unit_id: String, level: int) -> int:
+	return clampi(level, 1, rarity_levels(unit_id)) + level_offset(unit_id)
+
+
+## A squad's level on the stat scale. Squads with an explicit "count"
+## (Legion Draft, challenge enemies) are already on it; collection squads
+## (armies, ranked opponents, army codes) use their rarity's levels.
+static func squad_stat_level(sq: Dictionary) -> int:
+	if sq.has("count"):
+		return int(sq["level"])
+	return stat_level(str(sq["unit"]), int(sq["level"]))
+
+
+## A level from before 0.9.7 (stat scale) as a collection level: the
+## highest level that isn't weaker, within the tier's cap.
+static func level_from_old(unit_id: String, old_level: int, tier: int) -> int:
+	return clampi(old_level - level_offset(unit_id), 1, max_level(unit_id, tier))
 
 
 static func level_mult(level: int) -> float:
@@ -314,7 +366,7 @@ static func army_power(squads: Array) -> float:
 	var counts := deploy_counts(squads)
 	var p := 0.0
 	for i in squads.size():
-		p += squad_power(squads[i]["unit"], int(squads[i]["level"]), int(counts[i]), squad_mods(squads[i]))
+		p += squad_power(squads[i]["unit"], squad_stat_level(squads[i]), int(counts[i]), squad_mods(squads[i]))
 	return p
 
 
@@ -338,7 +390,8 @@ static func encode(player_name: String, rating: int, squads: Array) -> String:
 ## Returns {} when the code is invalid. Values are clamped to legal ranges.
 static func decode(code: String) -> Dictionary:
 	code = code.strip_edges()
-	if not code.begins_with(CODE_PREFIX):
+	var old := code.begins_with(OLD_CODE_PREFIX)
+	if not code.begins_with(CODE_PREFIX) and not old:
 		return {}
 	var text := Marshalls.base64_to_utf8(code.substr(CODE_PREFIX.length()))
 	var parsed = JSON.parse_string(text)
@@ -352,7 +405,7 @@ static func decode(code: String) -> Dictionary:
 		if not GameData.UNITS.has(uid) or UnitLocks.is_locked(uid):
 			continue
 		var tier := clampi(int(entry[2]), 0, GameData.MAX_TIER)
-		var level := clampi(int(entry[1]), 1, max_level_for_tier(tier))
+		var level := level_from_old(uid, int(entry[1]), tier) if old else clampi(int(entry[1]), 1, max_level(uid, tier))
 		var row_i := clampi(int(entry[3]), 0, GameData.ROWS.size() - 1)
 		var sq := {"unit": uid, "level": level, "tier": tier, "row": GameData.ROWS[row_i]}
 		var trinkets := Trinkets.clean_list(entry[4]) if entry.size() > 4 else []
@@ -475,18 +528,27 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int,
 		squads.append({"unit": id, "level": 1, "tier": 0, "row": GameData.default_row_for(id)})
 	if trinkets:
 		_give_ghost_trinkets(squads, rating, rng)
+	# Rarer units start strong (0.9.7): if the fresh army is already over the
+	# target, send home its strongest squads first.
+	while squads.size() > 1 and army_power(squads) > target_power:
+		var strongest := 0
+		for k in squads.size():
+			if army_power([squads[k]]) > army_power([squads[strongest]]):
+				strongest = k
+		used.erase(squads[strongest]["unit"])
+		squads.remove_at(strongest)
 	# Upgrade random squads until we reach the target power.
 	var guard := 0
 	while army_power(squads) < target_power and guard < 2000:
 		guard += 1
 		var sq: Dictionary = squads[rng.randi_range(0, squads.size() - 1)]
-		if rng.randf() < 0.55 and int(sq["level"]) < max_level_for_tier(int(sq["tier"])):
+		if rng.randf() < 0.55 and int(sq["level"]) < max_level(sq["unit"], int(sq["tier"])):
 			sq["level"] = int(sq["level"]) + 1
 		elif int(sq["tier"]) < GameData.MAX_TIER:
 			sq["tier"] = int(sq["tier"]) + 1
-		elif int(sq["level"]) < max_level_for_tier(int(sq["tier"])):
+		elif int(sq["level"]) < max_level(sq["unit"], int(sq["tier"])):
 			sq["level"] = int(sq["level"]) + 1
-		elif squads.size() < GameData.MAX_SQUADS and squads.all(func(q): return int(q["tier"]) >= GameData.MAX_TIER and int(q["level"]) >= max_level_for_tier(int(q["tier"]))):
+		elif squads.size() < GameData.MAX_SQUADS and squads.all(func(q): return int(q["tier"]) >= GameData.MAX_TIER and int(q["level"]) >= max_level(q["unit"], int(q["tier"]))):
 			# Everything is maxed: very strong targets get extra squads.
 			var spare: Array = pool.filter(func(u): return not used.has(u))
 			if spare.is_empty():

@@ -212,17 +212,23 @@ func _rating_notice() -> void:
 	profile.settings.erase("ai_rating_notice")
 
 
+## UIKit loaded at runtime: naming it in this script would compile it before
+## the autoloads it uses exist.
+func _ui_kit() -> GDScript:
+	return load("res://scripts/ui/ui_kit.gd")
+
+
 ## 0.9.7: a 4th toast while 3 were showing froze the game.
 func _toasts() -> void:
 	print("toasts")
 	var box: VBoxContainer = main._toast_box
 	for i in 10:
-		UIKit.toast("Toast %d" % i)
+		_ui_kit().toast("Toast %d" % i)
 	check(box.get_child_count() == 3, "ten toasts in a row: the game keeps running, 3 on screen (%d)" % box.get_child_count())
 	var last := box.get_child(2).get_child(0) as Label
 	check(last != null and last.text == "Toast 9", "the newest is shown last")
 	await process_frame
-	UIKit.toast("One more")
+	_ui_kit().toast("One more")
 	check(box.get_child_count() == 3, "...and another one after a frame")
 
 

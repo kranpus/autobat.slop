@@ -43,6 +43,7 @@ static func default_profile() -> Dictionary:
 		"trinkets": {},           # owned trinket id -> true
 		"challenges": {},         # cleared challenge id -> true
 		"pending_trinket": {},    # an open trinket hunt choice
+		"levels_version": 2,      # 0.9.7 per-rarity levels
 	}
 
 
@@ -51,6 +52,8 @@ func load_from(source: Dictionary) -> void:
 	data = default_profile()
 	for k in source:
 		data[k] = source[k]
+	if not source.is_empty() and not source.has("levels_version"):
+		data["levels_version"] = 1   # saved before 0.9.7: old-style levels
 	_sanitize()
 	_regen_maps()
 
@@ -64,13 +67,21 @@ func _sanitize() -> void:
 	for k in ["gold", "maps", "map_clock", "rating", "wins", "losses"]:
 		data[k] = int(data.get(k, 0))
 	var units := {}
+	# Before 0.9.7 every rarity used the same 50 levels; now rarer units have
+	# fewer, starting further up (Army.RARITY_LEVELS). Old levels move to the
+	# nearest new level that isn't weaker.
+	var old_levels := int(data.get("levels_version", 1)) < 2
 	for id in data.get("units", {}):
 		if GameData.UNITS.has(id):
 			var u: Dictionary = data["units"][id]
-			units[id] = {"level": int(u.get("level", 1)), "tier": int(u.get("tier", 0)), "shards": int(u.get("shards", 0))}
+			var tier := clampi(int(u.get("tier", 0)), 0, GameData.MAX_TIER)
+			var lvl := int(u.get("level", 1))
+			lvl = Army.level_from_old(id, lvl, tier) if old_levels else clampi(lvl, 1, Army.max_level(id, tier))
+			units[id] = {"level": lvl, "tier": tier, "shards": int(u.get("shards", 0))}
 			if u.has("trinkets"):
 				units[id]["trinkets"] = Trinkets.clean_list(u["trinkets"])
 	data["units"] = units
+	data["levels_version"] = 2
 	# Trinkets: only known, owned ones, each held by at most one unit.
 	var owned_t := {}
 	var raw_t = data.get("trinkets", {})
@@ -185,7 +196,7 @@ func unit(id: String) -> Dictionary:
 
 
 func level_cap(id: String) -> int:
-	return Army.max_level_for_tier(int(unit(id).get("tier", 0)))
+	return Army.max_level(id, int(unit(id).get("tier", 0)))
 
 
 func squad_size(id: String) -> int:
@@ -195,7 +206,9 @@ func squad_size(id: String) -> int:
 # --- upgrades ---------------------------------------------------------------
 
 func level_up_cost(id: String) -> int:
-	var lvl := int(unit(id).get("level", 1))
+	# Priced by where the unit is on the stat scale (0.9.7): a rare's first
+	# level costs what a common's 21st does, since it adds the same stats.
+	var lvl := Army.stat_level(id, int(unit(id).get("level", 1)))
 	var mult: float = GameData.RARITIES[GameData.UNITS[id]["rarity"]]["cost_mult"]
 	return roundi(40.0 * pow(float(lvl), 1.6) * mult)
 

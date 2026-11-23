@@ -110,7 +110,7 @@ func refresh() -> void:
 				if UnitLocks.is_locked(squads[i]["unit"]):
 					continue  # locked squads don't deploy
 				units += int(counts[i])
-				power += Army.squad_power(squads[i]["unit"], int(squads[i]["level"]), int(counts[i]), Army.squad_mods(squads[i]))
+				power += Army.squad_power(squads[i]["unit"], Army.squad_stat_level(squads[i]), int(counts[i]), Army.squad_mods(squads[i]))
 		(_columns[row]["header"] as Label).text = "%d squad%s · %d units · Power %s" % [indexes.size(), "" if indexes.size() == 1 else "s", units, Army.format_power(power)]
 		if indexes.is_empty():
 			var empty := UIKit.label("Drop squads here", 13, UIKit.TEXT_DIM)
@@ -159,7 +159,7 @@ func _make_card(index: int, sq: Dictionary, deployed: int, first: bool, last: bo
 	if UnitLocks.is_locked(id):
 		info.add_child(UIKit.label("⊘ Locked by server: won't deploy", 12, UIKit.BAD))
 	else:
-		info.add_child(UIKit.label("Lv %d · x%d · Power %s" % [int(sq["level"]), deployed, Army.format_power(Army.squad_power(id, int(sq["level"]), deployed, Army.squad_mods(sq)))], 12, UIKit.TEXT_DIM))
+		info.add_child(UIKit.label("Lv %d · x%d · Power %s" % [int(sq["level"]), deployed, Army.format_power(Army.squad_power(id, Army.squad_stat_level(sq), deployed, Army.squad_mods(sq)))], 12, UIKit.TEXT_DIM))
 	h.add_child(info)
 	v.add_child(h)
 	var buttons := UIKit.hbox(4)
@@ -326,7 +326,7 @@ func _auto_build() -> void:
 	var options: Array = []
 	for id in Profile.data["units"]:
 		var u := Profile.unit(id)
-		options.append({"unit": id, "power": Army.squad_power(id, int(u["level"]), Profile.squad_size(id))})
+		options.append({"unit": id, "power": Army.squad_power(id, Army.stat_level(id, int(u["level"])), Profile.squad_size(id))})
 	options.sort_custom(func(a, b): return float(a["power"]) > float(b["power"]))
 	var army: Array = []
 	for o in options.slice(0, GameData.MAX_SQUADS):

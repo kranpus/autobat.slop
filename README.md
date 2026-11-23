@@ -125,11 +125,27 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      for gold.
    - The sub-tab shows each site's odds and your whole collection.
 2. **Level up: Collection tab.** Spend gold to raise a unit's level (+8% HP and damage per level).
+   - **Levels by rarity (0.9.7):** rarer units have fewer levels but start stronger. A unit's
+     level 1 is as strong as a common unit at the level shown below, and every rarity's top level
+     has the same stats (a common at level 50), so a fully levelled unit is as strong as before.
+
+     | Rarity | Levels | Level 1 is as strong as a common at |
+     |---|---|---|
+     | Common | 50 | level 1 |
+     | Uncommon | 40 | level 11 |
+     | Rare | 30 | level 21 |
+     | Epic | 20 | level 31 |
+     | Legendary | 10 | level 41 |
+
+     The cost of a level follows its strength: a rare's first level costs what a common's 21st
+     does (times the rare price). Legion Draft and challenge enemies keep the old 1-50 scale
+     (`Army.squad_stat_level`).
    **Trinkets:** each unit has **2 trinket slots**. Equip, swap or remove them in the unit's
    details panel. A trinket can only be on one unit at a time, so equipping it elsewhere moves
    it. Trinkets go into battle with the army and into its army code.
 3. **Increase quantity: Collection tab.** Spend shards and gold to raise the squad tier, which
-   adds units to the squad. Each tier also raises the level cap by 4.
+   adds units to the squad. Each tier also raises the level cap: a fifth of a rarity's levels
+   at tier 0 (common 10, legendary 2), all of them at tier 10.
 
    | Rarity | Squad size at tier 0 → tier 10 |
    |---|---|

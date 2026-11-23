@@ -26,7 +26,7 @@ signal left_match(reason: String)
 ## similar rating). Empty when the server can't be reached.
 signal ranked_opponents(list: Array)
 
-const GAME_VERSION := "legion-draft-19"   # client and server must match exactly
+const GAME_VERSION := "legion-draft-20"   # client and server must match exactly
 const PORT := 24700                      # LAN hosting
 const SERVER_PORT := 24702               # dedicated online server (ENet/UDP)
 const WS_PORT := 24704                   # same server for browsers (WebSocket/TCP)
@@ -2858,7 +2858,7 @@ func _player_set_unit(pl: ProfileLogic, id: String, opts: Dictionary) -> void:
 		u["tier"] = clampi(int(opts["tier"]), 0, GameData.MAX_TIER)
 	if opts.has("level"):
 		u["level"] = int(opts["level"])
-	u["level"] = clampi(int(u["level"]), 1, Army.max_level_for_tier(int(u["tier"])))
+	u["level"] = clampi(int(u["level"]), 1, Army.max_level(id, int(u["tier"])))
 	if opts.has("shards"):
 		u["shards"] = clampi(int(opts["shards"]), 0, 1000000)
 

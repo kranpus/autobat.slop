@@ -168,13 +168,17 @@ func _build_detail() -> void:
 	var tier := int(u["tier"])
 	var cap := Profile.level_cap(id)
 	_detail.add_child(UIKit.label("Level %d / %d     Squad tier %d / %d" % [level, cap, tier, GameData.MAX_TIER], 16, UIKit.ACCENT))
+	if Army.level_offset(id) > 0:
+		var tip := UIKit.label("%s units have %d levels and start as strong as a common unit at level %d." % [GameData.RARITIES[GameData.UNITS[id]["rarity"]]["name"], Army.rarity_levels(id), 1 + Army.level_offset(id)], 12, UIKit.TEXT_DIM)
+		tip.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_detail.add_child(tip)
 	_add_stats(id, level)
 
 	# Level up
 	var lvl_box := UIKit.vbox(4)
 	if level < cap:
-		var nxt := Army.unit_stats(id, level + 1)
-		var cur := Army.unit_stats(id, level)
+		var nxt := Army.unit_stats(id, Army.stat_level(id, level + 1))
+		var cur := Army.unit_stats(id, Army.stat_level(id, level))
 		lvl_box.add_child(UIKit.label("Next level: HP %d → %d, Damage %d → %d" % [roundi(cur["hp"]), roundi(nxt["hp"]), roundi(cur["dmg"]), roundi(nxt["dmg"])], 13, UIKit.TEXT_DIM))
 		var b := UIKit.button("Level Up  (%d gold)" % Profile.level_up_cost(id), func():
 			if Profile.level_up(id):
@@ -185,7 +189,10 @@ func _build_detail() -> void:
 		UIKit.tut(b, "level_up")
 		lvl_box.add_child(b)
 	else:
-		lvl_box.add_child(UIKit.label("Level cap reached. Upgrade the squad tier to raise it (+%d levels)." % GameData.LEVELS_PER_TIER, 13, UIKit.TEXT_DIM))
+		if tier < GameData.MAX_TIER:
+			lvl_box.add_child(UIKit.label("Level cap reached. Upgrade the squad tier to raise it (+%d levels)." % (Army.max_level(id, tier + 1) - cap), 13, UIKit.TEXT_DIM))
+		else:
+			lvl_box.add_child(UIKit.label("Fully levelled.", 13, UIKit.TEXT_DIM))
 	_detail.add_child(lvl_box)
 
 	# Quantity (squad tier)
@@ -314,8 +321,9 @@ func _open_trinket_picker(unit_id: String, slot: int) -> void:
 	_trinket_popup.popup_centered()
 
 
+## level: the unit's own (collection) level.
 func _add_stats(id: String, level: int) -> void:
-	var s := Army.unit_stats(id, level)
+	var s := Army.unit_stats(id, Army.stat_level(id, level))
 	var g := GridContainer.new()
 	g.columns = 4
 	g.add_theme_constant_override("h_separation", 14)
