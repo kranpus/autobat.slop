@@ -267,7 +267,7 @@ Ctrl+P then Ctrl+Q to detach again.
 | `ranked` | How many player armies are saved for ranked matchmaking, and their rating range. |
 | `ranked clear` | Delete all saved ranked armies. |
 | `ranked range 150` | Only match players against saved armies within this many rating points (default 200). Saved with the server settings. |
-| `units` | List all 60 units and whether each is locked or open. |
+| `units` | List all 100 units and whether each is locked or open. |
 | `lock Storm Dragon` / `lock goblin ogre` | Lock units by name or id. Locked units stop appearing in expeditions, draft shops and ranked opponents, are removed from army codes, and don't deploy in battles. Useful for emergency balance fixes. |
 | `unlock storm_dragon` | Unlock units again. |
 | `regions` | List all 13 expedition regions and whether each is locked. |

@@ -71,17 +71,22 @@ accounts, password hashing and encryption work.
 ## The gameplay loop
 
 **Rating unlocks regions.** Each expedition region needs a ranked rating, spread out from the
-start to the top:
+start to the top. The Expeditions tab (and the Collection's "found in") lists them in this
+order, the next one to unlock always after the ones you have:
 
 | Rating | Regions |
 |---|---|
-| 0 | Goblin Warrens, Haunted Crypt, Badlands Camp* |
+| 0 | Badlands Camp*, Goblin Warrens, Haunted Crypt |
+| 600 | Fungal Hollows (0.9.4) |
 | 1100 / 1200 | Sunken Marsh*, Hive Tunnels* |
 | 1300 | Whispering Forest |
+| 1400 | Tidewater Grotto (0.9.4) |
 | 1500 / 1700 | Elven Glade*, Bone Fields* |
 | 1900 | Dwarven Deeps |
+| 2000 | Abyssal Rift (0.9.4) |
 | 2200 | Giant's Steps* |
 | 2500 | Dragon Peaks |
+| 2800 | Frostfell Wastes (0.9.4) |
 | 3000 | Dragon's Hoard* |
 | 3500 | Celestial Spire* |
 
@@ -207,7 +212,8 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
 
 ## Locked units
 
-There are **60 units**. The original 20 are open. **40 more are locked** until you release them:
+There are **100 units**. The original 20 and the 40 from patch 0.9.4 are open. **The 40 from
+patch 0.9 are locked** until you release them:
 - **Commons:** Jackals, Hobgoblins, Cave Bats, Goblin Archers and more.
 - **Uncommons:** Knights, Hippogriffs, War Hounds, Elven Mages and more.
 - **Rares:** Trolls, Cyclopes, Minotaurs, Vampire Knights and more.
@@ -223,7 +229,9 @@ The new units come from **8 new expedition regions**, which are locked too:
 - **Mid regions (2 maps):** Elven Glade (1500), Bone Fields (1700), Giant's Steps (2200).
 - **Top regions (3 maps):** Dragon's Hoard (3000), Celestial Spire (3500).
 
-The original 5 regions keep their original 20 units. A locked region is hidden from the
+The original 5 regions keep their original 20 units. The 0.9.4 units come from their own 4
+regions (Fungal Hollows, Tidewater Grotto, Abyssal Rift, Frostfell Wastes), open from the start
+like their units; see Battle abilities for the list. A locked region is hidden from the
 Expeditions tab, and a region can only be explored once some of its units are unlocked.
 
 The Legion Draft server controls the locks (`units`, `regions`, `lock`, `unlock`,
@@ -248,7 +256,7 @@ collection: everyone drafts an army from scratch each match.
 - **Duplicates level up:** drop a copy onto the same unit, or merge two board units. Lv2 needs 3
   copies and Lv3 needs 6. Each level makes the squad bigger (common: 16 → 32 → 48 units) and
   stronger (+40% per level).
-- **Out-of-battle abilities:** each of the 20 units has its own, triggered when bought, sold or
+- **Out-of-battle abilities:** each of the 100 units has its own, triggered when bought, sold or
   levelled up, at the start or end of a turn, when given a trinket, when an ally is sold, or
   after a win or loss. Examples: Rats breed +2 units each turn, the Golden Dragon earns gold, and
   the Lich grows stronger whenever you sell an ally.
@@ -321,7 +329,7 @@ obstacles (x/y as fractions of the map; anything left of centre is mirrored auto
   - **Melee splash** hits nearby enemies for 45% of the blow (60% before 0.9.2).
   - **Projectile splash** (stones, magic, fire) hits them for 35% (60% before patch 0.9, 45% in
     0.9).
-- **Battle abilities** (patch 0.9.2): 23 units have one, including every epic and legendary,
+- **Battle abilities** (patch 0.9.2, 40 more in 0.9.4): 63 units have one, including every epic and legendary,
   each with an ability no other epic or legendary shares. They're shown on each unit's card and
   simulated in `BattleSim` (`Ab`); see `GameData.ABILITIES`.
 
@@ -349,6 +357,16 @@ obstacles (x/y as fractions of the map; anything left of centre is mirrored auto
   | Rising Storm | Storm Titan | Each blow adds +5% damage, up to +100%. |
   | Resurrection | Seraph | Every 4s brings the latest fallen ally nearby back at half health. |
   | Divine Aegis | Grand Avatar | Allies nearby take 20% less damage. |
+
+  **Patch 0.9.4** added 40 more units, every one with an ability, commons included (no two new
+  commons share one):
+
+  | Region | Units (rarity) and abilities |
+  |---|---|
+  | Fungal Hollows | Cave Spider (C): Venom, stacking poison. Sporeling (C, healer): Purify, healing cleanses ailments. Ooze (C): Split into two halves on death. Giant Snail (C): Shell, 60% less damage once below half health. Trapdoor Spider (U): Ensnare, roots. Wolf Spider (U): Pounce onto distant targets. Deathcap (U): Corrode, +6% damage taken per hit (up to 30%). Acid Blob (R): Acid Skin, 40% thorns. Spider Matriarch (R): Brood, hatches Cave Spiders. Vine Stalker (E): Shadowstep, appears beside its first target for a 2.5x blow. |
+  | Tidewater Grotto | Snapping Turtle (C): Block 35% of melee blows. Merfolk Javelineer (C): Twin Throw. Giant Newt (C): Evasion 30%. Mermaid (U, healer): Siren Song, allies attack 25% faster. Merfolk Aquamancer (U): Undertow sweeps enemies back. Electric Eel (U): Stun. Shark (R): Blood Frenzy, faster with each kill. Guardian Serpent (R): Taunt. Kraken (E): Drag Under, pulls and holds. Merfolk Avatar (L): Tidal Wave. |
+  | Abyssal Rift | Imp (C): Unstable, explodes on its first blow. Lemure (C): Martyr, its death enrages allies. Hell Hound (U): Pack Hunter. Quasit (U): Wither. Rakshasa (R): Mirror Hide reflects 40% of ranged damage. Hairy Devil (R): Berserk. Hellion (R): Hellfire anywhere on the field. Balrug (E): Burning Aura. Executioner (E): Execute, +150% below 30% health. Pit Fiend (L): Terror, enemies flee. |
+  | Frostfell Wastes | Yak (C): Thick Fur, 40% less from magic and fire. Warg (U): Howl, allies +20% damage. Ice Beast (U): Chill. Ice Devil (R): Frost Armour chills attackers. Blizzard Demon (R): Blizzard aura chills. Polar Bear (R): Devour 25%. Ice Fiend (E): Entomb. Crystal Golem (E): Fortify, -2% damage taken per second (up to 40%). Spectral Dragon (L): Phase Shift, untouchable for 1.5s every 6s. Rime Lindwurm (L): Avalanche. |
 
   - **Squad growth:** epic and legendary squad upgrades cost 1.75× and 2× the shards.
 

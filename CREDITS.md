@@ -8,6 +8,11 @@ License texts that shipped with the packs are in [`assets/licenses/`](assets/lic
 **Dungeon Crawl Stone Soup 32x32 tiles** by the Crawl tiles team, collected on OpenGameArt by MedicineStorm. CC0.
 <https://opengameart.org/content/dungeon-crawl-32x32-tiles>
 
+All 100 unit sprites and every region tile are listed file by file in
+[`assets/sprites/units/SOURCES.txt`](assets/sprites/units/SOURCES.txt) and
+[`assets/sprites/tiles/SOURCES.txt`](assets/sprites/tiles/SOURCES.txt); the table below covers the
+original 20 units and the battlefield art.
+
 The 100 trinket icons in `items/` come from the same pack's `item/` folder (rings, amulets,
 armour, wands, staves, books, potions and misc items). The file-by-file list is in
 [`assets/sprites/items/SOURCES.txt`](assets/sprites/items/SOURCES.txt).

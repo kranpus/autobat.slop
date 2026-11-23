@@ -6,9 +6,20 @@ extends RefCounted
 ## kept under. Note kinds: "nerf", "buff", "change", "note".
 
 const LIST := [
-	{"version": "0.9.4", "date": "2026-11-23", "title": "Songs of the Tavern",
-		"summary": "A new soundtrack for the lobby, a sound for every battle ability and a gentler start to each battle. No balance changes.",
+	{"version": "0.9.4", "date": "2026-11-23", "title": "Beasts of the Four Realms",
+		"summary": "40 new units, every one with a battle ability of its own, from four new regions; regions listed in the order you unlock them; and a new soundtrack with a sound for every ability.",
 		"sections": [
+			{"name": "40 new units", "notes": [
+				{"kind": "change", "text": "100 units now. The 40 new ones are open to everyone from the start, and every one of them has a battle ability, commons included: no two new commons share one."},
+				{"kind": "change", "text": "Fungal Hollows (rating 600): Cave Spiders that poison, Sporelings whose healing cleanses, Oozes that split in two when they die, Giant Snails that hide in their shells, Trapdoor Spiders that root, pouncing Wolf Spiders, armour-eating Deathcaps, the thorny Acid Blob, the Spider Matriarch who hatches spiders and the Vine Stalker who steps out of the undergrowth beside its prey."},
+				{"kind": "change", "text": "Tidewater Grotto (1400): Snapping Turtles that block blows, Merfolk Javelineers that throw two at once, dodging Giant Newts, Mermaids whose song quickens allies, Aquamancers that sweep foes back, Electric Eels, frenzied Sharks, the taunting Guardian Serpent, the Kraken that drags its prey in, and the Merfolk Avatar's tidal waves."},
+				{"kind": "change", "text": "Abyssal Rift (2000): exploding Imps, Lemures whose deaths enrage their allies, Hell Hounds that hunt in packs, withering Quasits, the Rakshasa that reflects arrows and spells, the berserk Hairy Devil, the Hellion's hellfire from the sky, the Balrug's burning aura, the Executioner and the Pit Fiend, whose blows send whole ranks fleeing."},
+				{"kind": "change", "text": "Frostfell Wastes (2800): fire-proof Yaks, howling Wargs that rally the pack, Ice Beasts, the frost-armoured Ice Devil, the Blizzard Demon, the Polar Bear, the Ice Fiend that freezes foes solid, the Crystal Golem that hardens as the battle drags on, the Spectral Dragon that fades out of reach and the Rime Lindwurm's avalanches."},
+				{"kind": "note", "text": "Each new unit's ability is on its card in the Collection, and each has its own Legion Draft ability too."},
+			]},
+			{"name": "Regions", "notes": [
+				{"kind": "change", "text": "Expeditions, trinket hunts and the Collection list regions in the order you unlock them, from the starting camps to the Celestial Spire."},
+			]},
 			{"name": "Music", "notes": [
 				{"kind": "change", "text": "Three new lobby tracks join the Town Theme: The Old Tower Inn, The Bard's Tale and Market Day. The lobby now plays them as a playlist, one after another and never the same twice in a row, instead of looping one tune."},
 			]},
