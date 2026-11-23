@@ -25,6 +25,7 @@ const LIST := [
 				{"kind": "note", "text": "Units that splash by nature (Orc Sorcerer, Hill Giant, Cyclops, Fire Giant, Golden Dragon, Grand Avatar) are unchanged."},
 			]},
 			{"name": "Training bands", "notes": [
+				{"kind": "nerf", "text": "Training bands grow stronger faster above 1000 rating: about 850 Strength at 1500 (was 700), 1,750 at 2000 (was 1,300), 3,000 at 2500 (was 2,100), 5,000 at 3000 (was 3,200) and 8,000 at 3500 (was 4,600). Easy, Even and Hard are still 0.9x, 1.1x and 1.5x of that. Below 1000 nothing changes."},
 				{"kind": "buff", "text": "Training bands are better led: like a seasoned commander, they now favour units that fight well instead of picking at random (while still varying from band to band). In simulated battles they beat the old bands about 64% of the time at equal Strength."},
 			]},
 			{"name": "Fixes", "notes": [

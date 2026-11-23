@@ -1490,6 +1490,7 @@ func test_rank_scaling() -> void:
 		if Army.rank_power(r + 50) <= Army.rank_power(r):
 			rising = false
 	check(rising, "the expected power rises with every step of rating")
+	check(is_equal_approx(Army.rank_power(3500), 80000.0) and is_equal_approx(Army.rank_power(1000), 3800.0), "8,000 Strength at 3500 rating (0.9.7), 380 at 1000")
 	# The same rating gives the same strength of opponents, whatever your army.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7

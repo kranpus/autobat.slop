@@ -456,8 +456,9 @@ const RANKED_LABEL_GAP := 40
 ## opponents are built around at each rating: [rating, shown power] points,
 ## straight lines in between. A new commander (0) starts with about 136.
 ## Past the last point it keeps growing 7% per 100 rating.
-const RANK_POWER := [[0, 140.0], [250, 170.0], [500, 220.0], [800, 300.0], [1000, 380.0], [1200, 470.0], [1500, 700.0],
-	[1700, 900.0], [2000, 1300.0], [2500, 2100.0], [3000, 3200.0], [3500, 4600.0], [4000, 6500.0]]
+## (0.9.7: steeper above 1000, reaching 8,000 at 3500; it was 4,600.)
+const RANK_POWER := [[0, 140.0], [250, 170.0], [500, 220.0], [800, 300.0], [1000, 380.0], [1200, 520.0], [1500, 850.0],
+	[1700, 1150.0], [2000, 1750.0], [2500, 3000.0], [3000, 5000.0], [3500, 8000.0], [4000, 11500.0]]
 
 
 static func rank_power(rating: int) -> float:
