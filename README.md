@@ -199,7 +199,6 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Signed in:** the server runs the battle and pays the reward.
    - **Look:** the fantasy skin (dark wood panels, gold trim, parchment, scroll rods, stone backdrop)
      is drawn from noise at startup by `scripts/ui/fantasy_skin.gd`; headings use the Cinzel font.
-scripts/ui/touch_scroll.gd    Touch drag-scrolling for every menu (autoload TouchScroll)
      `ScrollUnroll` (`scripts/ui/scroll_unroll.gd`) is the unrolling scroll used for ranked
      opponents and patch notes.
    - **Tutorial:** new players are guided through the basics by doing them, with a spotlight on the
@@ -441,6 +440,7 @@ scripts/battle/battle_sim.gd  Deterministic simulation
 scripts/battle/battle_view.gd MultiMesh renderer + camera
 scripts/battle/battle_screen.gd  HUD, start and result screens
 scripts/ui/*.gd               Menu tabs
+scripts/ui/touch_scroll.gd    Touch drag-scrolling for every menu (autoload TouchScroll)
 tests/test_battle.gd          Headless tests
 tests/net_account_test.gd     End-to-end account test against a running server
 tests/tutorial_test.gd        Plays through the whole tutorial as a new player
