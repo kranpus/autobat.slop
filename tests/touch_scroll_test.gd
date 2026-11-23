@@ -56,6 +56,7 @@ func _run() -> void:
 	await create_timer(1.0).timeout   # let the glide settle
 	await _mouse_drag()
 	await _rating_notice()
+	await _toasts()
 	_finish()
 
 
@@ -209,6 +210,20 @@ func _rating_notice() -> void:
 	main._rating_notice()
 	check(get_nodes_in_group("rating_notice").is_empty(), "...only once")
 	profile.settings.erase("ai_rating_notice")
+
+
+## 0.9.7: a 4th toast while 3 were showing froze the game.
+func _toasts() -> void:
+	print("toasts")
+	var box: VBoxContainer = main._toast_box
+	for i in 10:
+		UIKit.toast("Toast %d" % i)
+	check(box.get_child_count() == 3, "ten toasts in a row: the game keeps running, 3 on screen (%d)" % box.get_child_count())
+	var last := box.get_child(2).get_child(0) as Label
+	check(last != null and last.text == "Toast 9", "the newest is shown last")
+	await process_frame
+	UIKit.toast("One more")
+	check(box.get_child_count() == 3, "...and another one after a frame")
 
 
 func _finish() -> void:

@@ -6,6 +6,7 @@ const KIND_TAGS := {
 	"nerf": ["NERF", FantasySkin.INK_BAD],
 	"buff": ["BUFF", FantasySkin.INK_GOOD],
 	"change": ["CHANGE", FantasySkin.INK_ACCENT],
+	"fix": ["FIX", FantasySkin.INK_GOOD],
 	"note": ["NOTE", FantasySkin.INK_DIM],
 }
 

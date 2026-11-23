@@ -280,6 +280,9 @@ func _build_toasts() -> void:
 	add_to_group("toast_host")
 
 
+const MAX_TOASTS := 3
+
+
 func show_toast(text: String, color: Color = Color.WHITE) -> void:
 	if _toast_box == null:
 		return
@@ -295,8 +298,13 @@ func show_toast(text: String, color: Color = Color.WHITE) -> void:
 	p.add_child(UIKit.label(text, 16, color))
 	p.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_toast_box.add_child(p)
-	while _toast_box.get_child_count() > 3:
-		_toast_box.get_child(0).queue_free()
+	# At most 3 at once: drop the oldest. (Take them out of the box first:
+	# queue_free alone only frees at the end of the frame, so the count would
+	# never drop and a while loop on it would hang the game. Fixed in 0.9.7.)
+	while _toast_box.get_child_count() > MAX_TOASTS:
+		var old := _toast_box.get_child(0)
+		_toast_box.remove_child(old)
+		old.queue_free()
 	p.modulate.a = 0.0
 	var tw := p.create_tween()
 	tw.tween_property(p, "modulate:a", 1.0, 0.15)

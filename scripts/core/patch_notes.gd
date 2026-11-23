@@ -3,12 +3,20 @@ extends RefCounted
 ## Balance changes and other notable changes, newest first (the Patch Notes tab).
 ## "version" matches the release version (Project Settings -> Application ->
 ## Config -> Version), which is also the "patch" the server's unit stats are
-## kept under. Note kinds: "nerf", "buff", "change", "note".
+## kept under. Note kinds: "nerf", "buff", "change", "fix", "note".
 ## Players read these: only changes they can see in the game. Server and
 ## admin changes (console commands, server settings and tools, hosting) stay
 ## out; they belong in HOSTING.md.
 
 const LIST := [
+	{"version": "0.9.7", "date": "2026-11-24", "title": "Steady Hands",
+		"summary": "Bug fixes.",
+		"sections": [
+			{"name": "Fixes", "notes": [
+				{"kind": "fix", "text": "The game froze when a fourth message popped up while three were already on screen (for example levelling up several units quickly). Now the oldest message makes way."},
+				{"kind": "fix", "text": "Two training bands in the same Call to Arms could share a name. Each one now has its own."},
+			]},
+		]},
 	{"version": "0.9.6", "date": "2026-11-23", "title": "Silenced Spells",
 		"summary": "A heavy, across-the-board nerf to casters below epic (15% less damage, squads 30% smaller), plus standalone nerfs to the Orc Sorcerer and every other caster still winning too often.",
 		"sections": [
