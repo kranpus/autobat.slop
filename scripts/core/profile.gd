@@ -20,6 +20,8 @@ signal recruit_result(result: Dictionary)
 signal trinket_choice_ready(choice: Dictionary)
 ## Logged in only: the server applied a trinket pick ({trinket, new, gold}).
 signal trinket_result(result: Dictionary)
+## Signed in: a quest reward the server paid ({gold, maps, trinket, xp, levels, quest}).
+signal quest_claimed(result: Dictionary)
 
 const SAVE_PATH := "user://profile.json"
 const SETTINGS_PATH := "user://settings.json"
@@ -153,6 +155,57 @@ func _remote(action: Array) -> void:
 
 
 # --- read-only accessors (same in both modes) -------------------------------------
+
+## Commander level and quest log (0.9.7).
+func xp() -> int:
+	return logic.xp()
+
+
+func player_level() -> int:
+	return logic.player_level()
+
+
+func feature_unlocked(key: String) -> bool:
+	return logic.feature_unlocked(key)
+
+
+func max_maps() -> int:
+	return logic.max_maps()
+
+
+func trinket_slots() -> int:
+	return logic.trinket_slots()
+
+
+func quest_log() -> Array:
+	return logic.quest_log()
+
+
+func claimable_quests() -> int:
+	return logic.claimable_quests()
+
+
+## New daily/weekly quests when the reset time has passed (asks the server
+## when signed in).
+func refresh_quests() -> void:
+	if online:
+		_remote(["refresh_quests"])
+		return
+	if logic.refresh_quests():
+		save()
+
+
+## Offline: returns {gold, maps, trinket, xp, levels}. Signed in: {} now, and
+## the reward arrives with the server's profile (event "quest").
+func claim_quest(kind: String, index: int) -> Dictionary:
+	if online:
+		_remote(["claim_quest", kind, index])
+		return {}
+	var res := logic.claim_quest(kind, index)
+	if not res.is_empty():
+		save()
+	return res
+
 
 func seconds_to_next_map() -> int:
 	return logic.seconds_to_next_map()

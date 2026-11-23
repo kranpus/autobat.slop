@@ -18,7 +18,7 @@ var _result_box: VBoxContainer
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 10)
-	var intro := UIKit.label("Send hunters after trinkets. Each hunt turns up %d different trinkets and you keep ONE. There are %d unique trinkets to collect; each unit can carry %d of them (equip them in the Collection tab). A trinket you already own is sold for gold instead." % [3, Trinkets.ALL.size(), Trinkets.SLOTS], 14, UIKit.TEXT_DIM)
+	var intro := UIKit.label("Send hunters after trinkets. Each hunt turns up %d different trinkets and you keep ONE. There are %d unique trinkets to collect; each unit can carry %d of them (equip them in the Collection tab; the second slot opens at commander level %d). A trinket you already own is sold for gold instead." % [3, Trinkets.ALL.size(), Trinkets.SLOTS, Progression.unlock_level("trinket_slot2")], 14, UIKit.TEXT_DIM)
 	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(intro)
 

@@ -28,6 +28,11 @@ static var train_slow_from: int = Army.AI_RATING_FULL_UNTIL
 static var train_slower_from: int = Army.AI_RATING_FROM
 static var train_div: float = Army.AI_RATING_DIV_LOW
 static var train_div_late: float = Army.AI_RATING_DIV_HIGH
+## Quest log resets (0.9.7): daily at this minute of the day (UTC), weekly on
+## this weekday (0 Monday ... 6 Sunday). Set with the 'quests' console command.
+static var quest_reset_minute := 0
+static var quest_reset_weekday := 0
+const WEEKDAYS := ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 const MAX_TRAIN_RATING := 20000
 const MAX_TRAIN_DIV := 100.0
 
@@ -36,6 +41,8 @@ static func reset() -> void:
 	tiers = Army.GHOST_TIERS.duplicate(true)
 	challenge_mult = 1.0
 	set_training(Army.AI_RATING_FULL_UNTIL, Army.AI_RATING_FROM, Army.AI_RATING_DIV_LOW, Army.AI_RATING_DIV_HIGH)
+	quest_reset_minute = 0
+	quest_reset_weekday = 0
 
 
 static func set_training(slow_from: int, slower_from: int, div: float = -1.0, div_late: float = -1.0) -> void:
@@ -48,7 +55,8 @@ static func set_training(slow_from: int, slower_from: int, div: float = -1.0, di
 
 
 static func to_dict() -> Dictionary:
-	var d := {"challenges": challenge_mult, "training": [train_slow_from, train_slower_from, train_div, train_div_late]}
+	var d := {"challenges": challenge_mult, "training": [train_slow_from, train_slower_from, train_div, train_div_late],
+		"quests": [quest_reset_minute, quest_reset_weekday]}
 	for t in tiers:
 		d[str(t[2]).to_lower()] = [float(t[0]), int(t[1])]
 	return d
@@ -66,6 +74,10 @@ static func apply(d) -> void:
 			set_tier(i, float(v[0]), int(v[1]))
 	if d.has("challenges"):
 		challenge_mult = clampf(float(d["challenges"]), MIN_CHALLENGE, MAX_CHALLENGE)
+	var qr = d.get("quests")
+	if typeof(qr) == TYPE_ARRAY and qr.size() == 2:
+		quest_reset_minute = clampi(int(qr[0]), 0, 1439)
+		quest_reset_weekday = clampi(int(qr[1]), 0, 6)
 	var t = d.get("training")
 	if typeof(t) == TYPE_ARRAY and t.size() == 4:
 		set_training(int(t[0]), int(t[1]), float(t[2]), float(t[3]))
@@ -84,6 +96,7 @@ static func tier_index(name: String) -> int:
 
 static func is_default() -> bool:
 	return JSON.stringify(to_dict()) == JSON.stringify({"challenges": 1.0, "training": [Army.AI_RATING_FULL_UNTIL, Army.AI_RATING_FROM, Army.AI_RATING_DIV_LOW, Army.AI_RATING_DIV_HIGH],
+		"quests": [0, 0],
 		"easy": [float(Army.GHOST_TIERS[0][0]), int(Army.GHOST_TIERS[0][1])],
 		"even": [float(Army.GHOST_TIERS[1][0]), int(Army.GHOST_TIERS[1][1])], "hard": [float(Army.GHOST_TIERS[2][0]), int(Army.GHOST_TIERS[2][1])]})
 
@@ -103,6 +116,10 @@ static func share_text(div: float) -> String:
 	if is_equal_approx(div, roundf(div)) and names.has(int(roundf(div))):
 		return names[int(roundf(div))]
 	return "1/%s" % _num(div)
+
+
+static func quest_reset_text() -> String:
+	return "Daily quests reset at %02d:%02d UTC, weekly quests on %s at that time." % [quest_reset_minute / 60, quest_reset_minute % 60, WEEKDAYS[quest_reset_weekday].capitalize()]
 
 
 static func _num(v: float) -> String:

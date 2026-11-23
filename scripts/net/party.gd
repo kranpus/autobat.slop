@@ -503,11 +503,14 @@ func run_command(line: String) -> String:
   unitstats patches               patches with recorded stats
   unitstats csv [patch]           save a spreadsheet of a patch's stats
   unitstats reset [patch]         delete a patch's stats (default: this patch)
+  quests                          when daily and weekly quests reset
+  quests reset 06:00 [monday]     daily reset time (UTC) [and the weekly reset day]
   accounts                        number of accounts and who is signed in
   accounts reset-password <user>  give a player who forgot their password a new
                                   temporary one (shown once) and sign them out
   player <user>                   a player's stats, units, trinkets and progress
-  player <user> set <stat> <n>    rating, gold, maps, wins, losses, draft_wins, draft_played
+  player <user> set <stat> <n>    rating, gold, maps, wins, losses, draft_wins, draft_played,
+                                  xp (levels reached pay rewards), commander_level (no rewards)
   player <user> add <stat> <n>    add to a stat (a minus number takes away)
   player <user> name <new name>   change their commander name
   player <user> unit <unit> [level <n>] [tier <n>] [shards <n>]
@@ -614,6 +617,8 @@ func run_command(line: String) -> String:
 			out = _drops_command(a)
 		"difficulty":
 			out = _difficulty_command(a)
+		"quests":
+			out = _quests_command(a)
 		_:
 			out = "Unknown command '%s'. Type 'help'." % a[0]
 	_log(out)
@@ -813,6 +818,32 @@ func _difficulty_command(a: PackedStringArray) -> String:
 	for id in _names:
 		_deliver(id, "difficulty", [Difficulty.to_dict()])
 	return "Difficulty updated. " + Difficulty.describe()
+
+
+## 'quests': when the quest log resets (UTC).
+func _quests_command(a: PackedStringArray) -> String:
+	var usage := "Usage: quests | quests reset <HH:MM> [weekday]   (UTC; weekly quests reset on the weekday, e.g. 'quests reset 06:00 monday')"
+	if a.size() == 1:
+		return Difficulty.quest_reset_text() + " " + usage
+	if a[1].to_lower() != "reset" or a.size() < 3 or a.size() > 4:
+		return usage
+	var hm := a[2].split(":")
+	if hm.size() != 2 or not hm[0].is_valid_int() or not hm[1].is_valid_int() or int(hm[0]) < 0 or int(hm[0]) > 23 or int(hm[1]) < 0 or int(hm[1]) > 59:
+		return "Give the time as HH:MM in UTC, e.g. 06:00. " + usage
+	var wd := Difficulty.quest_reset_weekday
+	if a.size() == 4:
+		wd = -1
+		for k in Difficulty.WEEKDAYS.size():
+			if Difficulty.WEEKDAYS[k].begins_with(a[3].to_lower().left(3)):
+				wd = k
+		if wd < 0:
+			return "Unknown weekday '%s'. %s" % [a[3], usage]
+	Difficulty.quest_reset_minute = int(hm[0]) * 60 + int(hm[1])
+	Difficulty.quest_reset_weekday = wd
+	_save_config()
+	for id in _names:
+		_deliver(id, "difficulty", [Difficulty.to_dict()])
+	return "Quest log updated. " + Difficulty.quest_reset_text() + " (Players see new quests from the next reset.)"
 
 
 func _gold_text() -> String:
@@ -2395,6 +2426,8 @@ func _rc_profile(profile_data: Dictionary, event: String, payload: Dictionary) -
 			Profile.trinket_choice_ready.emit(payload)
 		"trinket_result":
 			Profile.trinket_result.emit(payload)
+		"quest":
+			Profile.quest_claimed.emit(payload)
 
 
 @rpc("authority", "reliable")
@@ -2602,6 +2635,8 @@ func _finish_login(id: int, username: String) -> void:
 	_names[id] = display
 	var pl := accounts.logic(username)
 	pl.gold_mult = float(rewards["battle_mult"])
+	if pl.refresh_quests():
+		accounts.save(username)
 	_deliver(id, "login_ok", [{
 		"username": display, "token": accounts.issue_token(username), "profile": pl.data,
 		"rewards": {"battle_mult": rewards["battle_mult"]},
@@ -2659,6 +2694,12 @@ func _rq_profile_action(action: Array) -> void:
 		"unequip_trinket":
 			if action.size() == 3:
 				pl.unequip_trinket(str(action[1]), int(action[2]))
+		"refresh_quests":
+			pl.refresh_quests()
+		"claim_quest":
+			if action.size() == 3:
+				payload = pl.claim_quest(str(action[1]), int(action[2]))
+				event = "quest" if not payload.is_empty() else ""
 		_:
 			return
 	accounts.save(user)
@@ -2689,7 +2730,7 @@ func _account_command(a: PackedStringArray) -> String:
 
 # --- player admin ------------------------------------------------------------------
 
-const PLAYER_STATS := ["rating", "gold", "maps", "wins", "losses", "draft_wins", "draft_played"]
+const PLAYER_STATS := ["rating", "gold", "maps", "wins", "losses", "draft_wins", "draft_played", "xp", "commander_level"]
 const PLAYER_KEYWORDS := ["level", "tier", "shards", "remove"]
 
 
@@ -2715,11 +2756,30 @@ func _player_command(a: PackedStringArray) -> String:
 				return "Usage: player <user> %s <%s> <number>" % [sub, "|".join(PackedStringArray(PLAYER_STATS))]
 			var stat := args[0].to_lower()
 			var v := int(args[1])
-			if sub == "add":
-				v += int(pl.data.get(stat, 0))
-			v = clampi(v, 0, 1000000000)
-			pl.data[stat] = v
-			out = "%s's %s is now %d." % [user, stat, v]
+			if stat == "commander_level":
+				# Jumps to the start of that level; the levels skipped pay no rewards.
+				if sub == "add":
+					v += pl.player_level()
+				v = clampi(v, 1, Progression.MAX_LEVEL)
+				pl.data["xp"] = Progression.xp_for_level(v)
+				pl.data["level_rewarded"] = v
+				pl.refresh_quests()
+				out = "%s is now commander level %d." % [user, v]
+			elif stat == "xp":
+				var target := clampi(v if sub == "set" else pl.xp() + v, 0, Progression.xp_for_level(Progression.MAX_LEVEL))
+				var gained: Array = []
+				if target > pl.xp():
+					gained = pl.add_xp(target - pl.xp())   # levels reached pay their rewards
+				else:
+					pl.data["xp"] = target
+					pl.data["level_rewarded"] = mini(int(pl.data["level_rewarded"]), pl.player_level())
+				out = "%s has %d XP (commander level %d)%s." % [user, pl.xp(), pl.player_level(), (", reached level %s with their rewards" % ", ".join(PackedStringArray(gained.map(func(x): return str(x))))) if not gained.is_empty() else ""]
+			else:
+				if sub == "add":
+					v += int(pl.data.get(stat, 0))
+				v = clampi(v, 0, 1000000000)
+				pl.data[stat] = v
+				out = "%s's %s is now %d." % [user, stat, v]
 		"name":
 			var nm := " ".join(args).strip_edges().left(24)
 			if nm == "":
@@ -2799,6 +2859,7 @@ func _player_summary(user: String, pl: ProfileLogic) -> String:
 	var rank := accounts.rank_of(user)
 	var lines: Array = []
 	lines.append("%s (commander name %s)%s" % [user, d.get("name", user), "  ONLINE" if _player_sessions(user).size() > 0 else ""])
+	lines.append("  commander level %d (%d XP), story quest %d of %d" % [pl.player_level(), pl.xp(), int(d["quests"]["story"]["index"]) + 1, Progression.STORY.size()])
 	lines.append("  rating %d%s, wins %d, losses %d, gold %d, maps %d, Legion Draft %d wins of %d" % [pl.rating(),
 		(" (#%d of %d)" % [int(rank["rank"]), int(rank["of"])]) if int(rank.get("rank", 0)) > 0 else "", int(d["wins"]), int(d["losses"]),
 		pl.gold(), pl.maps(), int(d.get("draft_wins", 0)), int(d.get("draft_played", 0))])

@@ -159,10 +159,10 @@ func _expedition_drag() -> void:
 
 
 func _patch_notes_drag() -> void:
-	main.tabs.current_tab = 7
+	main.tabs.current_tab = 8
 	await create_timer(1.5).timeout   # the scrolls unroll
 	var scroll: ScrollContainer = null
-	for s in main.tabs.get_child(7).find_children("*", "ScrollContainer", true, false):
+	for s in main.tabs.get_child(8).find_children("*", "ScrollContainer", true, false):
 		if s.is_visible_in_tree() and _ts._can_scroll_v(s):
 			scroll = s
 	check(scroll != null, "the patch notes scroll")

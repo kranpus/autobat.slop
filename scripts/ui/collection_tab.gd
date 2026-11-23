@@ -224,8 +224,12 @@ func _build_detail() -> void:
 	_detail.add_child(UIKit.label("Squad power: %s%s" % [Army.format_power(Army.army_power([power_sq])), "  (with trinkets)" if not ts.is_empty() else ""], 14, UIKit.ACCENT))
 
 	# Trinkets: two slots
-	_detail.add_child(UIKit.label("Trinkets (%d slots)" % Trinkets.SLOTS, 16, Color.WHITE))
+	_detail.add_child(UIKit.label("Trinkets (%d slot%s)" % [Profile.trinket_slots(), "" if Profile.trinket_slots() == 1 else "s"], 16, Color.WHITE))
 	for slot in Trinkets.SLOTS:
+		if slot >= Profile.trinket_slots() and slot >= ts.size():
+			var locked := UIKit.label("Second slot: unlocks at commander level %d." % Progression.unlock_level("trinket_slot2"), 13, UIKit.TEXT_DIM)
+			_detail.add_child(locked)
+			continue
 		_detail.add_child(_trinket_slot(id, slot, ts[slot] if slot < ts.size() else ""))
 
 	# Army membership

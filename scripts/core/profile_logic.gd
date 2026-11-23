@@ -44,6 +44,9 @@ static func default_profile() -> Dictionary:
 		"challenges": {},         # cleared challenge id -> true
 		"pending_trinket": {},    # an open trinket hunt choice
 		"levels_version": 2,      # 0.9.7 per-rarity levels
+		"xp": 0,                  # commander XP (0.9.7)
+		"level_rewarded": 1,      # commander levels whose reward has been paid
+		"quests": {},             # the quest log (see Progression)
 	}
 
 
@@ -54,12 +57,17 @@ func load_from(source: Dictionary) -> void:
 		data[k] = source[k]
 	if not source.is_empty() and not source.has("levels_version"):
 		data["levels_version"] = 1   # saved before 0.9.7: old-style levels
+	if not source.is_empty() and not source.has("xp"):
+		_start_commander_level(source)
 	_sanitize()
 	_regen_maps()
+	refresh_quests()
 
 
 func reset() -> void:
 	data = default_profile()
+	_sanitize_quests()
+	refresh_quests()
 
 
 func _sanitize() -> void:
@@ -133,25 +141,28 @@ func _sanitize() -> void:
 		if not opts.is_empty():
 			clean_pc = {"region": str(pc.get("region", "")), "options": opts, "gold": int(pc.get("gold", 0))}
 	data["pending_choice"] = clean_pc
+	data["xp"] = clampi(int(data.get("xp", 0)), 0, Progression.xp_for_level(Progression.MAX_LEVEL))
+	data["level_rewarded"] = clampi(int(data.get("level_rewarded", 1)), 1, Progression.MAX_LEVEL)
+	_sanitize_quests()
 
 
 func _regen_maps() -> void:
 	var now := int(Time.get_unix_time_from_system())
-	if int(data["maps"]) >= MAX_MAPS:
+	if int(data["maps"]) >= max_maps():
 		data["map_clock"] = now
 		return
 	var elapsed := now - int(data["map_clock"])
 	@warning_ignore("integer_division")
 	var gained := elapsed / MAP_REGEN_SECONDS
 	if gained > 0:
-		data["maps"] = mini(MAX_MAPS, int(data["maps"]) + gained)
+		data["maps"] = mini(max_maps(), int(data["maps"]) + gained)
 		data["map_clock"] = int(data["map_clock"]) + gained * MAP_REGEN_SECONDS
 
 
 ## Seconds until the next free scouting map, or -1 when full.
 func seconds_to_next_map() -> int:
 	_regen_maps()
-	if int(data["maps"]) >= MAX_MAPS:
+	if int(data["maps"]) >= max_maps():
 		return -1
 	return MAP_REGEN_SECONDS - (int(Time.get_unix_time_from_system()) - int(data["map_clock"]))
 
@@ -220,8 +231,11 @@ func can_level_up(id: String) -> bool:
 func level_up(id: String) -> bool:
 	if not can_level_up(id):
 		return false
-	data["gold"] = gold() - level_up_cost(id)
+	var cost := level_up_cost(id)
+	data["gold"] = gold() - cost
 	data["units"][id]["level"] = int(data["units"][id]["level"]) + 1
+	_on("unit_level")
+	quest_event("gold_spend", cost)
 	return true
 
 
@@ -251,6 +265,8 @@ func tier_up(id: String) -> bool:
 	var u: Dictionary = data["units"][id]
 	u["shards"] = int(u["shards"]) - int(c["shards"])
 	u["tier"] = int(u["tier"]) + 1
+	_on("tier_up")
+	quest_event("gold_spend", int(c["gold"]))
 	return true
 
 
@@ -280,7 +296,7 @@ func explore(region_id: String) -> Dictionary:
 	if not can_explore(region_id):
 		return {}
 	var region: Dictionary = GameData.REGIONS[region_id]
-	if int(data["maps"]) >= MAX_MAPS:
+	if int(data["maps"]) >= max_maps():
 		data["map_clock"] = int(Time.get_unix_time_from_system())
 	data["maps"] = int(data["maps"]) - int(region["cost_maps"])
 	var rng := RandomNumberGenerator.new()
@@ -298,6 +314,7 @@ func explore(region_id: String) -> Dictionary:
 		var shards := rng.randi_range(int(range_[0]), int(range_[1])) * int(region["cost_maps"]) * GameData.CHOICE_SHARD_MULT
 		options.append({"unit": picked, "shards": shards, "guaranteed": picked == guaranteed})
 	var gold_found := rng.randi_range(15, 45) * int(region["cost_maps"])
+	_on("explore")
 	data["gold"] = gold() + gold_found
 	data["pending_choice"] = {"region": region_id, "options": options, "gold": gold_found}
 	return pending_choice()
@@ -381,6 +398,7 @@ func choose_recruit(index: int) -> Dictionary:
 	var is_new := not owns(id)
 	if is_new:
 		data["units"][id] = {"level": 1, "tier": 0, "shards": shards}
+		quest_event("new_unit")
 	else:
 		data["units"][id]["shards"] = int(data["units"][id]["shards"]) + shards
 	data["pending_choice"] = {}
@@ -512,7 +530,7 @@ func trinket_holder(id: String) -> String:
 
 ## Put trinket `id` in a unit's slot (taking it off whoever held it).
 func equip_trinket(unit_id: String, slot: int, id: String) -> bool:
-	if not owns(unit_id) or not owns_trinket(id) or slot < 0 or slot >= Trinkets.SLOTS:
+	if not owns(unit_id) or not owns_trinket(id) or slot < 0 or slot >= trinket_slots():
 		return false
 	var holder := trinket_holder(id)
 	if holder != "":
@@ -535,7 +553,7 @@ func unequip_trinket(unit_id: String, slot: int) -> bool:
 
 
 func trinket_site_unlocked(site_id: String) -> bool:
-	return Trinkets.SITES.has(site_id) and rating() >= int(Trinkets.SITES[site_id]["min_rating"])
+	return Trinkets.SITES.has(site_id) and rating() >= int(Trinkets.SITES[site_id]["min_rating"]) and feature_unlocked("trinkets")
 
 
 func can_hunt_trinkets(site_id: String) -> bool:
@@ -555,9 +573,10 @@ func pending_trinket() -> Dictionary:
 func hunt_trinkets(site_id: String) -> Dictionary:
 	if not can_hunt_trinkets(site_id):
 		return {}
-	if int(data["maps"]) >= MAX_MAPS:
+	if int(data["maps"]) >= max_maps():
 		data["map_clock"] = int(Time.get_unix_time_from_system())
 	data["maps"] = int(data["maps"]) - int(Trinkets.SITES[site_id]["cost_maps"])
+	_on("trinket_hunt")
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	data["pending_trinket"] = {"site": site_id, "options": Trinkets.roll_hunt(site_id, data["trinkets"], rng)}
@@ -604,8 +623,11 @@ func challenge_unlocked(id: String) -> bool:
 func complete_challenge(id: String, won: bool) -> Dictionary:
 	var out := {"challenge": id, "won": won, "first_clear": false, "gold": 0, "maps": 0,
 		"trinket": "", "trinket_new": false, "unit": "", "unit_new": false, "shards": 0}
+	if won and challenge_unlocked(id):
+		_on("challenge_win")
 	if not won or not challenge_unlocked(id) or challenge_cleared(id):
 		return out
+	add_xp(int(Progression.XP["challenge_first"]))
 	var reward: Dictionary = Challenges.get_challenge(id)["reward"]
 	data["challenges"][id] = true
 	out["first_clear"] = true
@@ -661,6 +683,14 @@ func apply_battle_result(mode: String, score: float, opp_rating: int, enemy_kill
 	data["gold"] = gold() + g
 	data["maps"] = int(data["maps"]) + int(summary["maps"])
 	summary["gold"] = g
+	var level_before := player_level()
+	_on("battle")
+	quest_event("kills", maxi(0, enemy_killed))
+	if (mode == "ranked" or mode == "live") and score >= 1.0:
+		_on("ranked_win")
+	summary["xp"] = int(Progression.XP["battle"]) + (int(Progression.XP["ranked_win"]) if (mode == "ranked" or mode == "live") and score >= 1.0 else 0)
+	summary["level"] = player_level()
+	summary["level_up"] = player_level() > level_before
 	return summary
 
 
@@ -672,6 +702,227 @@ func add_draft_reward(gold_reward: int, maps_reward: int, place: int) -> Diction
 	data["gold"] = gold() + gold_reward
 	data["maps"] = int(data["maps"]) + maps_reward
 	data["draft_played"] = int(data.get("draft_played", 0)) + 1
+	_on("draft_play")
 	if place == 1:
 		data["draft_wins"] = int(data.get("draft_wins", 0)) + 1
+		_on("draft_win")
 	return {"gold": gold_reward, "maps": maps_reward}
+
+
+
+# --- commander level and quest log (0.9.7) ----------------------------------------------
+
+func xp() -> int:
+	return int(data.get("xp", 0))
+
+
+func player_level() -> int:
+	return Progression.level_for_xp(xp())
+
+
+func feature_unlocked(key: String) -> bool:
+	return player_level() >= Progression.unlock_level(key)
+
+
+func max_maps() -> int:
+	return MAX_MAPS + Progression.extra_maps(player_level())
+
+
+func trinket_slots() -> int:
+	return Progression.trinket_slots(player_level())
+
+
+## Players from before 0.9.7 start with XP for what they've done, and at
+## least level 8 (everything they could do before stays open). The levels
+## they start at don't pay rewards.
+func _start_commander_level(source: Dictionary) -> void:
+	var units := (source.get("units", {}) as Dictionary).size() if typeof(source.get("units")) == TYPE_DICTIONARY else 0
+	var played := int(source.get("wins", 0)) + int(source.get("losses", 0))
+	var draft := int(source.get("draft_played", 0))
+	var cleared := (source.get("challenges", {}) as Dictionary).size() if typeof(source.get("challenges")) == TYPE_DICTIONARY else 0
+	var x := 30 * played + 80 * cleared + 40 * draft + 20 * maxi(0, units - GameData.STARTER_UNITS.size())
+	if played + draft > 0 or units > GameData.STARTER_UNITS.size():
+		x = maxi(x, Progression.xp_for_level(8))
+	data["xp"] = mini(x, Progression.xp_for_level(Progression.MAX_LEVEL))
+	data["level_rewarded"] = Progression.level_for_xp(int(data["xp"]))
+
+
+## Add XP; pays the reward of every level reached. Returns the new levels.
+func add_xp(amount: int) -> Array:
+	if amount <= 0:
+		return []
+	data["xp"] = mini(xp() + amount, Progression.xp_for_level(Progression.MAX_LEVEL))
+	var gained: Array = []
+	while int(data.get("level_rewarded", 1)) < player_level():
+		var lvl := int(data.get("level_rewarded", 1)) + 1
+		data["level_rewarded"] = lvl
+		_pay(Progression.level_reward(lvl))
+		gained.append(lvl)
+	if not gained.is_empty():
+		refresh_quests()   # new quest slots may have opened
+	return gained
+
+
+## Gold, maps and a random trinket of a rarity (gold if you own them all).
+func _pay(r: Dictionary) -> Dictionary:
+	var out := {"gold": int(r.get("gold", 0)), "maps": int(r.get("maps", 0)), "trinket": ""}
+	if r.has("trinket_rarity"):
+		var rar := str(r["trinket_rarity"])
+		var pool: Array = Trinkets.ids_by_rarity(rar).filter(func(t): return not owns_trinket(t))
+		if pool.is_empty():
+			out["gold"] = int(out["gold"]) + int(Trinkets.DUPLICATE_GOLD.get(rar, 100))
+		else:
+			var rng := RandomNumberGenerator.new()
+			rng.randomize()
+			var t: String = pool[rng.randi_range(0, pool.size() - 1)]
+			data["trinkets"][t] = true
+			out["trinket"] = t
+	data["gold"] = gold() + int(out["gold"])
+	data["maps"] = int(data["maps"]) + int(out["maps"])
+	return out
+
+
+## Something happened: quest progress plus its XP.
+func _on(goal: String, amount: int = 1) -> void:
+	quest_event(goal, amount)
+	add_xp(int(Progression.XP.get(goal, 0)) * amount)
+
+
+func quest_event(goal: String, amount: int = 1) -> void:
+	if amount <= 0:
+		return
+	var q: Dictionary = data["quests"]
+	for kind in ["daily", "weekly"]:
+		for e in q[kind]["list"]:
+			var d := Progression.quest_def(str(e["id"]))
+			if not bool(e["claimed"]) and str(d.get("goal", "")) == goal:
+				e["progress"] = mini(int(d["n"]), int(e["progress"]) + amount)
+	var st := Progression.story(int(q["story"]["index"]))
+	if not st.is_empty() and str(st["goal"]) == goal:
+		q["story"]["progress"] = mini(int(st["n"]), int(q["story"]["progress"]) + amount)
+
+
+func _sanitize_quests() -> void:
+	var raw = data.get("quests", {})
+	var q := {}
+	for kind in ["daily", "weekly"]:
+		var src = raw.get(kind, {}) if typeof(raw) == TYPE_DICTIONARY else {}
+		var list: Array = []
+		if typeof(src) == TYPE_DICTIONARY and typeof(src.get("list")) == TYPE_ARRAY:
+			for e in src["list"]:
+				if typeof(e) == TYPE_DICTIONARY and not Progression.quest_def(str(e.get("id", ""))).is_empty():
+					list.append({"id": str(e["id"]), "progress": maxi(0, int(e.get("progress", 0))), "claimed": bool(e.get("claimed", false))})
+		q[kind] = {"period": int(src.get("period", -1)) if typeof(src) == TYPE_DICTIONARY else -1, "list": list}
+	var st = raw.get("story", {}) if typeof(raw) == TYPE_DICTIONARY else {}
+	q["story"] = {"index": clampi(int(st.get("index", 0)) if typeof(st) == TYPE_DICTIONARY else 0, 0, Progression.STORY.size()),
+		"progress": maxi(0, int(st.get("progress", 0)) if typeof(st) == TYPE_DICTIONARY else 0)}
+	data["quests"] = q
+
+
+## New daily and weekly quests when their period has turned over (or a new
+## quest slot has opened). Returns true when anything changed.
+func refresh_quests(now: int = -1) -> bool:
+	if now < 0:
+		now = int(Time.get_unix_time_from_system())
+	var changed := false
+	var lvl := player_level()
+	for kind in ["daily", "weekly"]:
+		var period := Progression.day_index(now) if kind == "daily" else Progression.week_index(now)
+		var want := Progression.daily_count(lvl) if kind == "daily" else Progression.weekly_count(lvl)
+		var slot: Dictionary = data["quests"][kind]
+		if int(slot["period"]) != period:
+			slot["period"] = period
+			slot["list"] = []
+			changed = true
+		if (slot["list"] as Array).size() < want:
+			var pool: Array = (Progression.DAILY if kind == "daily" else Progression.WEEKLY).filter(func(d):
+				return lvl >= int(d.get("min_level", 1)) and not (slot["list"] as Array).any(func(e): return e["id"] == d["id"]))
+			var rng := RandomNumberGenerator.new()
+			rng.randomize()
+			while (slot["list"] as Array).size() < want and not pool.is_empty():
+				var d: Dictionary = pool[rng.randi_range(0, pool.size() - 1)]
+				pool.erase(d)
+				slot["list"].append({"id": d["id"], "progress": 0, "claimed": false})
+				changed = true
+	return changed
+
+
+## Progress toward a quest: counters as recorded, milestones from the profile.
+func quest_progress(def: Dictionary, recorded: int) -> int:
+	var n := int(def.get("n", 1))
+	match str(def.get("goal", "")):
+		"rating":
+			return mini(n, rating())
+		"units_owned":
+			return mini(n, data["units"].size())
+		"max_tier":
+			var t := 0
+			for u in data["units"]:
+				t = maxi(t, int(data["units"][u]["tier"]))
+			return mini(n, t)
+		"challenges_cleared":
+			return mini(n, challenges_cleared())
+		"army_power":
+			return mini(n, roundi(Army.army_power(battle_squads()) / 10.0))
+		"player_level":
+			return mini(n, player_level())
+		"trinkets_owned":
+			return mini(n, data["trinkets"].size())
+	return mini(n, recorded)
+
+
+## The quest log for the UI: [{kind, index, id, text, n, progress, done,
+## claimed, reward (text), def}].
+func quest_log() -> Array:
+	var out: Array = []
+	var q: Dictionary = data["quests"]
+	var si := int(q["story"]["index"])
+	var st := Progression.story(si)
+	if not st.is_empty():
+		var p := quest_progress(st, int(q["story"]["progress"]))
+		out.append({"kind": "story", "index": si, "id": st["id"], "text": st["text"], "n": int(st["n"]), "progress": p,
+			"done": p >= int(st["n"]), "claimed": false, "reward": Progression.reward_text(st), "def": st})
+	for kind in ["daily", "weekly"]:
+		var list: Array = q[kind]["list"]
+		for i in list.size():
+			var d := Progression.quest_def(str(list[i]["id"]))
+			var p := quest_progress(d, int(list[i]["progress"]))
+			out.append({"kind": kind, "index": i, "id": d["id"], "text": d["text"], "n": int(d["n"]), "progress": p,
+				"done": p >= int(d["n"]), "claimed": bool(list[i]["claimed"]), "reward": Progression.reward_text(d), "def": d})
+	return out
+
+
+func can_claim_quest(kind: String, index: int) -> bool:
+	for e in quest_log():
+		if e["kind"] == kind and int(e["index"]) == index:
+			return bool(e["done"]) and not bool(e["claimed"])
+	return false
+
+
+## Claim a finished quest: pays its reward and XP. Story quests move on to the
+## next. Returns {gold, maps, trinket, xp, levels} ({} if it can't be claimed).
+func claim_quest(kind: String, index: int) -> Dictionary:
+	refresh_quests()
+	if not can_claim_quest(kind, index):
+		return {}
+	var def: Dictionary
+	if kind == "story":
+		def = Progression.story(index)
+		data["quests"]["story"] = {"index": index + 1, "progress": 0}
+	else:
+		var e: Dictionary = data["quests"][kind]["list"][index]
+		def = Progression.quest_def(str(e["id"]))
+		e["claimed"] = true
+	var out := _pay(def)
+	out["xp"] = int(def.get("xp", 0))
+	out["levels"] = add_xp(int(def.get("xp", 0)))
+	out["quest"] = def.get("text", "")
+	return out
+
+
+func claimable_quests() -> int:
+	var n := 0
+	for e in quest_log():
+		if bool(e["done"]) and not bool(e["claimed"]):
+			n += 1
+	return n

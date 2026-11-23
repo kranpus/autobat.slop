@@ -14,6 +14,7 @@ const TrinketTab := preload("res://scripts/ui/trinket_tab.gd")
 const LeaderboardTab := preload("res://scripts/ui/leaderboard_tab.gd")
 const ChallengesTab := preload("res://scripts/ui/challenges_tab.gd")
 const PatchNotesTab := preload("res://scripts/ui/patch_notes_tab.gd")
+const QuestsTab := preload("res://scripts/ui/quests_tab.gd")
 const TutorialScript := preload("res://scripts/ui/tutorial.gd")
 
 var menu_layer: CanvasLayer
@@ -23,6 +24,9 @@ var expedition_tab: Control
 var trinket_tab: Control
 var _gold_label: Label
 var _maps_label: Label
+var _level_label: Label
+var _exp_tabs: TabContainer
+var _draft_tab: Control
 var _rating_label: Label
 var _battle: Node = null
 var _battle_mode := ""
@@ -77,6 +81,7 @@ func _ready() -> void:
 	tabs.add_child(army_tab)
 	# Expeditions has two sub-tabs: regions (units) and trinket hunts.
 	var exp_tabs := TabContainer.new()
+	_exp_tabs = exp_tabs
 	exp_tabs.name = "Expeditions"
 	tabs.add_child(exp_tabs)
 	expedition_tab = ExpeditionTab.new()
@@ -94,10 +99,14 @@ func _ready() -> void:
 	challenges_tab.name = "Challenges"
 	challenges_tab.battle_requested.connect(start_battle)
 	tabs.add_child(challenges_tab)
+	var quests_tab := QuestsTab.new()
+	quests_tab.name = "Quests"
+	tabs.add_child(quests_tab)
 	var board_tab := LeaderboardTab.new()
 	board_tab.name = "Leaderboard"
 	tabs.add_child(board_tab)
 	var draft_tab := DraftLobbyTab.new()
+	_draft_tab = draft_tab
 	draft_tab.name = "Legion Draft"
 	tabs.add_child(draft_tab)
 	var notes_tab := PatchNotesTab.new()
@@ -208,6 +217,9 @@ func _build_top_bar() -> Control:
 	h.add_child(_account_label)
 	h.add_child(UIKit.spacer())
 	var fs := 14 if compact else 17
+	_level_label = UIKit.label("", fs, UIKit.ACCENT)
+	_level_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	h.add_child(_level_label)
 	_gold_label = UIKit.label("", fs, Color("ffd76a"))
 	_maps_label = UIKit.label("", fs, Color("9fd3ff"))
 	_rating_label = UIKit.label("", fs, Color("ffffff"))
@@ -234,7 +246,11 @@ func _refresh_top_bar() -> void:
 	if next >= 0:
 		@warning_ignore("integer_division")
 		timer_text = "  (+1 in %d:%02d)" % [next / 60, next % 60]
-	_maps_label.text = "%s: %d/%d%s" % ["Maps" if UIKit.is_compact(self) else "Scouting Maps", Profile.maps(), Profile.MAX_MAPS, timer_text]
+	_maps_label.text = "%s: %d/%d%s" % ["Maps" if UIKit.is_compact(self) else "Scouting Maps", Profile.maps(), Profile.max_maps(), timer_text]
+	var lvl := Profile.player_level()
+	_level_label.text = "Lv %d" % lvl
+	_level_label.tooltip_text = "Commander level %d: %d XP%s. See the Quests tab." % [lvl, Profile.xp(),
+		"" if lvl >= Progression.MAX_LEVEL else ", %d to the next level" % (Progression.xp_for_level(lvl + 1) - Profile.xp())]
 	_rating_label.text = "Rating: %d   W/L %d/%d" % [Profile.rating(), int(Profile.data["wins"]), int(Profile.data["losses"])]
 	if Profile.online:
 		_account_label.text = Profile.account + ("" if Party.session_active() else " (reconnecting...)")
@@ -328,7 +344,9 @@ func _refresh_badges() -> void:
 						dot = true
 						break
 			"Expeditions":
-				dot = Profile.maps() >= Profile.MAX_MAPS or Profile.has_pending_choice() or Profile.has_pending_trinket()
+				dot = Profile.maps() >= Profile.max_maps() or Profile.has_pending_choice() or Profile.has_pending_trinket()
+			"Quests":
+				dot = Profile.claimable_quests() > 0
 			"Challenges":
 				for c in Challenges.LIST:
 					if Profile.challenge_unlocked(c["id"]) and not Profile.challenge_cleared(c["id"]) and power >= Challenges.recommended(c["id"]):
@@ -337,6 +355,65 @@ func _refresh_badges() -> void:
 			"Patch Notes":
 				dot = str(Profile.settings.get("seen_patch", "")) != PatchNotes.latest()
 		tabs.set_tab_icon(i, UIKit.badge_dot() if dot else null)
+	_refresh_gates()
+	_level_up_notice()
+
+
+## Parts of the game that open with the commander level (0.9.7).
+func _refresh_gates() -> void:
+	if _draft_tab:
+		var i := _draft_tab.get_index()
+		var open := Profile.feature_unlocked("draft")
+		tabs.set_tab_disabled(i, not open)
+		tabs.set_tab_title(i, "Legion Draft" if open else "Legion Draft (Lv %d)" % Progression.unlock_level("draft"))
+		if not open and tabs.current_tab == i:
+			tabs.current_tab = 0
+	if _exp_tabs:
+		var open := Profile.feature_unlocked("trinkets")
+		var j := trinket_tab.get_index()
+		_exp_tabs.set_tab_disabled(j, not open)
+		_exp_tabs.set_tab_title(j, "Trinkets" if open else "Trinkets (Lv %d)" % Progression.unlock_level("trinkets"))
+		if not open and _exp_tabs.current_tab == j:
+			_exp_tabs.current_tab = 0
+
+
+## A message for each commander level reached: its reward and what it opens.
+func _level_up_notice() -> void:
+	var lvl := Profile.player_level()
+	if not Profile.settings.has("seen_level"):
+		Profile.settings["seen_level"] = lvl   # first run of 0.9.7: no flood of old levels
+		Profile.save_settings()
+		return
+	var seen := int(Profile.settings["seen_level"])
+	if lvl <= seen or not menu_layer.visible or not get_tree().get_nodes_in_group("level_notice").is_empty():
+		return
+	Profile.settings["seen_level"] = lvl
+	Profile.save_settings()
+	var lines: Array = []
+	for l in range(seen + 1, lvl + 1):
+		var r := Progression.level_reward(l)
+		var parts: Array = ["%d gold" % int(r["gold"])]
+		if r.has("maps"):
+			parts.append("%d scouting maps" % int(r["maps"]))
+		if r.has("trinket_rarity"):
+			parts.append("a %s trinket" % r["trinket_rarity"])
+		var line := "Level %d: %s." % [l, ", ".join(PackedStringArray(parts))]
+		if Progression.UNLOCKS.has(l):
+			line += "  Unlocked: %s!" % Progression.UNLOCKS[l]["text"]
+		lines.append(line)
+	var d := AcceptDialog.new()
+	d.theme = UIKit.make_theme()
+	d.title = "Commander level %d!" % lvl
+	d.dialog_text = "\n".join(PackedStringArray(lines))
+	d.dialog_autowrap = true
+	d.min_size = Vector2i(460, 0)
+	d.ok_button_text = "Onward"
+	d.add_to_group("level_notice")
+	add_child(d)
+	d.popup_centered()
+	d.confirmed.connect(d.queue_free)
+	d.canceled.connect(d.queue_free)
+	Audio.play_sfx("fanfare")
 
 
 # --- phones held upright ------------------------------------------------------------

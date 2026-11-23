@@ -335,6 +335,8 @@ func _show_rewards(summary: Dictionary, mode: String) -> void:
 	if mode in ["ranked", "ranked_online", "live"]:
 		var d := int(summary.get("rating", 0))
 		_rewards_box.add_child(UIKit.label("Rating %s%d  (now %d)" % ["+" if d >= 0 else "", d, Profile.rating()], 16, UIKit.GOOD if d >= 0 else UIKit.BAD))
+	if int(summary.get("xp", 0)) > 0:
+		_rewards_box.add_child(UIKit.label("+%d XP%s" % [int(summary["xp"]), "  ·  Commander level %d!" % int(summary["level"]) if bool(summary.get("level_up", false)) else ""], 15, UIKit.ACCENT))
 	if mode == "ranked_online":
 		_rewards_box.add_child(UIKit.label("Battle checked and rewarded by the server.", 12, UIKit.TEXT_DIM))
 

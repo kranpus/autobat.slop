@@ -143,7 +143,7 @@ func _run() -> void:
 		"use_lives": true, "use_wins": true, "use_timer": false, "max_rounds": 0})
 	for i in 3:
 		party.add_bot()
-	main.tabs.current_tab = 6
+	main.tabs.current_tab = 7
 	await _wait(0.5)
 	party.start_match()
 	await _wait(1.0)

@@ -45,6 +45,7 @@ func _initialize() -> void:
 	test_rarity_levels()
 	test_trinket_splash()
 	test_ghost_picks()
+	test_quests()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -683,6 +684,8 @@ func test_trinkets() -> void:
 	var pl := ProfileLogic.new()
 	pl.data["maps"] = 10
 	pl.data["rating"] = 1300
+	pl.data["xp"] = Progression.xp_for_level(8)   # trinket hunts and both slots open
+	pl.data["level_rewarded"] = 8
 	check(not pl.equip_trinket("goblin", 0, "octoring"), "can't equip a trinket you don't own")
 	var choice := pl.hunt_trinkets("trove")
 	check(choice.get("options", []).size() == 3 and pl.maps() == 7, "a hunt spends maps and offers 3 trinkets")
@@ -913,6 +916,8 @@ func test_challenges() -> void:
 
 	# Clear the first one with the starting army.
 	var pl := ProfileLogic.new()
+	pl.data["xp"] = Progression.xp_for_level(Progression.MAX_LEVEL)   # no level-up rewards mixed in
+	pl.data["level_rewarded"] = Progression.MAX_LEVEL
 	var sim := BattleSim.new()
 	sim.setup(pl.battle_squads(), Challenges.enemy_squads("rat_problem"), 5, "open_arena")
 	sim.run_to_end(200000)
@@ -1700,3 +1705,76 @@ func test_ghost_picks() -> void:
 	check(names.size() >= 40, "...and still vary (%d different units across 60 bands)" % names.size())
 	var g := Army.generate_opponent(40000.0, 3500, 4)
 	check(absf(Army.army_power(g["squads"]) / 40000.0 - 1.0) < 0.1, "at the requested Strength")
+
+
+func test_quests() -> void:
+	print("commander levels and quest log (patch 0.9.7)")
+	check(Progression.level_for_xp(0) == 1 and Progression.level_for_xp(99) == 1 and Progression.level_for_xp(100) == 2 and Progression.level_for_xp(Progression.xp_for_level(30)) == 30, "XP curve: level 2 at 100 XP, up to level 30")
+	check(Progression.STORY.size() == 50 and range(50).all(func(i): return not Progression.story(i).is_empty() and (Progression.COUNTER_GOALS.has(Progression.story(i)["goal"]) or Progression.story(i)["goal"] in ["rating", "units_owned", "max_tier", "challenges_cleared", "army_power", "player_level", "trinkets_owned"])), "50 story quests, each with a known goal")
+	var pl := ProfileLogic.new()
+	check(pl.player_level() == 1 and pl.quest_log().size() == 1 and pl.quest_log()[0]["kind"] == "story", "a new commander: level 1, the first story quest, no daily quests yet")
+	pl.data["maps"] = 10
+	pl.data["rating"] = 1300
+	check(not pl.can_hunt_trinkets("camp") and not pl.feature_unlocked("draft") and pl.trinket_slots() == 1 and pl.max_maps() == 10, "trinket hunts, Legion Draft and the second trinket slot start locked")
+	var gold0 := pl.gold()
+	var gained := pl.add_xp(Progression.xp_for_level(3))
+	check(gained == [2, 3] and pl.gold() == gold0 + 300 + 450 and int(pl.data["maps"]) == 12, "levels 2 and 3 pay 300 and 450 gold, and level 3 two maps (%s)" % [gained])
+	check(pl.can_hunt_trinkets("camp"), "level 3 opens trinket hunts")
+	pl.refresh_quests()
+	var daily: Array = pl.quest_log().filter(func(e): return e["kind"] == "daily")
+	check(daily.size() == 3 and pl.quest_log().filter(func(e): return e["kind"] == "weekly").is_empty(), "level 2 brings 3 daily quests; weekly ones wait for level 4")
+	# Make a known daily quest and complete it.
+	pl.data["quests"]["daily"]["list"][0] = {"id": "d_battles", "progress": 0, "claimed": false}
+	for i in 5:
+		pl.apply_battle_result("practice", 1.0, 0, 20)
+	var q: Dictionary = pl.quest_log().filter(func(e): return e["id"] == "d_battles")[0]
+	check(bool(q["done"]) and int(q["progress"]) == 5, "fighting 5 battles completes 'Fight 5 battles'")
+	var g1 := pl.gold()
+	var xp1 := pl.xp()
+	var res := pl.claim_quest("daily", int(q["index"]))
+	check(int(res.get("gold", 0)) == 300 and pl.gold() >= g1 + 300 and pl.xp() == xp1 + Progression.DAILY_XP, "claiming pays 300 gold and %d XP" % Progression.DAILY_XP)
+	check(pl.claim_quest("daily", int(q["index"])).is_empty(), "...once")
+	# A new day.
+	var now := int(Time.get_unix_time_from_system())
+	check(pl.refresh_quests(now + Progression.DAY) and pl.quest_log().filter(func(e): return e["kind"] == "daily" and e["claimed"]).is_empty(), "the next day brings fresh daily quests")
+	# The server's reset time moves the day boundary.
+	Difficulty.quest_reset_minute = 0
+	var midnight := (now / Progression.DAY) * Progression.DAY
+	var before6 := Progression.day_index(midnight + 5 * 3600)
+	Difficulty.quest_reset_minute = 6 * 60
+	check(Progression.day_index(midnight + 5 * 3600) == before6 - 1 and Progression.day_index(midnight + 7 * 3600) == before6, "with a 06:00 reset, 05:00 still belongs to the day before")
+	check(Progression.seconds_to_next_day(midnight + 5 * 3600) == 3600, "...and the next reset is an hour away")
+	Difficulty.quest_reset_minute = 0
+	check(Progression.week_index(midnight) != Progression.week_index(midnight + 8 * Progression.DAY) and Progression.week_index(midnight) == Progression.week_index(midnight + 0) , "weeks turn over")
+	# Story quests: in order; milestones count what you already have.
+	var sp := ProfileLogic.new()
+	sp.apply_battle_result("practice", 0.0, 0, 5)
+	check(sp.claim_quest("story", 0).size() > 0 and int(sp.data["quests"]["story"]["index"]) == 1, "claiming a story quest moves on to the next")
+	check(sp.claim_quest("story", 0).is_empty() and sp.claim_quest("story", 2).is_empty(), "story quests can't be claimed out of order")
+	sp.data["quests"]["story"] = {"index": 5, "progress": 0}
+	for u in ["ogre", "orc_warrior", "elf_archer"]:
+		sp.data["units"][u] = {"level": 1, "tier": 0, "shards": 0}
+	check(sp.quest_log()[0]["text"] == "Own 6 units" and bool(sp.quest_log()[0]["done"]), "milestones like 'Own 6 units' count what you already have")
+	# Players from before 0.9.7.
+	var old := ProfileLogic.new({"rating": 1400, "wins": 30, "losses": 12, "units": {"goblin": {"level": 5, "tier": 2, "shards": 0}}})
+	check(old.player_level() >= 8 and int(old.data["level_rewarded"]) == old.player_level(), "existing commanders start at level %d or more, without back-paid rewards" % old.player_level())
+	check(old.feature_unlocked("draft") and old.can_hunt_trinkets("camp") == (old.maps() >= 1) and old.trinket_slots() == 2, "...so nothing they could do before is locked")
+	var fresh := ProfileLogic.new({})
+	check(fresh.player_level() == 1, "a brand-new save starts at level 1")
+	# Level 10 and 20: more map storage; 15: a fourth daily quest.
+	var hi := ProfileLogic.new()
+	hi.data["xp"] = Progression.xp_for_level(15)
+	hi.data["level_rewarded"] = 15
+	hi.refresh_quests()
+	check(hi.max_maps() == 12 and hi.quest_log().filter(func(e): return e["kind"] == "daily").size() == 4 and hi.quest_log().filter(func(e): return e["kind"] == "weekly").size() == 3, "level 15: 12 maps stored, 4 daily and 3 weekly quests")
+	# Server console.
+	var party := root.get_node("Party")
+	check(party.run_command("quests reset 06:30 tuesday").begins_with("Quest log updated") and Difficulty.quest_reset_minute == 390 and Difficulty.quest_reset_weekday == 1, "'quests reset 06:30 tuesday' sets the reset time")
+	var saved := Difficulty.to_dict()
+	Difficulty.reset()
+	Difficulty.apply(saved)
+	check(Difficulty.quest_reset_minute == 390, "...saved and sent to players like the difficulty settings")
+	check(party.run_command("quests reset 25:00").contains("HH:MM"), "bad times are refused")
+	Difficulty.reset()
+	var s_res := ProfileLogic.new().apply_battle_result("ranked", 1.0, 40, 10, true)
+	check(int(s_res["xp"]) == 30, "a ranked win shows +30 XP on the result screen")
