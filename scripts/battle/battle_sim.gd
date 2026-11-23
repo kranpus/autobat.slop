@@ -691,7 +691,7 @@ func _cleanse(t: int) -> bool:
 ## Imp: blows itself up on its first blow.
 func _detonate(i: int, t: int) -> void:
 	events.append([Ev.BLAST, px[t], py[t], DETONATE_RADIUS])
-	for k in _enemies_near(px[t], py[t], DETONATE_RADIUS, team[i], false, 8):
+	for k in _enemies_near(px[t], py[t], DETONATE_RADIUS, team[i], false, 5):
 		_damage_unit(k, dmg[i] * ab_val[i], dtype[i], false, -1)
 	if alive[i] == 1:
 		_kill(i, -1)
@@ -741,7 +741,7 @@ func _periodic_ability(i: int) -> void:
 			var x := px[t]
 			var y := py[t]
 			events.append([Ev.WAVE, x, y, ab_id[i]])
-			for k in _enemies_near(x, y, WAVE_RADIUS, team[i], false, 12):
+			for k in _enemies_near(x, y, WAVE_RADIUS, team[i], false, 8):
 				_damage_unit(k, dmg[i] * WAVE_MULT, dtype[i], false, i)
 				if alive[k] == 0 or ab_id[k] == Ab.UNSTOPPABLE:
 					continue
@@ -1178,7 +1178,7 @@ func _apply_auras() -> void:
 					inspire_until[k] = maxi(inspire_until[k], until)
 					inspire_amt[k] = maxf(inspire_amt[k], ab_val[i])
 			Ab.IMMOLATE:
-				for k in _enemies_near(px[i], py[i], 80.0, team[i], false, 20):
+				for k in _enemies_near(px[i], py[i], 80.0, team[i], false, 8):
 					_damage_unit(k, dmg[i] * ab_val[i] * float(AURA_TICKS) * DT, 3, false, -1)
 			Ab.FROST_AURA:
 				for k in _enemies_near(px[i], py[i], 110.0, team[i], false, 30):
