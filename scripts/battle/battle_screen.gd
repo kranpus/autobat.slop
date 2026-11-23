@@ -261,7 +261,7 @@ func _on_finished(winner: int) -> void:
 	elif mode == "challenge":
 		summary = Profile.complete_challenge(str(config.get("challenge", "")), score >= 1.0)
 	elif mode != "draft":
-		summary = Profile.apply_battle_result(mode, score, opp_rating, killed)
+		summary = Profile.apply_battle_result(mode, score, opp_rating, killed, bool(config.get("vs_ai", false)))
 	if mode == "live":
 		Net.report_result(sim.checksum())
 

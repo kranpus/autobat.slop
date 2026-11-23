@@ -271,6 +271,7 @@ func _build_board(shopping: bool) -> void:
 		var s: int = slot
 		var b := _card(Vector2(card_w, 128 if _compact else 178), Color("4a5068"), 2, func(): _on_slot(s))
 		b.set_drag_forwarding(_drag_from_slot.bind(s), _can_drop_on_slot.bind(s), _drop_on_slot.bind(s))
+		b.set_meta("drag_source", true)
 		_slot_buttons[slot] = b
 		var v := _card_content(b)
 		v.add_child(_centered(UIKit.label("%s · %d" % [DraftData.slot_row(run.slots, slot).capitalize(), slot + 1], 11, UIKit.TEXT_DIM)))
@@ -359,6 +360,7 @@ func _build_shop(shopping: bool) -> void:
 		var idx: int = i
 		var b := _card(_shop_card_size(), border, width, func(): _select("unit", idx))
 		b.set_drag_forwarding(_drag_from_shop.bind("unit", idx), Callable(), Callable())
+		b.set_meta("drag_source", true)
 		var v := _card_content(b)
 		var ic := UIKit.unit_icon(uid, 32 if _compact else 48)
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -383,6 +385,7 @@ func _build_shop(shopping: bool) -> void:
 		var idx: int = i
 		var b := _card(_shop_card_size(), border, width, func(): _select("trinket", idx))
 		b.set_drag_forwarding(_drag_from_shop.bind("trinket", idx), Callable(), Callable())
+		b.set_meta("drag_source", true)
 		var v := _card_content(b)
 		var ic := UIKit.icon(DraftData.trinket_texture(tid), 30 if _compact else 44)
 		ic.mouse_filter = Control.MOUSE_FILTER_IGNORE

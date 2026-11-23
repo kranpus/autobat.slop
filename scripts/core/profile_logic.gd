@@ -9,6 +9,8 @@ extends RefCounted
 const SAVE_VERSION := 1
 const MAP_REGEN_SECONDS := 600
 const MAX_MAPS := 10
+## Rating a new commander starts at (1000 before 0.9.5).
+const START_RATING := 600
 
 var data: Dictionary = {}
 ## Gold multiplier for battle rewards (set by the server admin's `gold battle`).
@@ -32,7 +34,7 @@ static func default_profile() -> Dictionary:
 		"gold": 600,
 		"maps": 5,
 		"map_clock": int(Time.get_unix_time_from_system()),
-		"rating": 1000,
+		"rating": START_RATING,
 		"wins": 0,
 		"losses": 0,
 		"units": units,
@@ -620,13 +622,14 @@ func complete_challenge(id: String, won: bool) -> Dictionary:
 # --- battle results ---------------------------------------------------------
 
 ## mode: "ranked", "live" or "practice". score: 1 win, 0.5 draw, 0 loss.
+## vs_ai: a ranked battle against a training band (moves rating less).
 ## Returns a summary dictionary for the result screen.
-func apply_battle_result(mode: String, score: float, opp_rating: int, enemy_killed: int) -> Dictionary:
+func apply_battle_result(mode: String, score: float, opp_rating: int, enemy_killed: int, vs_ai: bool = false) -> Dictionary:
 	var summary := {"gold": 0, "maps": 0, "rating": 0}
 	var g := 20 + enemy_killed / 5
 	if mode == "ranked" or mode == "live":
 		var rank_mult := Army.win_gold_mult(rating())   # your rating before this battle
-		var delta := Army.elo_delta(rating(), opp_rating, score)
+		var delta := Army.ranked_delta(rating(), opp_rating, score, vs_ai and mode == "ranked")
 		data["rating"] = maxi(0, rating() + delta)
 		summary["rating"] = delta
 		if score >= 1.0:

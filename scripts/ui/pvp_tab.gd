@@ -210,7 +210,7 @@ func _on_ranked_opponents(list: Array) -> void:
 	# did this for signed-in players).
 	if not Profile.online:
 		var before := _opponents.size()
-		Army.fill_ghosts(_opponents, Army.army_power(Profile.battle_squads()), rating, rng)
+		Army.fill_ghosts(_opponents, rating, rng)
 		for i in range(before, _opponents.size()):
 			_opponents[i]["map"] = BattleMaps.random_map_id(rng)
 	var order := {"Easy": 0, "Even": 1, "Hard": 2}
@@ -257,7 +257,10 @@ func _make_opponent_card(opp: Dictionary) -> Control:
 		tag.mouse_filter = Control.MOUSE_FILTER_PASS
 		h.add_child(tag)
 	else:
-		h.add_child(ScrollUnroll.ink("training band", 12, FantasySkin.INK_DIM))
+		var band := ScrollUnroll.ink("training band", 12, FantasySkin.INK_DIM)
+		band.tooltip_text = "An army raised for your rating. Worth %s the rating of a commander's army." % ("a quarter" if Profile.rating() < Army.AI_RATING_FROM else "a tenth")
+		band.mouse_filter = Control.MOUSE_FILTER_PASS
+		h.add_child(band)
 	h.add_child(UIKit.spacer())
 	h.add_child(ScrollUnroll.ink("Rating %d · Power %s · %d units" % [int(opp["rating"]), Army.format_power(Army.army_power(opp["squads"])), Army.total_units(opp["squads"])], 13, FantasySkin.INK_DIM))
 	v.add_child(h)
@@ -265,7 +268,7 @@ func _make_opponent_card(opp: Dictionary) -> Control:
 	h2.add_child(UIKit.squad_strip(opp["squads"], 30, FantasySkin.INK_DIM))
 	h2.add_child(UIKit.spacer())
 	h2.add_child(ScrollUnroll.ink("at %s" % BattleMaps.get_map(opp["map"])["name"], 13, FantasySkin.INK_DIM))
-	var win_delta := Army.elo_delta(Profile.rating(), int(opp["rating"]), 1.0)
+	var win_delta := Army.ranked_delta(Profile.rating(), int(opp["rating"]), 1.0, not bool(opp.get("player", false)))
 	h2.add_child(UIKit.tut(ScrollUnroll.seal_button("Attack  +%d" % win_delta, func(): _start(opp, "ranked")), "attack"))
 	v.add_child(h2)
 	return v
@@ -300,6 +303,7 @@ func _start(opp: Dictionary, mode: String) -> void:
 		"name_b": opp["name"],
 		"rating_a": Profile.rating(),
 		"rating_b": int(opp["rating"]),
+		"vs_ai": mode == "ranked" and not bool(opp.get("player", false)),
 		"local_team": 0,
 		"map": str(opp.get("map", _chosen_map_or_random())),
 	})

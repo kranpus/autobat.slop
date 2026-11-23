@@ -145,6 +145,7 @@ func _make_card(index: int, sq: Dictionary, deployed: int, first: bool, last: bo
 	var p := UIKit.panel(UIKit.PANEL)
 	p.mouse_default_cursor_shape = Control.CURSOR_DRAG
 	p.set_drag_forwarding(_drag_squad.bind(index), _can_drop_squad, _drop_on_card.bind(index))
+	p.set_meta("drag_source", true)   # touch scrolling: only along the list
 	var v := UIKit.vbox(4)
 	p.add_child(v)
 	var id: String = sq["unit"]
@@ -278,6 +279,7 @@ func _make_reserve(id: String, full: bool) -> Control:
 	b.disabled = full
 	b.tooltip_text = "%s: Lv %d, %d units. %s" % [GameData.UNITS[id]["name"], int(Profile.unit(id)["level"]), Profile.squad_size(id), "Army full." if full else "Tap to add to the %s." % COLUMN_INFO[GameData.default_row_for(id)]["title"].to_lower()]
 	b.pressed.connect(func(): _add_unit(id, GameData.default_row_for(id)))
+	b.set_meta("drag_source", true)
 	b.set_drag_forwarding(func(_at: Vector2) -> Variant:
 		if full:
 			return null

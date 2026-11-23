@@ -488,7 +488,7 @@ func run_command(line: String) -> String:
   drops pity <rarity> <n>         guarantee rare/epic/legendary every n expeditions (0 = off)
   drops reset                     back to the defaults
   difficulty                      show ranked opponent and challenge difficulty
-  difficulty hard 1.5 [150]       a ranked tier's power vs yours [and rating offset];
+  difficulty hard 1.5 [150]       a ranked tier's power vs your rating's [and rating offset];
                                   tiers: easy, even, hard
   difficulty ranked 1.2           scale all three ranked tiers' power
   difficulty challenges 1.3       challenge enemies' HP and damage (1 = as designed)
@@ -2723,7 +2723,7 @@ func _ranked_offer_for(id: int) -> Array:
 		var r := int(e["rating"])
 		offers.append({"name": e["name"], "rating": r, "squads": army["squads"], "player": true, "saved_at": e["saved_at"],
 			"difficulty": "Easy" if r < rating - Army.RANKED_LABEL_GAP else ("Hard" if r > rating + Army.RANKED_LABEL_GAP else "Even")})
-	Army.fill_ghosts(offers, Army.army_power(pl.battle_squads()), rating, _rng)
+	Army.fill_ghosts(offers, rating, _rng)
 	for i in offers.size():
 		offers[i]["map"] = BattleMaps.random_map_id(_rng)
 		offers[i]["index"] = i
@@ -2812,7 +2812,7 @@ func _poll_ranked_jobs() -> void:
 		if j.has("challenge"):
 			summary = pl.complete_challenge(str(j["challenge"]), score >= 1.0)
 		else:
-			summary = pl.apply_battle_result("ranked", score, int(j["opp"]["rating"]), killed)
+			summary = pl.apply_battle_result("ranked", score, int(j["opp"]["rating"]), killed, not bool(j["opp"].get("player", false)))
 			unit_stats.record("ranked", j["mine"], score)
 		summary["score"] = score
 		accounts.save(user)

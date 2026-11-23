@@ -249,7 +249,7 @@ Ctrl+P then Ctrl+Q to detach again.
 | `rooms` | List rooms with their phase and player count. |
 | `gold` | Show the gold settings. |
 | `update-url https://yourname.itch.io/game` | Where out-of-date games download the new version. Their **Update required** prompt gets a **Download update** button that opens this link (browser players just reload). `update-url none` removes it. Can also be set with the `UPDATE_URL` environment variable. |
-| `difficulty` | Show how hard fights are: each ranked training tier's power and rating relative to the player, and the challenge multiplier. |
+| `difficulty` | Show how hard fights are: each ranked training tier's power (relative to the power expected at the player's rating) and rating relative to the player, and the challenge multiplier. |
 | `difficulty hard 1.5 150` | Set a ranked tier (`easy`, `even` or `hard`): its power relative to the player's army, and optionally its rating offset. Defaults: easy 0.9 −40, even 1.1 +60, hard 1.5 +150. |
 | `difficulty ranked 1.2` | Scale the power of all three ranked tiers at once (1.2 = 20% stronger opponents). |
 | `difficulty challenges 1.3` | Multiply challenge enemies' HP and damage (1 = as designed, 0.25–5). The recommended power on each card scales with it. |
@@ -454,7 +454,8 @@ When a player presses **Find Opponents** in the Battle tab, their game:
    below and one slightly above.
 
 Empty slots, or all three if the server can't be reached, are filled with generated training
-opponents. Saved armies are kept for 30 days in `ranked_armies.json`, in the server's Godot user
+opponents, sized by the player's rating (not their army) and worth a quarter of the rating (a
+tenth from 2500) of a saved player army. Saved armies are kept for 30 days in `ranked_armies.json`, in the server's Godot user
 data folder.
 
 For signed-in players the server uses the army and rating from their account, simulates the

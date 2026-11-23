@@ -5,7 +5,8 @@ extends RefCounted
 ## the server too.
 ##
 ## - Ranked training opponents: for Easy / Even / Hard, their power relative
-##   to yours and their rating relative to yours (see Army.GHOST_TIERS for
+##   to the power expected at your rating (Army.rank_power) and their rating
+##   relative to yours (see Army.GHOST_TIERS for
 ##   the defaults and what they mean).
 ## - Challenges: enemy HP and damage multiplier (1 = as designed). The
 ##   recommended power shown on each card scales with it.

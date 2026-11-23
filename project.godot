@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Autobat Legions"
-config/version="0.9.4"
+config/version="0.9.5"
 config/description="Collect, level and multiply units, then send armies of up to 1000 into auto-battles against other players."
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.3", "GL Compatibility")
@@ -24,6 +24,7 @@ Profile="*res://scripts/core/profile.gd"
 Audio="*res://scripts/core/audio.gd"
 Net="*res://scripts/net/net.gd"
 Party="*res://scripts/net/party.gd"
+TouchScroll="*res://scripts/ui/touch_scroll.gd"
 
 [display]
 

@@ -6,6 +6,19 @@ extends RefCounted
 ## kept under. Note kinds: "nerf", "buff", "change", "note".
 
 const LIST := [
+	{"version": "0.9.5", "date": "2026-11-23", "title": "The Long Road",
+		"summary": "Scroll any menu by dragging on a touchscreen. New commanders start lower, training bands match your rank instead of your army, and they're worth less rating than real armies.",
+		"sections": [
+			{"name": "Ranked", "notes": [
+				{"kind": "change", "text": "New commanders start at 600 rating instead of 1000. Fungal Hollows (600) is open from the first day; every other region keeps its rating."},
+				{"kind": "change", "text": "Training bands are built for your rating, not your army: about 140 power at 600, 700 at 1500, 1,300 at 2000, 2,100 at 2500 and 3,200 at 3000 (Easy 0.9x, Even 1.1x, Hard 1.5x of that). An army ahead of its rank beats them more easily; one that's behind has catching up to do."},
+				{"kind": "nerf", "text": "Battles against training bands move your rating a quarter as much as before, and a tenth as much from 2500 rating (always at least 1 point for a win or loss). Saved player armies and live duels count in full, so the fastest climb is against other commanders."},
+				{"kind": "note", "text": "Existing ratings are unchanged."},
+			]},
+			{"name": "Interface", "notes": [
+				{"kind": "change", "text": "Phones and tablets: drag anywhere on a list to scroll it (unit cards, regions, challenges, patch notes, the leaderboard...), not just on the thin scroll bar. A quick flick keeps it gliding. A tap still presses what's under your finger, and on the Army tab and in Legion Draft, dragging a card sideways still picks it up."},
+			]},
+		]},
 	{"version": "0.9.4", "date": "2026-11-23", "title": "Beasts of the Four Realms",
 		"summary": "40 new units, every one with a battle ability of its own, from four new regions; regions listed in the order you unlock them; and a new soundtrack with a sound for every ability.",
 		"sections": [

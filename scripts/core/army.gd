@@ -338,10 +338,11 @@ const GHOST_NAMES := [
 ]
 
 
-## Generated ("training") ranked opponents: power relative to yours, rating
-## offset, label. Measured in the simulator (each pairing fought from both
-## sides) against a generated army of your power, you win about 55% at 0.9x,
-## 21% at 1.1x and 5% at 1.5x: a hard ladder that rewards a well-built army.
+## Generated ("training") ranked opponents: power relative to the power
+## expected at your rating (rank_power, since 0.9.5; before that, relative to
+## your own army), rating offset, label. Measured in the simulator (each
+## pairing fought from both sides) against a generated army of that power,
+## you win about 55% at 0.9x, 21% at 1.1x and 5% at 1.5x.
 ## The rating offsets pay more for the harder fights but less than those
 ## odds would (Easy is about fair, Even and Hard lose rating on average for
 ## an ordinary army), so none of them is a free climb.
@@ -353,9 +354,31 @@ const RANKED_SEARCH_BIAS := 0
 const RANKED_LABEL_GAP := 40
 
 
+## Army power (as used internally, 10x what the game shows) that training
+## opponents are built around at each rating: [rating, shown power] points,
+## straight lines in between. A new commander (600) starts with about 136.
+## Past the last point it keeps growing 7% per 100 rating.
+const RANK_POWER := [[0, 100.0], [600, 140.0], [800, 220.0], [1000, 320.0], [1200, 450.0], [1500, 700.0],
+	[1700, 900.0], [2000, 1300.0], [2500, 2100.0], [3000, 3200.0], [3500, 4600.0], [4000, 6500.0]]
+
+
+static func rank_power(rating: int) -> float:
+	var last: Array = RANK_POWER[-1]
+	if rating >= int(last[0]):
+		return float(last[1]) * pow(1.07, float(rating - int(last[0])) / 100.0) * 10.0
+	for k in range(1, RANK_POWER.size()):
+		var b: Array = RANK_POWER[k]
+		if rating <= int(b[0]):
+			var a: Array = RANK_POWER[k - 1]
+			var t := clampf(float(rating - int(a[0])) / float(int(b[0]) - int(a[0])), 0.0, 1.0)
+			return lerpf(float(a[1]), float(b[1]), t) * 10.0
+	return float(RANK_POWER[0][1]) * 10.0
+
+
 ## Fill `offers` up to three opponents with generated ones, first covering any
-## missing difficulty. Each gets "difficulty" and "player": false.
-static func fill_ghosts(offers: Array, my_power: float, rating: int, rng: RandomNumberGenerator) -> void:
+## missing difficulty. Each gets "difficulty" and "player": false. Their
+## strength follows your rating (rank_power), not your army.
+static func fill_ghosts(offers: Array, rating: int, rng: RandomNumberGenerator) -> void:
 	for pass_i in 2:
 		for t in Difficulty.tiers:   # GHOST_TIERS unless the server admin changed them
 			if offers.size() >= 3:
@@ -366,7 +389,7 @@ static func fill_ghosts(offers: Array, my_power: float, rating: int, rng: Random
 					taken = true
 			if taken and pass_i == 0:
 				continue
-			var opp := generate_opponent(maxf(500.0, my_power) * float(t[0]) * rng.randf_range(0.95, 1.05), maxi(0, rating + int(t[1]) + rng.randi_range(-15, 15)), rng.randi())
+			var opp := generate_opponent(rank_power(rating) * float(t[0]) * rng.randf_range(0.95, 1.05), maxi(0, rating + int(t[1]) + rng.randi_range(-15, 15)), rng.randi())
 			opp["difficulty"] = t[2]
 			opp["player"] = false
 			opp["saved_at"] = 0
@@ -485,7 +508,35 @@ static func rating_k(rating: int) -> float:
 
 ## k < 0: the K-factor for my_rating (rating_k).
 static func elo_delta(my_rating: int, opp_rating: int, score: float, k: float = -1.0) -> int:
+	return roundi(_elo_raw(my_rating, opp_rating, score, k))
+
+
+static func _elo_raw(my_rating: int, opp_rating: int, score: float, k: float = -1.0) -> float:
 	if k < 0.0:
 		k = rating_k(my_rating)
 	var expected := 1.0 / (1.0 + pow(10.0, float(opp_rating - my_rating) / 400.0))
-	return roundi(k * (score - expected))
+	return k * (score - expected)
+
+
+## Battles against training bands (the AI's generated armies, not saved
+## player armies or live duels) move rating less: a quarter as much below
+## AI_RATING_FROM, a tenth from there on. A decided battle still moves it by
+## at least 1.
+const AI_RATING_DIV_LOW := 4.0
+const AI_RATING_DIV_HIGH := 10.0
+const AI_RATING_FROM := 2500
+
+
+static func ai_rating_div(my_rating: int) -> float:
+	return AI_RATING_DIV_LOW if my_rating < AI_RATING_FROM else AI_RATING_DIV_HIGH
+
+
+## Rating change for a ranked battle; vs_ai: against a training band.
+static func ranked_delta(my_rating: int, opp_rating: int, score: float, vs_ai: bool) -> int:
+	if not vs_ai:
+		return elo_delta(my_rating, opp_rating, score)
+	var raw := _elo_raw(my_rating, opp_rating, score) / ai_rating_div(my_rating)
+	var d := roundi(raw)
+	if d == 0 and score != 0.5 and absf(raw) > 0.0:
+		d = 1 if raw > 0.0 else -1
+	return d

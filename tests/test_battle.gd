@@ -39,6 +39,7 @@ func _initialize() -> void:
 	test_abilities()
 	test_audio()
 	test_new_units()
+	test_rank_scaling()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -723,20 +724,19 @@ func test_trinkets() -> void:
 
 func test_harder_ghosts() -> void:
 	print("ranked opponents")
-	var my := [{"unit": "orc_warrior", "level": 8, "tier": 3, "row": "front"}, {"unit": "elf_archer", "level": 8, "tier": 3, "row": "back"}]
-	var mine := Army.army_power(my)
+	var mine := Army.rank_power(1100)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 99
 	var total := 0.0
 	var n := 0
 	for i in 40:
 		var offers: Array = []
-		Army.fill_ghosts(offers, mine, 1100, rng)
+		Army.fill_ghosts(offers, 1100, rng)
 		for o in offers:
 			total += Army.army_power(o["squads"]) / mine
 			n += 1
 	var avg := total / float(n)
-	check(avg > 1.12 and avg < 1.25, "generated opponents average %.2fx your power (Easy 0.9x, Even 1.1x, Hard 1.5x)" % avg)
+	check(avg > 1.12 and avg < 1.25, "generated opponents average %.2fx the power expected at their rating (Easy 0.9x, Even 1.1x, Hard 1.5x)" % avg)
 	var low := Army.generate_opponent(5000.0, 900, 5)
 	var low_has: bool = low["squads"].any(func(sq): return sq.has("trinkets"))
 	var high_count := 0
@@ -1110,15 +1110,14 @@ func test_difficulty() -> void:
 	var party := root.get_node("Party")
 	Difficulty.reset()
 	check(Difficulty.is_default() and Difficulty.tiers == Army.GHOST_TIERS, "defaults are the built-in ranked tiers")
-	var my := [{"unit": "orc_warrior", "level": 8, "tier": 3, "row": "front"}, {"unit": "elf_archer", "level": 8, "tier": 3, "row": "back"}]
-	var mine := Army.army_power(my)
+	var mine := Army.rank_power(1100)
 	var hard_power := func() -> float:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = 4
 		var total := 0.0
 		for i in 10:
 			var offers: Array = []
-			Army.fill_ghosts(offers, mine, 1100, rng)
+			Army.fill_ghosts(offers, 1100, rng)
 			total += Army.army_power(offers[2]["squads"]) / mine
 		return total / 10.0
 	var before: float = hard_power.call()
@@ -1453,3 +1452,42 @@ func test_new_units() -> void:
 	var proto: String = root.get_node("Party").GAME_VERSION
 	check(proto == "legion-draft-18", "protocol bumped for the new units (%s)" % proto)
 	UnitLocks.set_locked_list(UnitLocks.defaults())
+
+
+func test_rank_scaling() -> void:
+	print("rating start, training bands by rank, AI rating (patch 0.9.5)")
+	check(int(ProfileLogic.default_profile()["rating"]) == 600, "new commanders start at 600 rating")
+	var starter: Array = []
+	for id in GameData.STARTER_UNITS:
+		starter.append({"unit": id, "level": 1, "tier": 0, "row": GameData.default_row_for(id)})
+	var sp := Army.army_power(starter)
+	check(absf(Army.rank_power(600) / sp - 1.0) < 0.15, "training bands at 600 are built around a starting army (%.0f vs %.0f)" % [Army.rank_power(600), sp])
+	var rising := true
+	for r in range(0, 5000, 50):
+		if Army.rank_power(r + 50) <= Army.rank_power(r):
+			rising = false
+	check(rising, "the expected power rises with every step of rating")
+	# The same rating gives the same strength of opponents, whatever your army.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var offers: Array = []
+	Army.fill_ghosts(offers, 2000, rng)
+	var p_easy := Army.army_power(offers[0]["squads"]) / Army.rank_power(2000)
+	check(p_easy > 0.8 and p_easy < 1.05, "Easy at 2000 is about 0.9x of %.0f (%.2fx)" % [Army.rank_power(2000) / 10.0, p_easy])
+	# AI battles move rating less.
+	var full := Army.elo_delta(1000, 1060, 1.0)
+	var ai := Army.ranked_delta(1000, 1060, 1.0, true)
+	check(ai == roundi(float(full) / 4.0) or absi(ai * 4 - full) <= 2, "beating a training band below 2500 gives a quarter of the rating (%d vs %d)" % [ai, full])
+	var full_hi := Army.elo_delta(2600, 2660, 1.0)
+	var ai_hi := Army.ranked_delta(2600, 2660, 1.0, true)
+	check(ai_hi >= 1 and ai_hi <= maxi(1, roundi(float(full_hi) / 10.0) + 1), "from 2500 a tenth (%d vs %d), but at least 1" % [ai_hi, full_hi])
+	check(Army.ranked_delta(1000, 960, 0.0, true) < 0 and Army.ranked_delta(1000, 960, 0.0, true) > Army.elo_delta(1000, 960, 0.0), "losses shrink the same way")
+	check(Army.ranked_delta(1000, 1060, 1.0, false) == full, "saved player armies and live duels count in full")
+	var pl := ProfileLogic.new()
+	pl.data["rating"] = 1000
+	var s_ai := pl.apply_battle_result("ranked", 1.0, 1060, 0, true)
+	pl.data["rating"] = 1000
+	var s_real := pl.apply_battle_result("ranked", 1.0, 1060, 0, false)
+	pl.data["rating"] = 1000
+	var s_live := pl.apply_battle_result("live", 1.0, 1060, 0, true)
+	check(int(s_ai["rating"]) == ai and int(s_real["rating"]) == full and int(s_live["rating"]) == full, "battle results use it (AI %+d, player army %+d, live duel %+d)" % [int(s_ai["rating"]), int(s_real["rating"]), int(s_live["rating"])])

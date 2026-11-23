@@ -416,11 +416,11 @@ func complete_challenge(id: String, won: bool) -> Dictionary:
 
 
 ## Offline battles only; logged-in battle rewards are decided by the server.
-func apply_battle_result(mode: String, score: float, opp_rating: int, enemy_killed: int) -> Dictionary:
+func apply_battle_result(mode: String, score: float, opp_rating: int, enemy_killed: int, vs_ai: bool = false) -> Dictionary:
 	if online:
 		return {"gold": 0, "maps": 0, "rating": 0}
 	logic.gold_mult = battle_gold_mult()
-	var summary := logic.apply_battle_result(mode, score, opp_rating, enemy_killed)
+	var summary := logic.apply_battle_result(mode, score, opp_rating, enemy_killed, vs_ai)
 	save()
 	return summary
 

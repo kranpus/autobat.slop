@@ -70,7 +70,8 @@ accounts, password hashing and encryption work.
 
 ## The gameplay loop
 
-**Rating unlocks regions.** Each expedition region needs a ranked rating, spread out from the
+**Rating unlocks regions.** New commanders start at **600 rating** (1000 before 0.9.5), so
+Fungal Hollows is open from the start. Each expedition region needs a ranked rating, spread out from the
 start to the top. The Expeditions tab (and the Collection's "found in") lists them in this
 order, the next one to unlock always after the ones you have:
 
@@ -171,12 +172,17 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Ability sounds:** every battle ability has its own sound (zaps, ice, fire, shattering
        glass, chimes, ghostly breath...), spaced out so big battles stay calm.
      - **Screen shake** can be turned off in Settings.
-   - **Training opponents:** a hard ladder.
-     - **Strength:** Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× your power by default (the server can change this with `difficulty`). Against an ordinary
-       army of your power, the simulator measures roughly 55% / 21% / 5% to win; a well-built
-       army does better.
+   - **Training opponents:** a hard ladder, sized by your **rating**, not your army (0.9.5).
+     - **Strength:** each rating has an expected army power (`Army.RANK_POWER`): about 140 at
+       600 (a starting army), 320 at 1000, 700 at 1500, 1,300 at 2000, 2,100 at 2500, 3,200 at
+       3000 and 4,600 at 3500. Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× of that by default (the
+       server can change this with `difficulty`). An army stronger than its rating beats them
+       more easily; one that's behind has to catch up.
      - **Rating:** they are rated 40 below, 60 above and 150 above you. Harder wins pay more
        rating, but less than the odds would suggest, so no difficulty is a free climb.
+     - **Less rating than real armies:** a battle against a training band moves your rating a
+       **quarter** as much as a saved player army would, and a **tenth** from 2500 rating (but
+       always at least 1 for a win or loss). Saved player armies and live duels count in full.
      - **Trinkets:** above rating ~950 they carry trinkets too, more and rarer as rating rises.
    - **Rating speed (Elo K-factor):** 24 up to rating 1200, falling steadily to 12 at 3000 and
      above. An even win is worth about +12 at the start and +6 near the top.
@@ -193,6 +199,7 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Signed in:** the server runs the battle and pays the reward.
    - **Look:** the fantasy skin (dark wood panels, gold trim, parchment, scroll rods, stone backdrop)
      is drawn from noise at startup by `scripts/ui/fantasy_skin.gd`; headings use the Cinzel font.
+scripts/ui/touch_scroll.gd    Touch drag-scrolling for every menu (autoload TouchScroll)
      `ScrollUnroll` (`scripts/ui/scroll_unroll.gd`) is the unrolling scroll used for ranked
      opponents and patch notes.
    - **Tutorial:** new players are guided through the basics by doing them, with a spotlight on the
@@ -437,6 +444,7 @@ scripts/ui/*.gd               Menu tabs
 tests/test_battle.gd          Headless tests
 tests/net_account_test.gd     End-to-end account test against a running server
 tests/tutorial_test.gd        Plays through the whole tutorial as a new player
+tests/touch_scroll_test.gd    Fakes finger drags on the menus: lists scroll, taps still work
 assets/                       CC0 sprites, sounds, music + licenses
 ```
 
@@ -453,6 +461,7 @@ godot --headless --import                       # once, registers class names
 godot --headless -s res://tests/test_battle.gd
 godot --headless -s res://tests/tutorial_test.gd   # plays through the tutorial
 godot --headless -s res://tests/tutorial_test.gd -- --existing   # returning players, replay, skip
+godot --headless -s res://tests/touch_scroll_test.gd   # touch drag-scrolling on the menus
 ```
 
 `tutorial_test.gd` acts like a new player: it presses whatever the tutorial spotlights,
