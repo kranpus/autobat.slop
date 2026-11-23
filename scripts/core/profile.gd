@@ -25,7 +25,7 @@ const SAVE_PATH := "user://profile.json"
 const SETTINGS_PATH := "user://settings.json"
 const MAP_REGEN_SECONDS := ProfileLogic.MAP_REGEN_SECONDS
 const MAX_MAPS := ProfileLogic.MAX_MAPS
-const SETTING_KEYS := ["music_volume", "sfx_volume", "ui_scale", "server_address", "unit_locks", "region_locks", "server_rewards", "drop_rates", "difficulty", "screen_shake"]
+const SETTING_KEYS := ["music_volume", "sfx_volume", "ui_scale", "server_address", "unit_locks", "region_locks", "locks_version", "server_rewards", "drop_rates", "difficulty", "screen_shake"]
 
 var logic := ProfileLogic.new()
 var settings: Dictionary = {"music_volume": 0.6, "sfx_volume": 0.8}
@@ -51,6 +51,13 @@ func _init() -> void:
 		UnitLocks.set_locked_list(settings["unit_locks"])
 	if typeof(settings.get("region_locks")) == TYPE_ARRAY:
 		UnitLocks.set_locked_regions(settings["region_locks"])
+	if int(settings.get("locks_version", 1)) < 2:
+		# 0.9.5: Badlands Camp's units are open by default (the server does the
+		# same with its own saved locks).
+		for id in GameData.REGIONS["badlands"]["drops"]:
+			UnitLocks.set_locked(id, false)
+		settings["unit_locks"] = UnitLocks.locked_list()
+		settings["locks_version"] = 2
 	if typeof(settings.get("drop_rates")) == TYPE_DICTIONARY:
 		DropRates.apply(settings["drop_rates"])
 	if typeof(settings.get("difficulty")) == TYPE_DICTIONARY:

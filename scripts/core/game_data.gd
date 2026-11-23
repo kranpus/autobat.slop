@@ -184,7 +184,7 @@ const UNITS := {
 	},
 	# --- Locked by default (enable with the server's `unlock` command) ---
 	"jackal": {
-		"name": "Jackal Pack", "rarity": "common", "role": "melee", "locked": true,
+		"name": "Jackal Pack", "rarity": "common", "role": "melee",
 		"hp": 45.0, "dmg": 7.0, "cooldown": 0.6, "range": 5.0, "speed": 105.0,
 		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 6.0, "scale": 0.7, "flying": false,
@@ -198,14 +198,14 @@ const UNITS := {
 		"desc": "Leaps into the fray and soaks up blows.",
 	},
 	"hobgoblin": {
-		"name": "Hobgoblin", "rarity": "common", "role": "melee", "locked": true,
+		"name": "Hobgoblin", "rarity": "common", "role": "melee",
 		"hp": 85.0, "dmg": 10.0, "cooldown": 1.0, "range": 6.0, "speed": 60.0,
 		"damage": "physical", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 7.0, "scale": 0.8, "flying": false,
 		"desc": "Tougher goblin kin with crude shields.",
 	},
 	"gnoll_raider": {
-		"name": "Gnoll Raider", "rarity": "common", "role": "melee", "locked": true,
+		"name": "Gnoll Raider", "rarity": "common", "role": "melee",
 		"hp": 75.0, "dmg": 11.0, "cooldown": 0.9, "range": 6.0, "speed": 70.0,
 		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 7.0, "scale": 0.8, "flying": false,
@@ -233,14 +233,14 @@ const UNITS := {
 		"desc": "Armoured insects that come in endless numbers.",
 	},
 	"goblin_archer": {
-		"name": "Goblin Archer", "rarity": "common", "role": "ranged", "locked": true,
+		"name": "Goblin Archer", "rarity": "common", "role": "ranged",
 		"hp": 40.0, "dmg": 8.0, "cooldown": 1.1, "range": 170.0, "speed": 60.0,
 		"damage": "pierce", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "arrow", "radius": 7.0, "scale": 0.8, "flying": false,
 		"desc": "Goblins with short bows and shorter tempers.",
 	},
 	"orc_knight": {
-		"name": "Orc Knight", "rarity": "uncommon", "role": "tank", "locked": true,
+		"name": "Orc Knight", "rarity": "uncommon", "role": "tank",
 		"hp": 260.0, "dmg": 18.0, "cooldown": 1.1, "range": 6.0, "speed": 50.0,
 		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 9.0, "scale": 1.0, "flying": false,
@@ -261,7 +261,7 @@ const UNITS := {
 		"desc": "A lighter cousin of the griffon.",
 	},
 	"war_hound": {
-		"name": "War Hound", "rarity": "uncommon", "role": "melee", "locked": true,
+		"name": "War Hound", "rarity": "uncommon", "role": "melee",
 		"hp": 130.0, "dmg": 15.0, "cooldown": 0.7, "range": 6.0, "speed": 115.0,
 		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 8.0, "scale": 0.8, "flying": false,
@@ -325,7 +325,7 @@ const UNITS := {
 		"desc": "Pure fury on two enormous legs.",
 	},
 	"cyclops": {
-		"name": "Cyclops", "rarity": "rare", "role": "ranged", "locked": true,
+		"name": "Cyclops", "rarity": "rare", "role": "ranged",
 		"hp": 520.0, "dmg": 50.0, "cooldown": 2.0, "range": 220.0, "speed": 40.0,
 		"damage": "physical", "armor": "beast", "aoe": 35.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "stone", "radius": 13.0, "scale": 1.4, "flying": false,
@@ -370,7 +370,7 @@ const UNITS := {
 		"desc": "Drains the life of everything it cuts.",
 	},
 	"orc_warlord": {
-		"name": "Orc Warlord", "rarity": "rare", "role": "tank", "locked": true,
+		"name": "Orc Warlord", "rarity": "rare", "role": "tank",
 		"hp": 600.0, "dmg": 40.0, "cooldown": 1.2, "range": 8.0, "speed": 50.0,
 		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 11.0, "scale": 1.2, "flying": false,
@@ -806,7 +806,7 @@ const UNITS := {
 # drops: unit id -> weight.
 const REGIONS := {
 	"warrens": {
-		"name": "Goblin Warrens", "tile": "warrens", "cost_maps": 1, "min_rating": 500,
+		"name": "Goblin Warrens", "tile": "warrens", "cost_maps": 1, "min_rating": 250,
 		"desc": "Damp tunnels crawling with greenskins.",
 		"drops": {"goblin": 34, "kobold_slinger": 28, "rat_swarm": 18, "orc_warrior": 12, "ogre": 6, "hill_giant": 2},
 	},
@@ -830,9 +830,10 @@ const REGIONS := {
 		"desc": "Only the bold climb where dragons nest.",
 		"drops": {"orc_sorcerer": 24, "centaur": 20, "griffon": 16, "hill_giant": 12, "lich": 10, "golden_dragon": 3, "phoenix": 2, "titan": 2},
 	},
-	# --- Locked by default (enable with the server's `unlock region` command) ---
+	# --- Badlands Camp is always open (0.9.5); the rest are locked by default
+	# (enable with the server's `unlock region` command) ---
 	"badlands": {
-		"name": "Badlands Camp", "tile": "badlands", "cost_maps": 1, "min_rating": 500, "locked": true,
+		"name": "Badlands Camp", "tile": "badlands", "cost_maps": 1, "min_rating": 0,
 		"desc": "A warband's camp in the scrublands: hounds, raiders and their bosses.",
 		"drops": {"jackal": 30, "hobgoblin": 30, "gnoll_raider": 26, "goblin_archer": 26, "war_hound": 16, "orc_knight": 14, "orc_warlord": 7, "cyclops": 5},
 	},

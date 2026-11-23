@@ -40,6 +40,7 @@ func _initialize() -> void:
 	test_audio()
 	test_new_units()
 	test_rank_scaling()
+	test_player_command()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -280,6 +281,8 @@ func test_expedition_pity() -> void:
 		var since := {}
 		for rule in DropRates.pity_rules():
 			since[rule["rarity"]] = 0
+		if GameData.region_drops(region).is_empty():
+			continue
 		for i in 300:
 			profile.data["maps"] = 99
 			profile.data["pending_choice"] = {}
@@ -290,7 +293,10 @@ func test_expedition_pity() -> void:
 				best = maxi(best, int(GameData.RARITIES[GameData.UNITS[o["unit"]]["rarity"]]["order"]))
 			for rule in DropRates.pity_rules():
 				var r: String = rule["rarity"]
-				since[r] = 0 if best >= int(GameData.RARITIES[r]["order"]) else int(since[r]) + 1
+				var need := int(GameData.RARITIES[r]["order"])
+				if not GameData.region_drops(region).keys().any(func(u): return int(GameData.RARITIES[GameData.UNITS[u]["rarity"]]["order"]) >= need):
+					continue   # nothing that rare here (Badlands Camp has no epics)
+				since[r] = 0 if best >= need else int(since[r]) + 1
 				worst[r] = maxi(int(worst.get(r, 0)), int(since[r]))
 			profile.data["pending_choice"] = {}
 	for rule in DropRates.pity_rules():
@@ -383,7 +389,7 @@ func test_unit_locks() -> void:
 	var backup: Dictionary = profile.data.duplicate(true)
 	UnitLocks.set_locked_list(UnitLocks.defaults())
 	var locked := UnitLocks.locked_list()
-	check(locked.size() == 40 and GameData.UNITS.size() == 100, "100 units, the 40 from 0.9 locked by default (the 0.9.4 ones open)")
+	check(locked.size() == 32 and GameData.UNITS.size() == 100, "100 units, 32 of the 0.9 set locked by default (Badlands Camp's 8 and the 0.9.4 ones open)")
 	var assets_ok := true
 	for id in locked:
 		var in_region := false
@@ -443,21 +449,24 @@ func test_unit_locks() -> void:
 	check(UnitLocks.is_locked("goblin") and not DraftData.units_for_tier(1, UnitLocks.as_dict()).has("goblin"), "'lock goblin' removes an original unit from shops")
 	check(party.run_command("lock nosuchunit").contains("Unknown"), "unknown names are reported")
 	party.run_command("unlock new")
-	check(UnitLocks.locked_list() == ["goblin"], "'unlock new' releases all 40 new units")
+	check(UnitLocks.locked_list() == ["goblin"], "'unlock new' releases every unit locked by default")
 	party.run_command("lock reset")
-	check(UnitLocks.locked_list().size() == 40 and not UnitLocks.is_locked("goblin"), "'lock reset' restores the defaults")
+	check(UnitLocks.locked_list().size() == 32 and not UnitLocks.is_locked("goblin"), "'lock reset' restores the defaults")
 	# Expedition regions.
-	check(GameData.REGIONS.size() == 17 and UnitLocks.locked_regions().size() == 8, "17 regions, the 8 from 0.9 locked by default")
+	check(GameData.REGIONS.size() == 17 and UnitLocks.locked_regions().size() == 7, "17 regions, 7 from 0.9 locked by default")
+	party.run_command("lock region badlands")
+	party.run_command("lock all")
+	check(not UnitLocks.is_region_locked("badlands"), "Badlands Camp can't be locked: there's always somewhere to explore")
+	party.run_command("lock reset")
 	var new_only := true
 	for rid in UnitLocks.default_regions():
-		for id in GameData.REGIONS[rid]["drops"]:
-			if not bool(GameData.UNITS[id].get("locked", false)):
-				new_only = false
-	for rid in ["warrens", "crypt", "forest", "deep", "peaks"]:
+		if not GameData.REGIONS[rid]["drops"].keys().any(func(id): return bool(GameData.UNITS[id].get("locked", false))):
+			new_only = false
+	for rid in ["warrens", "crypt", "forest", "deep", "peaks", "badlands"]:
 		for id in GameData.REGIONS[rid]["drops"]:
 			if bool(GameData.UNITS[id].get("locked", false)):
 				new_only = false
-	check(new_only, "new regions hold only new units; the original 5 hold none")
+	check(new_only, "every locked region has locked units; the open starting regions have none")
 	profile.data["maps"] = 99
 	profile.data["rating"] = 5000
 	profile.data["pending_choice"] = {}
@@ -488,7 +497,7 @@ func test_unit_locks() -> void:
 	party.run_command("lock region bone_fields")
 	check(UnitLocks.is_region_locked("bone_fields") and not profile.can_explore("bone_fields"), "'lock region bone_fields' closes a region")
 	party.run_command("lock reset")
-	check(UnitLocks.locked_regions().size() == 8 and UnitLocks.locked_list().size() == 40, "'lock reset' re-locks the new units and regions")
+	check(UnitLocks.locked_regions().size() == 7 and UnitLocks.locked_list().size() == 32, "'lock reset' re-locks the new units and regions")
 	profile.data["pending_choice"] = {}
 	# A server-run match syncs the lock list into every run state.
 	var room := MatchRoom.new("LOCKS", {"max_players": 2}, true, false)
@@ -499,7 +508,7 @@ func test_unit_locks() -> void:
 	room.add_player(5, "P")
 	room.add_bot(5)
 	room.start(5)
-	check(not states.is_empty() and (states[0]["excluded"] as Array).size() == 40, "match state carries the server's locks to clients")
+	check(not states.is_empty() and (states[0]["excluded"] as Array).size() == 32, "match state carries the server's locks to clients")
 	profile.data = backup
 	profile.save()
 
@@ -1456,16 +1465,21 @@ func test_new_units() -> void:
 
 func test_rank_scaling() -> void:
 	print("rating start, training bands by rank, AI rating (patch 0.9.5)")
-	check(int(ProfileLogic.default_profile()["rating"]) == 600, "new commanders start at 600 rating")
-	var starts: Array = ["warrens", "crypt", "badlands"].map(func(r): return int(GameData.REGIONS[r]["min_rating"]))
-	check(starts.all(func(x): return x == 500) and int(Trinkets.SITES["camp"]["min_rating"]) == 500, "the starting regions and the War Camp need 500 (below the 600 start)")
+	check(int(ProfileLogic.default_profile()["rating"]) == 0, "new commanders start at 0 rating")
+	check(int(GameData.REGIONS["badlands"]["min_rating"]) == 0 and not UnitLocks.is_region_locked("badlands") and int(GameData.REGIONS["warrens"]["min_rating"]) == 250 and int(GameData.REGIONS["crypt"]["min_rating"]) == 500, "Badlands Camp is open from the start, then Goblin Warrens at 250 and Haunted Crypt at 500")
+	var fresh := ProfileLogic.new()
+	fresh.data["maps"] = 5
+	check(fresh.can_explore("badlands") and not fresh.can_explore("warrens"), "a brand-new commander can explore Badlands Camp")
+	fresh.data["rating"] = 5
+	var lost := fresh.apply_battle_result("ranked", 0.0, 40, 0, true)
+	check(fresh.rating() == 0 and int(lost["rating"]) == -5, "rating never goes below 0 (and the result shows the real change)")
 	check(int(GameData.REGIONS["fungal_hollows"]["min_rating"]) == 800 and GameData.region_ids_by_unlock()[3] == "fungal_hollows", "Fungal Hollows at 800 is the first step up")
 	check((root.get_node("Audio").MUSIC["menu"] as Array).size() == 8, "eight lobby tracks")
 	var starter: Array = []
 	for id in GameData.STARTER_UNITS:
 		starter.append({"unit": id, "level": 1, "tier": 0, "row": GameData.default_row_for(id)})
 	var sp := Army.army_power(starter)
-	check(absf(Army.rank_power(600) / sp - 1.0) < 0.15, "training bands at 600 are built around a starting army (%.0f vs %.0f)" % [Army.rank_power(600), sp])
+	check(absf(Army.rank_power(0) / sp - 1.0) < 0.15, "training bands at 0 are built around a starting army (%.0f vs %.0f)" % [Army.rank_power(0), sp])
 	var rising := true
 	for r in range(0, 5000, 50):
 		if Army.rank_power(r + 50) <= Army.rank_power(r):
@@ -1478,7 +1492,8 @@ func test_rank_scaling() -> void:
 	Army.fill_ghosts(offers, 2000, rng)
 	var p_easy := Army.army_power(offers[0]["squads"]) / Army.rank_power(2000)
 	check(p_easy > 0.8 and p_easy < 1.05, "Easy at 2000 is about 0.9x of %.0f (%.2fx)" % [Army.rank_power(2000) / 10.0, p_easy])
-	# AI battles move rating less.
+	# AI battles count in full below 1000, then move rating less.
+	check(Army.ranked_delta(600, 660, 1.0, true) == Army.elo_delta(600, 660, 1.0) and Army.ranked_delta(999, 960, 0.0, true) == Army.elo_delta(999, 960, 0.0), "below 1000, training bands count in full")
 	var full := Army.elo_delta(1000, 1060, 1.0)
 	var ai := Army.ranked_delta(1000, 1060, 1.0, true)
 	check(ai == roundi(float(full) / 4.0) or absi(ai * 4 - full) <= 2, "beating a training band below 2500 gives a quarter of the rating (%d vs %d)" % [ai, full])
@@ -1495,3 +1510,48 @@ func test_rank_scaling() -> void:
 	pl.data["rating"] = 1000
 	var s_live := pl.apply_battle_result("live", 1.0, 1060, 0, true)
 	check(int(s_ai["rating"]) == ai and int(s_real["rating"]) == full and int(s_live["rating"]) == full, "battle results use it (AI %+d, player army %+d, live duel %+d)" % [int(s_ai["rating"]), int(s_real["rating"]), int(s_live["rating"])])
+
+
+func test_player_command() -> void:
+	print("server 'player' command (patch 0.9.5)")
+	var party := root.get_node("Party")
+	var saved_accounts = party.accounts
+	var store := AccountStore.new("user://test_player_cmd_%d" % Time.get_ticks_usec())
+	store.create("Bob", Passwords.make_record("whatever1", 1000))
+	party.accounts = store
+	check(party.run_command("player nobody").begins_with("No account"), "unknown players are reported")
+	check(party.run_command("player bob").contains("rating 0"), "shows a player's stats")
+	party.run_command("player bob set rating 1500")
+	party.run_command("player bob add gold 250")
+	party.run_command("player Bob add gold -100")
+	party.run_command("player bob set maps 9")
+	var pl: ProfileLogic = store.logic("bob")
+	check(pl.rating() == 1500 and pl.gold() == 600 + 150 and pl.maps() == 9, "set and add change stats (rating %d, gold %d, maps %d)" % [pl.rating(), pl.gold(), pl.maps()])
+	party.run_command("player bob add rating -99999")
+	check(pl.rating() == 0, "rating can't go below 0")
+	party.run_command("player bob name Lord Bob")
+	check(str(pl.data["name"]) == "Lord Bob", "renames the commander")
+	party.run_command("player bob unit Storm Dragon level 12 tier 2 shards 30")
+	var u: Dictionary = pl.data["units"].get("storm_dragon", {})
+	check(int(u.get("level", 0)) == 12 and int(u.get("tier", 0)) == 2 and int(u.get("shards", 0)) == 30, "gives a unit by name with level, tier and shards")
+	party.run_command("player bob unit storm_dragon level 999")
+	check(int(pl.data["units"]["storm_dragon"]["level"]) == Army.max_level_for_tier(2), "levels are capped by the tier")
+	party.run_command("player bob unit goblin remove")
+	check(not pl.data["units"].has("goblin") and pl.data["army"].all(func(sq): return sq["unit"] != "goblin"), "takes a unit away, out of the army too")
+	party.run_command("player bob units all level 5")
+	check(UnitLocks.unlocked_ids().all(func(id): return pl.data["units"].has(id)), "'units all' gives every open unit (%d)" % UnitLocks.unlocked_ids().size())
+	party.run_command("player bob trinket Copper Band")
+	check(pl.data["trinkets"].has("copper_band"), "gives a trinket by name")
+	party.run_command("player bob trinket copper_band remove")
+	check(not pl.data["trinkets"].has("copper_band"), "...and takes it back")
+	party.run_command("player bob trinkets all")
+	check(pl.data["trinkets"].size() == Trinkets.ALL.size(), "'trinkets all'")
+	party.run_command("player bob challenge all")
+	party.run_command("player bob challenge rat_problem remove")
+	check(pl.data["challenges"].size() == Challenges.LIST.size() - 1 and not pl.data["challenges"].has("rat_problem"), "clears and un-clears challenges")
+	var reloaded := AccountStore.new(store.dir)
+	check(reloaded.logic("bob").rating() == 0 and reloaded.logic("bob").data["trinkets"].size() == Trinkets.ALL.size(), "changes are saved to the account file")
+	check(party.run_command("player bob reset").contains("reset confirm"), "reset asks for confirmation")
+	party.run_command("player bob reset confirm")
+	check(pl.data["units"].size() == GameData.STARTER_UNITS.size() and pl.rating() == 0 and str(pl.data["name"]) == "Lord Bob", "reset starts the profile over (name kept)")
+	party.accounts = saved_accounts

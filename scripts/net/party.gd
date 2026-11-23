@@ -475,7 +475,7 @@ func run_command(line: String) -> String:
   regions                         list expedition regions and whether they are locked
   lock region <region> [...]      lock expedition regions (names or ids)
   unlock region <region> [...]    unlock expedition regions
-  lock new / unlock new           the unreleased set: 40 new units + 8 new regions
+  lock new / unlock new           the unreleased set: units and regions locked by default
   unlock all                      every unit and region
   lock reset                      back to the defaults (the new units and regions locked)
   ranked                          how many player armies are saved for ranked matchmaking
@@ -502,7 +502,20 @@ func run_command(line: String) -> String:
   unitstats reset [patch]         delete a patch's stats (default: this patch)
   accounts                        number of accounts and who is signed in
   accounts reset-password <user>  give a player who forgot their password a new
-                                  temporary one (shown once) and sign them out"""
+                                  temporary one (shown once) and sign them out
+  player <user>                   a player's stats, units, trinkets and progress
+  player <user> set <stat> <n>    rating, gold, maps, wins, losses, draft_wins, draft_played
+  player <user> add <stat> <n>    add to a stat (a minus number takes away)
+  player <user> name <new name>   change their commander name
+  player <user> unit <unit> [level <n>] [tier <n>] [shards <n>]
+                                  give a unit, or change one they own
+  player <user> unit <unit> remove   take a unit away
+  player <user> units all [level <n>] [tier <n>]   give every open unit
+  player <user> trinket <trinket> [remove]   give (or take) a trinket
+  player <user> trinkets all|none give every trinket / take them all
+  player <user> challenge <id>|all [remove]   mark challenges cleared (or not)
+  player <user> reset confirm     start their profile over (keeps the account)
+  Changes are saved at once and sent to the player if they're online."""
 		"unitstats":
 			out = _unitstats_command(a.slice(1))
 		"status":
@@ -581,6 +594,8 @@ func run_command(line: String) -> String:
 			out = "Sent: " + msg
 		"accounts":
 			out = _account_command(a)
+		"player":
+			out = _player_command(a.slice(1))
 		"update-url":
 			if a.size() == 2 and (a[1].begins_with("https://") or a[1].begins_with("http://")):
 				update_url = a[1].left(300)
@@ -816,6 +831,11 @@ func _load_config() -> void:
 		UnitLocks.set_locked_list(parsed["locked"])
 	if typeof(parsed.get("locked_regions")) == TYPE_ARRAY:
 		UnitLocks.set_locked_regions(parsed["locked_regions"])
+	if int(parsed.get("locks_version", 1)) < 2:
+		# 0.9.5: Badlands Camp is always open, and its units are open by default.
+		for id in GameData.REGIONS["badlands"]["drops"]:
+			UnitLocks.set_locked(id, false)
+		call_deferred("_save_config")
 	DropRates.apply(parsed.get("drops", {}))
 	Difficulty.apply(parsed.get("difficulty", {}))
 	ranked_range = clampi(int(parsed.get("ranked_range", DEFAULT_RANKED_RANGE)), 10, 5000)
@@ -833,7 +853,7 @@ func _load_config() -> void:
 func _save_config() -> void:
 	var f := FileAccess.open(CONFIG_PATH, FileAccess.WRITE)
 	if f:
-		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "drops": DropRates.to_dict(), "difficulty": Difficulty.to_dict(), "ranked_range": ranked_range, "update_url": update_url}, "\t"))
+		f.store_string(JSON.stringify({"rewards": rewards, "locked": UnitLocks.locked_list(), "locked_regions": UnitLocks.locked_regions(), "locks_version": 2, "drops": DropRates.to_dict(), "difficulty": Difficulty.to_dict(), "ranked_range": ranked_range, "update_url": update_url}, "\t"))
 
 
 func _log(text: String) -> void:
@@ -2657,6 +2677,224 @@ func _account_command(a: PackedStringArray) -> String:
 		_failures.erase(AccountStore.key_of(a[2]))
 		return "New temporary password for %s: %s  (tell them to change it in Settings)" % [a[2], temp]
 	return "Usage: accounts | accounts reset-password <user>"
+
+
+# --- player admin ------------------------------------------------------------------
+
+const PLAYER_STATS := ["rating", "gold", "maps", "wins", "losses", "draft_wins", "draft_played"]
+const PLAYER_KEYWORDS := ["level", "tier", "shards", "remove"]
+
+
+## The 'player' console command: look at and change a signed-in account's
+## profile. Saved straight away and pushed to the player's open sessions.
+func _player_command(a: PackedStringArray) -> String:
+	if accounts == null:
+		return "Player accounts are only available on the dedicated server."
+	if a.is_empty():
+		return "Usage: player <user> [set|add|name|unit|units|trinket|trinkets|challenge|reset] ...  (see 'help')"
+	var user := a[0]
+	if not accounts.exists(user):
+		return "No account called '%s'." % user
+	var pl := accounts.logic(user)
+	if a.size() == 1:
+		return _player_summary(user, pl)
+	var sub := a[1].to_lower()
+	var args := a.slice(2)
+	var out := ""
+	match sub:
+		"set", "add":
+			if args.size() != 2 or not args[0].to_lower() in PLAYER_STATS or not args[1].is_valid_int():
+				return "Usage: player <user> %s <%s> <number>" % [sub, "|".join(PackedStringArray(PLAYER_STATS))]
+			var stat := args[0].to_lower()
+			var v := int(args[1])
+			if sub == "add":
+				v += int(pl.data.get(stat, 0))
+			v = clampi(v, 0, 1000000000)
+			pl.data[stat] = v
+			out = "%s's %s is now %d." % [user, stat, v]
+		"name":
+			var nm := " ".join(args).strip_edges().left(24)
+			if nm == "":
+				return "Usage: player <user> name <new name>"
+			pl.data["name"] = nm
+			out = "%s's commander name is now %s." % [user, nm]
+		"unit":
+			out = _player_unit(pl, user, args)
+		"units":
+			if args.is_empty() or args[0].to_lower() != "all":
+				return "Usage: player <user> units all [level <n>] [tier <n>]"
+			var opts := _player_opts(args.slice(1))
+			var n := 0
+			for id in UnitLocks.unlocked_ids():
+				_player_set_unit(pl, id, opts)
+				n += 1
+			out = "Gave %s all %d open units%s." % [user, n, _opts_text(opts)]
+		"trinket":
+			if args.is_empty():
+				return "Usage: player <user> trinket <trinket> [remove]"
+			var remove := args[args.size() - 1].to_lower() == "remove"
+			var words := args.slice(0, args.size() - 1) if remove else args
+			var t := _trinket_by_name(" ".join(words))
+			if t == "":
+				return "Unknown trinket '%s'." % " ".join(words)
+			if remove:
+				pl.data["trinkets"].erase(t)
+				out = "Took %s from %s." % [Trinkets.ALL[t]["name"], user]
+			else:
+				pl.data["trinkets"][t] = true
+				out = "Gave %s to %s." % [Trinkets.ALL[t]["name"], user]
+		"trinkets":
+			var which := args[0].to_lower() if not args.is_empty() else ""
+			if which == "all":
+				for t in Trinkets.ALL:
+					pl.data["trinkets"][t] = true
+				out = "Gave %s all %d trinkets." % [user, Trinkets.ALL.size()]
+			elif which == "none":
+				pl.data["trinkets"] = {}
+				out = "Took every trinket from %s." % user
+			else:
+				return "Usage: player <user> trinkets all|none"
+		"challenge":
+			if args.is_empty():
+				return "Usage: player <user> challenge <id>|all [remove]"
+			var remove := args.size() > 1 and args[1].to_lower() == "remove"
+			var ids: Array = []
+			if args[0].to_lower() == "all":
+				for c in Challenges.LIST:
+					ids.append(c["id"])
+			else:
+				var cid := _challenge_by_name(args[0])
+				if cid == "":
+					return "Unknown challenge '%s'. Ids: %s" % [args[0], ", ".join(PackedStringArray(Challenges.LIST.map(func(c): return str(c["id"]))))]
+				ids.append(cid)
+			for cid in ids:
+				if remove:
+					pl.data["challenges"].erase(cid)
+				else:
+					pl.data["challenges"][cid] = true
+			out = "%s %d challenge%s for %s." % ["Un-cleared" if remove else "Cleared", ids.size(), "" if ids.size() == 1 else "s", user]
+		"reset":
+			if args.is_empty() or args[0].to_lower() != "confirm":
+				return "This wipes %s's progress (units, gold, rating...). Type 'player %s reset confirm' to do it." % [user, user]
+			var nm := str(pl.data.get("name", user))
+			pl.reset()
+			pl.data["name"] = nm
+			out = "%s's profile has been reset." % user
+		_:
+			return "Unknown 'player' option '%s'. Type 'help'." % sub
+	_player_changed(user, pl)
+	return out
+
+
+func _player_summary(user: String, pl: ProfileLogic) -> String:
+	var d := pl.data
+	var rank := accounts.rank_of(user)
+	var lines: Array = []
+	lines.append("%s (commander name %s)%s" % [user, d.get("name", user), "  ONLINE" if _player_sessions(user).size() > 0 else ""])
+	lines.append("  rating %d%s, wins %d, losses %d, gold %d, maps %d, Legion Draft %d wins of %d" % [pl.rating(),
+		(" (#%d of %d)" % [int(rank["rank"]), int(rank["of"])]) if int(rank.get("rank", 0)) > 0 else "", int(d["wins"]), int(d["losses"]),
+		pl.gold(), pl.maps(), int(d.get("draft_wins", 0)), int(d.get("draft_played", 0))])
+	var units: Array = []
+	for id in GameData.unit_ids_sorted():
+		if d["units"].has(id):
+			var u: Dictionary = d["units"][id]
+			units.append("%s Lv%d T%d" % [id, int(u["level"]), int(u["tier"])])
+	lines.append("  units (%d of %d): %s" % [units.size(), GameData.UNITS.size(), ", ".join(PackedStringArray(units))])
+	lines.append("  army: %s" % ", ".join(PackedStringArray(d.get("army", []).map(func(sq): return "%s (%s)" % [sq["unit"], sq["row"]]))))
+	lines.append("  trinkets: %d of %d    challenges cleared: %d of %d" % [d["trinkets"].size(), Trinkets.ALL.size(), d["challenges"].size(), Challenges.LIST.size()])
+	return "\n".join(PackedStringArray(lines))
+
+
+func _player_unit(pl: ProfileLogic, user: String, args: PackedStringArray) -> String:
+	var name_words: Array = []
+	var i := 0
+	while i < args.size() and not args[i].to_lower() in PLAYER_KEYWORDS:
+		name_words.append(args[i])
+		i += 1
+	var joined := " ".join(PackedStringArray(name_words)).to_lower()
+	var id := joined.replace(" ", "_") if GameData.UNITS.has(joined.replace(" ", "_")) else _unit_by_name(joined)
+	if id == "":
+		return "Unknown unit '%s' (type 'units' for the list)." % joined
+	var rest := args.slice(i)
+	if not rest.is_empty() and rest[0].to_lower() == "remove":
+		if not pl.data["units"].has(id):
+			return "%s doesn't own %s." % [user, id]
+		pl.data["units"].erase(id)
+		pl.data["army"] = pl.data["army"].filter(func(sq): return str(sq["unit"]) != id)
+		return "Took %s from %s (and out of their army)." % [GameData.UNITS[id]["name"], user]
+	var opts := _player_opts(rest)
+	var had: bool = pl.data["units"].has(id)
+	_player_set_unit(pl, id, opts)
+	var u: Dictionary = pl.data["units"][id]
+	return "%s %s %s: level %d, tier %d, %d shards." % ["Updated" if had else "Gave", user, GameData.UNITS[id]["name"], int(u["level"]), int(u["tier"]), int(u["shards"])]
+
+
+## level / tier / shards from "level 5 tier 2 shards 10".
+func _player_opts(words: PackedStringArray) -> Dictionary:
+	var opts := {}
+	var k := 0
+	while k + 1 < words.size():
+		var key := words[k].to_lower()
+		if key in ["level", "tier", "shards"] and words[k + 1].is_valid_int():
+			opts[key] = int(words[k + 1])
+		k += 2
+	return opts
+
+
+func _opts_text(opts: Dictionary) -> String:
+	if opts.is_empty():
+		return ""
+	var parts: Array = []
+	for k in opts:
+		parts.append("%s %d" % [k, opts[k]])
+	return " (" + ", ".join(PackedStringArray(parts)) + ")"
+
+
+func _player_set_unit(pl: ProfileLogic, id: String, opts: Dictionary) -> void:
+	if not pl.data["units"].has(id):
+		pl.data["units"][id] = {"level": 1, "tier": 0, "shards": 0, "trinkets": []}
+	var u: Dictionary = pl.data["units"][id]
+	if opts.has("tier"):
+		u["tier"] = clampi(int(opts["tier"]), 0, GameData.MAX_TIER)
+	if opts.has("level"):
+		u["level"] = int(opts["level"])
+	u["level"] = clampi(int(u["level"]), 1, Army.max_level_for_tier(int(u["tier"])))
+	if opts.has("shards"):
+		u["shards"] = clampi(int(opts["shards"]), 0, 1000000)
+
+
+func _trinket_by_name(text: String) -> String:
+	var t := text.strip_edges().to_lower()
+	if Trinkets.ALL.has(t.replace(" ", "_")):
+		return t.replace(" ", "_")
+	for id in Trinkets.ALL:
+		if str(Trinkets.ALL[id]["name"]).to_lower() == t or str(Trinkets.ALL[id]["name"]).to_lower().replace("'", "") == t.replace("'", ""):
+			return id
+	return ""
+
+
+func _challenge_by_name(text: String) -> String:
+	var t := text.strip_edges().to_lower()
+	for c in Challenges.LIST:
+		if str(c["id"]) == t or str(c["name"]).to_lower() == t:
+			return str(c["id"])
+	return ""
+
+
+func _player_sessions(user: String) -> Array:
+	var out: Array = []
+	for p in _sessions:
+		if _sessions[p] == AccountStore.key_of(user):
+			out.append(p)
+	return out
+
+
+## Clean up (the profile's own rules), save, and send to the player.
+func _player_changed(user: String, pl: ProfileLogic) -> void:
+	pl.load_from(pl.data.duplicate(true))
+	accounts.save(user)
+	for p in _player_sessions(user):
+		_deliver(p, "profile", [pl.data, "", {}])
 
 
 # --- leaderboard -------------------------------------------------------------------

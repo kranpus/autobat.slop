@@ -270,11 +270,11 @@ Ctrl+P then Ctrl+Q to detach again.
 | `units` | List all 100 units and whether each is locked or open. |
 | `lock Storm Dragon` / `lock goblin ogre` | Lock units by name or id. Locked units stop appearing in expeditions, draft shops and ranked opponents, are removed from army codes, and don't deploy in battles. Useful for emergency balance fixes. |
 | `unlock storm_dragon` | Unlock units again. |
-| `regions` | List all 13 expedition regions and whether each is locked. |
+| `regions` | List all 17 expedition regions and whether each is locked (Badlands Camp is always open). |
 | `lock region Bone Fields` / `unlock region marsh` | Lock or unlock expedition regions by name or id. Locked regions are hidden and can't be explored. |
-| `unlock new` / `lock new` | Release (or re-lock) the unreleased content all at once: the 40 new units **and** the 8 new regions. |
+| `unlock new` / `lock new` | Release (or re-lock) the unreleased content all at once: the 32 units **and** 7 regions locked by default. |
 | `unlock all` | Unlock every unit and region. |
-| `lock reset` | Back to the defaults: the 40 new units and 8 new regions locked, everything else open. |
+| `lock reset` | Back to the defaults: those 32 units and 7 regions locked, everything else open. |
 | `unitstats` | Unit balance stats for the current patch: each unit's **use rate** (share of armies that include it) and **win rate** with W-L-D, in ranked and in Legion Draft side by side. Only units that have been used are listed. See below. |
 | `unitstats draft win 20` | Options in any order: `ranked` / `draft` (sort by that mode only), `use` / `win` / `games` / `name` (sort key), `all` (also list unused units), a number (show only that many rows), a patch such as `0.9`. |
 | `unitstats patches` | The patches that have stats, with how many armies each recorded. |
@@ -438,6 +438,27 @@ connection is dropped mid-handshake. They are harmless.
 | --- | --- |
 | `accounts` | Number of accounts and who is signed in right now. |
 | `accounts reset-password <user>` | Sets a new temporary password, prints it once in the console, and signs that player out everywhere. Give it to them; they change it in **Settings → Account**. |
+
+### Player commands
+
+Look at and change one signed-in player's account (guests keep their progress on their own
+device, so these don't reach them). Changes are saved straight away and, if the player is
+online, sent to their game at once. Unit, trinket and challenge names can be ids
+(`storm_dragon`) or names as shown in the game (`Storm Dragon`).
+
+| Command | What it does |
+|---|---|
+| `player <user>` | Their rating (and leaderboard place), wins, losses, gold, maps, Legion Draft record, every unit they own with level and tier, their army, and how many trinkets and challenges they have. |
+| `player <user> set <stat> <n>` | Set `rating`, `gold`, `maps`, `wins`, `losses`, `draft_wins` or `draft_played`, e.g. `player bob set rating 1200`. Never below 0. |
+| `player <user> add <stat> <n>` | Add to one (a minus number takes away), e.g. `player bob add gold 500`. |
+| `player <user> name <new name>` | Change their commander name (shown on the leaderboard and to opponents). |
+| `player <user> unit <unit> [level <n>] [tier <n>] [shards <n>]` | Give them a unit, or change one they own, e.g. `player bob unit Storm Dragon level 20 tier 4`. Levels are capped by the tier, like in the game. Works for locked units too (they sit out of battles until unlocked). |
+| `player <user> unit <unit> remove` | Take a unit away (and out of their army). |
+| `player <user> units all [level <n>] [tier <n>]` | Give them every open unit. |
+| `player <user> trinket <trinket> [remove]` | Give (or take away) a trinket. |
+| `player <user> trinkets all` / `none` | Every trinket, or take them all away. |
+| `player <user> challenge <id>\|all [remove]` | Mark one challenge (or all) as cleared, which also opens the ones after it; `remove` un-clears it. |
+| `player <user> reset confirm` | Start their progress over (their account, password and commander name stay). Without `confirm` it only explains. |
 
 Back up the server's user data folder (`accounts/`, `ranked_armies.json`, `server_config.json`,
 `server_tls.*`) regularly. With Docker it's the `legion-data` volume:

@@ -356,9 +356,9 @@ const RANKED_LABEL_GAP := 40
 
 ## Army power (as used internally, 10x what the game shows) that training
 ## opponents are built around at each rating: [rating, shown power] points,
-## straight lines in between. A new commander (600) starts with about 136.
+## straight lines in between. A new commander (0) starts with about 136.
 ## Past the last point it keeps growing 7% per 100 rating.
-const RANK_POWER := [[0, 100.0], [600, 140.0], [800, 220.0], [1000, 320.0], [1200, 450.0], [1500, 700.0],
+const RANK_POWER := [[0, 140.0], [250, 170.0], [500, 220.0], [800, 300.0], [1000, 380.0], [1200, 470.0], [1500, 700.0],
 	[1700, 900.0], [2000, 1300.0], [2500, 2100.0], [3000, 3200.0], [3500, 4600.0], [4000, 6500.0]]
 
 
@@ -519,21 +519,25 @@ static func _elo_raw(my_rating: int, opp_rating: int, score: float, k: float = -
 
 
 ## Battles against training bands (the AI's generated armies, not saved
-## player armies or live duels) move rating less: a quarter as much below
-## AI_RATING_FROM, a tenth from there on. A decided battle still moves it by
-## at least 1.
+## player armies or live duels) count in full up to AI_RATING_FULL_UNTIL,
+## then move rating less: a quarter as much, and a tenth from AI_RATING_FROM.
+## A decided battle still moves it by at least 1. (The game tells you once,
+## when you reach AI_RATING_FULL_UNTIL.)
+const AI_RATING_FULL_UNTIL := 1000
 const AI_RATING_DIV_LOW := 4.0
 const AI_RATING_DIV_HIGH := 10.0
 const AI_RATING_FROM := 2500
 
 
 static func ai_rating_div(my_rating: int) -> float:
+	if my_rating < AI_RATING_FULL_UNTIL:
+		return 1.0
 	return AI_RATING_DIV_LOW if my_rating < AI_RATING_FROM else AI_RATING_DIV_HIGH
 
 
 ## Rating change for a ranked battle; vs_ai: against a training band.
 static func ranked_delta(my_rating: int, opp_rating: int, score: float, vs_ai: bool) -> int:
-	if not vs_ai:
+	if not vs_ai or ai_rating_div(my_rating) <= 1.0:
 		return elo_delta(my_rating, opp_rating, score)
 	var raw := _elo_raw(my_rating, opp_rating, score) / ai_rating_div(my_rating)
 	var d := roundi(raw)

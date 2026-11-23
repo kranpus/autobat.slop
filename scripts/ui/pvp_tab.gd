@@ -258,7 +258,8 @@ func _make_opponent_card(opp: Dictionary) -> Control:
 		h.add_child(tag)
 	else:
 		var band := ScrollUnroll.ink("training band", 12, FantasySkin.INK_DIM)
-		band.tooltip_text = "An army raised for your rating. Worth %s the rating of a commander's army." % ("a quarter" if Profile.rating() < Army.AI_RATING_FROM else "a tenth")
+		var div := Army.ai_rating_div(Profile.rating())
+		band.tooltip_text = "An army raised for your rating. %s" % ("Counts in full until %d rating." % Army.AI_RATING_FULL_UNTIL if div <= 1.0 else "Worth %s the rating of a commander's army." % ("a quarter" if div < Army.AI_RATING_DIV_HIGH else "a tenth"))
 		band.mouse_filter = Control.MOUSE_FILTER_PASS
 		h.add_child(band)
 	h.add_child(UIKit.spacer())

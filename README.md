@@ -70,14 +70,16 @@ accounts, password hashing and encryption work.
 
 ## The gameplay loop
 
-**Rating unlocks regions.** New commanders start at **600 rating** (1000 before 0.9.5), just
-above the starting regions (500); Fungal Hollows at 800 is the first step up. Each expedition
+**Rating unlocks regions.** New commanders start at **0 rating** (1000 before 0.9.5), and
+rating never drops below 0. Badlands Camp is always open; Goblin Warrens opens at 250, Haunted
+Crypt at 500, and Fungal Hollows at 800 is the first big step up. Each expedition
 region needs a ranked rating, spread out from the start to the top. The Expeditions tab (and the Collection's "found in") lists them in this
 order, the next one to unlock always after the ones you have:
 
 | Rating | Regions |
 |---|---|
-| 500 | Badlands Camp*, Goblin Warrens, Haunted Crypt |
+| 0 | Badlands Camp (always open) |
+| 250 / 500 | Goblin Warrens, Haunted Crypt |
 | 800 | Fungal Hollows (0.9.4) |
 | 1100 / 1200 | Sunken Marsh*, Hive Tunnels* |
 | 1300 | Whispering Forest |
@@ -112,7 +114,7 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      `drops` command (see [HOSTING.md](HOSTING.md)).
    **Trinket hunts: Expeditions → Trinkets.**
    - **Hunting:** spend maps at one of three sites to turn up **3 trinkets** and keep **one**:
-     - **Abandoned War Camp:** 1 map, rating 500, mostly common.
+     - **Abandoned War Camp:** 1 map, open from the start, mostly common.
      - **Sunken Vault:** 2 maps, rating 1050.
      - **Dragon's Trove:** 3 maps, rating 1200, best legendary odds.
    - **The collection:** there are **100 unique trinkets** to collect (30 common, 25 uncommon,
@@ -174,15 +176,16 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Screen shake** can be turned off in Settings.
    - **Training opponents:** a hard ladder, sized by your **rating**, not your army (0.9.5).
      - **Strength:** each rating has an expected army power (`Army.RANK_POWER`): about 140 at
-       600 (a starting army), 320 at 1000, 700 at 1500, 1,300 at 2000, 2,100 at 2500, 3,200 at
+       0 (a starting army), 380 at 1000, 700 at 1500, 1,300 at 2000, 2,100 at 2500, 3,200 at
        3000 and 4,600 at 3500. Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× of that by default (the
        server can change this with `difficulty`). An army stronger than its rating beats them
        more easily; one that's behind has to catch up.
      - **Rating:** they are rated 40 below, 60 above and 150 above you. Harder wins pay more
        rating, but less than the odds would suggest, so no difficulty is a free climb.
-     - **Less rating than real armies:** a battle against a training band moves your rating a
-       **quarter** as much as a saved player army would, and a **tenth** from 2500 rating (but
-       always at least 1 for a win or loss). Saved player armies and live duels count in full.
+     - **Less rating than real armies from 1000:** up to 1000 rating, training bands count in
+       full. From there a battle against one moves your rating a **quarter** as much as a saved
+       player army would, and a **tenth** from 2500 (but always at least 1 for a win or loss); a
+       message tells you when you reach 1000. Saved player armies and live duels count in full.
      - **Trinkets:** above rating ~950 they carry trinkets too, more and rarer as rating rises.
    - **Rating speed (Elo K-factor):** 24 up to rating 1200, falling steadily to 12 at 3000 and
      above. An even win is worth about +12 at the start and +6 near the top.
@@ -218,24 +221,25 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
 
 ## Locked units
 
-There are **100 units**. The original 20 and the 40 from patch 0.9.4 are open. **The 40 from
-patch 0.9 are locked** until you release them:
-- **Commons:** Jackals, Hobgoblins, Cave Bats, Goblin Archers and more.
-- **Uncommons:** Knights, Hippogriffs, War Hounds, Elven Mages and more.
-- **Rares:** Trolls, Cyclopes, Minotaurs, Vampire Knights and more.
+There are **100 units**. The original 20, the 40 from patch 0.9.4 and Badlands Camp's 8 are
+open. **The other 32 from patch 0.9 are locked** until you release them:
+- **Commons:** Cave Bats, Giant Frogs, Soldier Ants, Kobold Brutes and more.
+- **Uncommons:** Elven Knights, Hippogriffs, Elven Mages and more.
+- **Rares:** Trolls, Minotaurs, Vampire Knights and more.
 - **Epics:** Giants, the Sphinx, an Ice Dragon, a Hydra, a Bone Dragon and a Juggernaut.
 - **Legendaries:** the Shadow Dragon, Storm Dragon, Seraph and Grand Avatar.
 
 Locked units don't appear anywhere: not in expeditions, draft shops or ranked opponents, and not
 in army codes. Locked units you own sit out of battles.
 
-The new units come from **8 new expedition regions**, which are locked too:
-- **Opening regions (1 map):** Badlands Camp (500), Sunken Marsh (1100), Hive
-  Tunnels (1200).
+They come from **7 more expedition regions**, which are locked too:
+- **Opening regions (1 map):** Sunken Marsh (1100), Hive Tunnels (1200).
 - **Mid regions (2 maps):** Elven Glade (1500), Bone Fields (1700), Giant's Steps (2200).
 - **Top regions (3 maps):** Dragon's Hoard (3000), Celestial Spire (3500).
 
-The original 5 regions keep their original 20 units. The 0.9.4 units come from their own 4
+**Badlands Camp** (0.9 too) is always open, and so are its 8 units: Jackals, Hobgoblins, Gnoll
+Raiders, Goblin Archers, War Hounds, Orc Knights, the Orc Warlord and the Cyclops (`lock region`
+can't close it). The original 5 regions keep their original 20 units. The 0.9.4 units come from their own 4
 regions (Fungal Hollows, Tidewater Grotto, Abyssal Rift, Frostfell Wastes), open from the start
 like their units; see Battle abilities for the list. A locked region is hidden from the
 Expeditions tab, and a region can only be explored once some of its units are unlocked.

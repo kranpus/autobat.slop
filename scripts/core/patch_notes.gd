@@ -10,17 +10,17 @@ extends RefCounted
 
 const LIST := [
 	{"version": "0.9.5", "date": "2026-11-23", "title": "The Long Road",
-		"summary": "Scroll any menu by dragging on a touchscreen. New commanders start lower, regions are re-spaced for it, training bands match your rank instead of your army and are worth less rating than real armies, and the lobby has four more songs.",
+		"summary": "Scroll any menu by dragging on a touchscreen. New commanders start at 0 with Badlands Camp open and the next regions at 250 and 500, training bands match your rank instead of your army and count for less from 1000 rating, and the lobby has four more songs.",
 		"sections": [
 			{"name": "Ranked", "notes": [
-				{"kind": "change", "text": "New commanders start at 600 rating instead of 1000."},
-				{"kind": "change", "text": "Training bands are built for your rating, not your army: about 140 power at 600, 700 at 1500, 1,300 at 2000, 2,100 at 2500 and 3,200 at 3000 (Easy 0.9x, Even 1.1x, Hard 1.5x of that). An army ahead of its rank beats them more easily; one that's behind has catching up to do."},
-				{"kind": "nerf", "text": "Battles against training bands move your rating a quarter as much as before, and a tenth as much from 2500 rating (always at least 1 point for a win or loss). Saved player armies and live duels count in full, so the fastest climb is against other commanders."},
+				{"kind": "change", "text": "New commanders start at 0 rating instead of 1000, and rating can't drop below 0."},
+				{"kind": "change", "text": "Training bands are built for your rating, not your army: about 140 power at 0 (a starting army), 380 at 1000, 700 at 1500, 1,300 at 2000, 2,100 at 2500 and 3,200 at 3000 (Easy 0.9x, Even 1.1x, Hard 1.5x of that). An army ahead of its rank beats them more easily; one that's behind has catching up to do."},
+				{"kind": "change", "text": "Up to 1000 rating, training bands count in full. From 1000 they move your rating a quarter as much, and a tenth as much from 2500 (always at least 1 point for a win or loss); you'll get a message when you reach 1000. Saved player armies and live duels always count in full, so the way to the top is against other commanders."},
 				{"kind": "note", "text": "Existing ratings are unchanged."},
 			]},
 			{"name": "Regions", "notes": [
-				{"kind": "change", "text": "The starting regions (Goblin Warrens, Haunted Crypt, Badlands Camp) and the Abandoned War Camp now need 500 rating; you start above that, so they're open from day one."},
-				{"kind": "change", "text": "Fungal Hollows moves up from 600 to 800 rating: your first big step up the ladder."},
+				{"kind": "change", "text": "Badlands Camp is open to everyone from the start, with its jackals, hobgoblins, gnoll raiders, goblin archers, war hounds, orc knights, an orc warlord and the cyclops; the Abandoned War Camp trinket hunt is open from the start too."},
+				{"kind": "change", "text": "Goblin Warrens opens at 250 rating and Haunted Crypt at 500; Fungal Hollows moves up to 800, the first big step up the ladder."},
 			]},
 			{"name": "Music", "notes": [
 				{"kind": "change", "text": "Four more tavern tunes join the lobby playlist: King's Feast, Minstrel Dance, Harvest Season and Rejoicing (eight tracks in all)."},

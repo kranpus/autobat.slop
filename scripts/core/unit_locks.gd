@@ -98,10 +98,14 @@ static func locked_regions() -> Array:
 	return out
 
 
+## Regions that can never be locked: there's always somewhere to explore.
+const ALWAYS_OPEN_REGIONS := ["badlands"]
+
+
 static func set_locked_regions(list: Array) -> void:
 	_locked_regions = {}
 	for id in list:
-		if GameData.REGIONS.has(str(id)):
+		if GameData.REGIONS.has(str(id)) and not str(id) in ALWAYS_OPEN_REGIONS:
 			_locked_regions[str(id)] = true
 	_regions_initialized = true
 
@@ -109,6 +113,8 @@ static func set_locked_regions(list: Array) -> void:
 static func set_region_locked(id: String, locked: bool) -> void:
 	if not _regions_initialized:
 		set_locked_regions(default_regions())
+	if locked and id in ALWAYS_OPEN_REGIONS:
+		return
 	if locked:
 		_locked_regions[id] = true
 	else:

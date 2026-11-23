@@ -1,5 +1,6 @@
 extends SceneTree
 ## Touch scrolling (TouchScroll autoload): fakes a finger on the real menus.
+## Also checks the one-time notice at 1000 rating.
 ## A drag over the Collection's unit cards scrolls the list and doesn't
 ## select the card it started on; a tap still selects; the Expeditions and
 ## Patch Notes lists scroll the same way; a real mouse drag doesn't scroll.
@@ -54,6 +55,7 @@ func _run() -> void:
 	await _patch_notes_drag()
 	await create_timer(1.0).timeout   # let the glide settle
 	await _mouse_drag()
+	await _rating_notice()
 	_finish()
 
 
@@ -186,6 +188,27 @@ func _mouse_drag() -> void:
 	_drag(pos, pos + Vector2(0, 200), 10, 0)
 	await process_frame
 	check(absi(_mouse_scroll.scroll_vertical - before) < 4, "a real mouse drag doesn't scroll (mouse users have the wheel and bar)")
+
+
+## Not touch scrolling, but the same real-menu setup: the one-time notice at
+## 1000 rating that training bands now count for less.
+func _rating_notice() -> void:
+	print("rating notice")
+	profile.settings.erase("ai_rating_notice")
+	profile.data["rating"] = 990
+	main._rating_notice()
+	check(get_nodes_in_group("rating_notice").is_empty(), "no notice below 1000")
+	profile.data["rating"] = 1003
+	main._rating_notice()
+	await process_frame
+	var shown := get_nodes_in_group("rating_notice")
+	check(shown.size() == 1 and (shown[0] as AcceptDialog).visible and (shown[0] as AcceptDialog).dialog_text.contains("quarter"), "reaching 1000 shows the notice")
+	for d in shown:
+		d.queue_free()
+	await process_frame
+	main._rating_notice()
+	check(get_nodes_in_group("rating_notice").is_empty(), "...only once")
+	profile.settings.erase("ai_rating_notice")
 
 
 func _finish() -> void:

@@ -466,6 +466,28 @@ func _on_battle_closed() -> void:
 		return
 	menu_layer.visible = true
 	Profile.changed.emit()
+	_rating_notice()
+
+
+## Once, when a commander first reaches 1000 rating: from here on, training
+## bands are worth less rating than other commanders' armies.
+func _rating_notice() -> void:
+	if Profile.rating() < Army.AI_RATING_FULL_UNTIL or bool(Profile.settings.get("ai_rating_notice", false)):
+		return
+	Profile.settings["ai_rating_notice"] = true
+	Profile.save_settings()
+	var d := AcceptDialog.new()
+	d.theme = UIKit.make_theme()
+	d.title = "Rating %d: the real ladder begins" % Army.AI_RATING_FULL_UNTIL
+	d.dialog_text = "Well fought, Commander! You've reached %d rating.\n\nFrom now on, battles against training bands count for a quarter of the rating (a tenth from %d). Armies saved by other commanders still count in full, so seek them out to keep climbing." % [Army.AI_RATING_FULL_UNTIL, Army.AI_RATING_FROM]
+	d.dialog_autowrap = true
+	d.min_size = Vector2i(460, 0)
+	d.ok_button_text = "To arms"
+	d.add_to_group("rating_notice")
+	add_child(d)
+	d.popup_centered()
+	d.confirmed.connect(d.queue_free)
+	d.canceled.connect(d.queue_free)
 
 
 ## Android back button / gesture: close a finished battle, otherwise step

@@ -9,8 +9,9 @@ extends RefCounted
 const SAVE_VERSION := 1
 const MAP_REGEN_SECONDS := 600
 const MAX_MAPS := 10
-## Rating a new commander starts at (1000 before 0.9.5).
-const START_RATING := 600
+## Rating a new commander starts at (1000 before 0.9.5). Rating never goes
+## below 0.
+const START_RATING := 0
 
 var data: Dictionary = {}
 ## Gold multiplier for battle rewards (set by the server admin's `gold battle`).
@@ -630,8 +631,9 @@ func apply_battle_result(mode: String, score: float, opp_rating: int, enemy_kill
 	if mode == "ranked" or mode == "live":
 		var rank_mult := Army.win_gold_mult(rating())   # your rating before this battle
 		var delta := Army.ranked_delta(rating(), opp_rating, score, vs_ai and mode == "ranked")
-		data["rating"] = maxi(0, rating() + delta)
-		summary["rating"] = delta
+		var before := rating()
+		data["rating"] = maxi(0, rating() + delta)   # never below 0
+		summary["rating"] = rating() - before
 		if score >= 1.0:
 			data["wins"] = int(data["wins"]) + 1
 			g = roundi(float(g + 100 + maxi(0, (opp_rating - 900) / 4)) * rank_mult)
