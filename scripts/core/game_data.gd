@@ -554,7 +554,7 @@ const UNITS := {
 	},
 	"vine_stalker": {
 		"name": "Vine Stalker", "rarity": "epic", "role": "melee",
-		"hp": 1250.0, "dmg": 60.0, "cooldown": 1.0, "range": 8.0, "speed": 80.0,
+		"hp": 1250.0, "dmg": 68.0, "cooldown": 1.0, "range": 8.0, "speed": 80.0,
 		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 14.0, "scale": 1.6, "flying": false,
 		"desc": "It steps out of the undergrowth right beside you.",
@@ -614,7 +614,7 @@ const UNITS := {
 		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
 		"projectile": "none", "radius": 11.0, "scale": 1.2, "flying": false,
 		"desc": "The scent of blood drives it into a frenzy.",
-		"ability": {"id": "frenzy", "value": 0.15},
+		"ability": {"id": "frenzy", "value": 0.2},
 	},
 	"guardian_serpent": {
 		"name": "Guardian Serpent", "rarity": "rare", "role": "tank",

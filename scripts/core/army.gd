@@ -120,9 +120,9 @@ const ABILITY_TUNING := {
 	# The 0.9.4 set (tuned with tools/balance_sim.gd).
 	"venom": 1.1, "purify": 0.0, "split": 1.8, "shell": 0.8, "ensnare": 0.05, "pounce": 0.0,
 	"corrode": 0.6, "spikes": 0.4, "summon": 0.15, "blink": 0.0, "block": 1.3, "volley": 1.3,
-	"evasion": 1.4, "song": 1.4, "undertow": 0.17, "frenzy": 0.2, "taunt": 0.08, "pull": 0.1,
-	"tidal_wave": 0.7, "avalanche": 0.8, "detonate": 0.6, "martyr": 0.3, "pack": 0.15, "reflect": 0.1,
-	"berserk": 0.45, "thunderstrike": 1.2, "immolate": 1.0, "execute": 0.33, "terror": 0.38, "ward": 0.4,
+	"evasion": 1.4, "song": 2.0, "undertow": 0.17, "frenzy": 0.0, "taunt": 0.08, "pull": 0.1,
+	"tidal_wave": 0.9, "avalanche": 0.9, "detonate": 0.8, "martyr": 0.3, "pack": 0.15, "reflect": 0.0,
+	"berserk": 0.3, "thunderstrike": 1.5, "immolate": 1.4, "execute": 0.33, "terror": 0.38, "ward": 0.4,
 	"inspire": 1.0, "frost_armor": 0.15, "frost_aura": 0.32, "entomb": 0.1, "fortify": 0.8, "phase": 0.0,
 }
 const CHAIN_POWER_CAP := 1.2
