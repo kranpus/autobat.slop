@@ -38,6 +38,7 @@ func _initialize() -> void:
 	test_difficulty()
 	test_abilities()
 	test_audio()
+	test_new_units()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -381,7 +382,7 @@ func test_unit_locks() -> void:
 	var backup: Dictionary = profile.data.duplicate(true)
 	UnitLocks.set_locked_list(UnitLocks.defaults())
 	var locked := UnitLocks.locked_list()
-	check(locked.size() == 40 and GameData.UNITS.size() == 60, "60 units, the 40 new ones locked by default")
+	check(locked.size() == 40 and GameData.UNITS.size() == 100, "100 units, the 40 from 0.9 locked by default (the 0.9.4 ones open)")
 	var assets_ok := true
 	for id in locked:
 		var in_region := false
@@ -445,7 +446,7 @@ func test_unit_locks() -> void:
 	party.run_command("lock reset")
 	check(UnitLocks.locked_list().size() == 40 and not UnitLocks.is_locked("goblin"), "'lock reset' restores the defaults")
 	# Expedition regions.
-	check(GameData.REGIONS.size() == 13 and UnitLocks.locked_regions().size() == 8, "13 regions, the 8 new ones locked by default")
+	check(GameData.REGIONS.size() == 17 and UnitLocks.locked_regions().size() == 8, "17 regions, the 8 from 0.9 locked by default")
 	var new_only := true
 	for rid in UnitLocks.default_regions():
 		for id in GameData.REGIONS[rid]["drops"]:
@@ -1162,7 +1163,7 @@ func test_abilities() -> void:
 	print("battle abilities (patch 0.9.2)")
 	var splashers: Array = GameData.UNITS.keys().filter(func(u): return float(GameData.UNITS[u]["aoe"]) > 0.0)
 	var with_ability: Array = GameData.UNITS.keys().filter(func(u): return not GameData.ability_of(u).is_empty())
-	check(splashers.size() == 6 and with_ability.size() == 23, "splash is rare now: %d units splash, %d have abilities" % [splashers.size(), with_ability.size()])
+	check(splashers.size() == 6 and with_ability.size() == 63, "splash is rare now: %d units splash, %d have abilities" % [splashers.size(), with_ability.size()])
 	var big: Array = GameData.UNITS.keys().filter(func(u): return GameData.UNITS[u]["rarity"] in ["epic", "legendary"])
 	var big_ids: Array = big.map(func(u): return str(GameData.ability_of(u).get("id", "")))
 	check(big_ids.all(func(x): return x != "" and big_ids.count(x) == 1), "every epic and legendary has an ability of its own (%d units)" % big.size())
@@ -1320,4 +1321,135 @@ func test_audio() -> void:
 					seen[int(e[3])] = true
 	var want := [BattleSim.Ab.CHILL, BattleSim.Ab.BURN, BattleSim.Ab.CURSE, BattleSim.Ab.WEAKEN, BattleSim.Ab.KNOCKBACK, BattleSim.Ab.SOUL_HARVEST]
 	check(want.all(func(a): return seen.has(a)), "chill, burn, shatter, wither, knockback and soul harvest each play a sound (%d of %d seen)" % [want.filter(func(a): return seen.has(a)).size(), want.size()])
+	UnitLocks.set_locked_list(UnitLocks.defaults())
+
+
+func _status_battle(squads_a: Array, squads_b: Array, seed_v: int = 3) -> Dictionary:
+	var sim := BattleSim.new()
+	sim.setup(squads_a, squads_b, seed_v, "open_arena")
+	var out := {"sim": sim, "n0": sim.n, "ev": {}, "ab": {}, "st": {}, "corrode": 0.0}
+	var keys := ["poison", "root", "fear", "shell", "phase", "entomb", "haste", "inspire", "taunt", "chill", "stun"]
+	for k in keys:
+		out["st"][k] = 0
+	while not sim.finished and sim.tick < 3000:
+		sim.step()
+		for e in sim.drain_events():
+			out["ev"][e[0]] = int(out["ev"].get(e[0], 0)) + 1
+			if e[0] == BattleSim.Ev.ABILITY:
+				out["ab"][int(e[3])] = int(out["ab"].get(int(e[3]), 0)) + 1
+		for i in sim.n:
+			if sim.alive[i] == 0:
+				continue
+			for k in keys:
+				if (sim.get(k + "_until") as PackedInt32Array)[i] > sim.tick:
+					out["st"][k] += 1
+			out["corrode"] = maxf(out["corrode"], sim.corrode[i])
+	return out
+
+
+func test_new_units() -> void:
+	print("40 new units (patch 0.9.4)")
+	UnitLocks.set_locked_list(UnitLocks.defaults())
+	var fresh: Array = GameData.UNITS.keys().slice(60)
+	check(fresh.size() == 40 and fresh.all(func(u): return not UnitLocks.is_locked(u)), "40 new units, open by default")
+	check(fresh.all(func(u): return not GameData.ability_of(u).is_empty() and BattleSim.AB_IDS.has(GameData.ability_of(u)["id"]) and GameData.ability_text(u) != ""), "every new unit, commons included, has a battle ability")
+	var commons: Array = fresh.filter(func(u): return GameData.UNITS[u]["rarity"] == "common")
+	var common_ids: Array = commons.map(func(u): return str(GameData.ability_of(u)["id"]))
+	check(common_ids.all(func(x): return common_ids.count(x) == 1), "no two new commons share an ability (%d commons)" % commons.size())
+	var data_ok := true
+	for u in GameData.UNITS:
+		if load("res://assets/sprites/units/%s.png" % u) == null or not DraftData.ABILITIES.has(u) or GameData.regions_for_unit(u).is_empty():
+			data_ok = false
+			print("    missing data for ", u)
+	check(data_ok, "all 100 units have a sprite, a draft ability and a region")
+	var order: Array = GameData.region_ids_by_unlock()
+	var sorted_ok := order.size() == GameData.REGIONS.size()
+	for k in range(1, order.size()):
+		if int(GameData.REGIONS[order[k]]["min_rating"]) < int(GameData.REGIONS[order[k - 1]]["min_rating"]):
+			sorted_ok = false
+	check(sorted_ok and order[0] == "badlands", "regions are listed in unlock order (%s first, %s last)" % [order[0], order[-1]])
+	var sites: Array = Trinkets.site_ids_by_unlock()
+	var sites_ok := true
+	for k in range(1, sites.size()):
+		if int(Trinkets.SITES[sites[k]]["min_rating"]) < int(Trinkets.SITES[sites[k - 1]]["min_rating"]):
+			sites_ok = false
+	check(sites_ok, "trinket sites too")
+	for rid in ["fungal_hollows", "tidewater_grotto", "abyssal_rift", "frostfell_wastes"]:
+		check(GameData.REGIONS.has(rid) and not UnitLocks.is_region_locked(rid) and load("res://assets/sprites/tiles/%s.png" % rid) != null, "%s is open and has its tile" % rid)
+	# Each mechanic in a real battle.
+	var foes := [{"unit": "orc_warrior", "level": 6, "tier": 6, "row": "front"}, {"unit": "elf_archer", "level": 6, "tier": 4, "row": "back"}, {"unit": "orc_sorcerer", "level": 5, "tier": 3, "row": "back"}]
+	var one := func(u: String) -> Array: return [{"unit": u, "level": 8, "tier": 4, "row": GameData.default_row_for(u)}]
+	var guard := [{"unit": "orc_warrior", "level": 6, "tier": 6, "row": "front"}]
+	var r := _status_battle(one.call("cave_spider"), foes)
+	check(r["st"]["poison"] > 0, "Cave Spider poisons")
+	r = _status_battle(one.call("ooze"), foes)
+	check(int(r["ab"].get(BattleSim.Ab.SPLIT, 0)) > 0 and (r["sim"] as BattleSim).n > int(r["n0"]), "Ooze splits when it dies (%d -> %d)" % [r["n0"], (r["sim"] as BattleSim).n])
+	var again := _status_battle(one.call("ooze"), foes)
+	check((again["sim"] as BattleSim).checksum() == (r["sim"] as BattleSim).checksum(), "split battles stay deterministic")
+	r = _status_battle(one.call("giant_snail"), foes)
+	check(r["st"]["shell"] > 0, "Giant Snail hides in its shell")
+	r = _status_battle(one.call("trapdoor_spider"), foes)
+	check(r["st"]["root"] > 0, "Trapdoor Spider roots")
+	r = _status_battle(one.call("wolf_spider"), foes)
+	check(int(r["ab"].get(BattleSim.Ab.POUNCE, 0)) > 0, "Wolf Spider pounces")
+	r = _status_battle(one.call("deathcap"), foes)
+	check(r["corrode"] > 0.0, "Deathcap corrodes armour")
+	r = _status_battle(one.call("spider_matriarch"), foes)
+	var sim: BattleSim = r["sim"]
+	check(int(r["ab"].get(BattleSim.Ab.SUMMON, 0)) > 0 and range(sim.n).any(func(i): return sim.team[i] == 0 and sim.unit_ids[sim.kind[i]] == "cave_spider"), "Spider Matriarch summons cave spiders")
+	r = _status_battle(one.call("snapping_turtle"), foes)
+	check(int(r["ab"].get(BattleSim.Ab.BLOCK, 0)) > 0, "Snapping Turtle blocks")
+	r = _status_battle(one.call("giant_newt"), foes)
+	check(int(r["ab"].get(BattleSim.Ab.EVASION, 0)) > 0, "Giant Newt dodges")
+	r = _status_battle(one.call("mermaid") + guard, foes)
+	check(r["st"]["haste"] > 0, "Mermaid's song hastens allies")
+	r = _status_battle(one.call("guardian_serpent") + [{"unit": "elf_archer", "level": 6, "tier": 4, "row": "back"}], foes)
+	check(r["st"]["taunt"] > 0, "Guardian Serpent taunts")
+	r = _status_battle(one.call("kraken"), foes)
+	check(int(r["ab"].get(BattleSim.Ab.PULL, 0)) > 0, "Kraken pulls")
+	r = _status_battle(one.call("merfolk_avatar"), foes)
+	check(int(r["ev"].get(BattleSim.Ev.WAVE, 0)) > 0, "Merfolk Avatar's tidal wave")
+	r = _status_battle(one.call("hellion"), foes)
+	check(int(r["ev"].get(BattleSim.Ev.STRIKE, 0)) > 0, "Hellion calls down fire")
+	r = _status_battle(one.call("pit_fiend"), foes)
+	check(r["st"]["fear"] > 0, "Pit Fiend terrifies")
+	r = _status_battle(one.call("warg") + guard, foes)
+	check(r["st"]["inspire"] > 0, "Warg inspires")
+	r = _status_battle(one.call("ice_fiend"), foes)
+	check(r["st"]["entomb"] > 0, "Ice Fiend entombs")
+	r = _status_battle(one.call("spectral_dragon"), foes)
+	check(r["st"]["phase"] > 0, "Spectral Dragon phases out")
+	r = _status_battle(one.call("rakshasa"), foes)
+	check(int(r["ab"].get(BattleSim.Ab.REFLECT, 0)) > 0, "Rakshasa reflects projectiles")
+	# Passive effects, checked directly.
+	check(is_equal_approx(float(Army.unit_stats("acid_blob", 1)["thorns"]), 0.4), "Acid Blob's spikes hurt attackers (40% thorns)")
+	var s := BattleSim.new()
+	s.setup([{"unit": "sporeling", "level": 1, "tier": 0, "row": "back"}, {"unit": "goblin", "level": 1, "tier": 0, "row": "front"}], [{"unit": "goblin", "level": 1, "tier": 0, "row": "front"}], 1, "open_arena")
+	var spore: int = range(s.n).filter(func(i): return s.ab_id[i] == BattleSim.Ab.PURIFY)[0]
+	var ally: int = range(s.n).filter(func(i): return s.team[i] == 0 and i != spore)[0]
+	s.px[spore] = s.px[ally] + 10.0
+	s.py[spore] = s.py[ally]
+	s._rebuild_grid()
+	s.hp[ally] = s.max_hp[ally] * 0.5
+	s.burn_until[ally] = s.tick + 200
+	s.poison_until[ally] = s.tick + 200
+	s.cd_t[spore] = 0.0
+	s._approach_and_act(spore, ally, true)
+	check(s.burn_until[ally] == 0 and s.poison_until[ally] == 0, "Sporeling's healing purifies burns and poison")
+	var e := BattleSim.new()
+	e.setup([{"unit": "executioner", "level": 1, "tier": 0, "row": "front"}], [{"unit": "troll", "level": 1, "tier": 0, "row": "front"}], 1, "open_arena")
+	var ex: int = range(e.n).filter(func(i): return e.team[i] == 0)[0]
+	var tr: int = range(e.n).filter(func(i): return e.team[i] == 1)[0]
+	e.rng.seed = 4
+	var h0 := e.hp[tr]
+	e._damage_unit(tr, 10.0, 0, true, ex)
+	var full := h0 - e.hp[tr]
+	e.hp[tr] = e.max_hp[tr] * 0.2
+	h0 = e.hp[tr]
+	e.rng.seed = 4
+	e._damage_unit(tr, 10.0, 0, true, ex)
+	var low := h0 - e.hp[tr]
+	check(absf(low / full - 2.5) < 0.05, "Executioner hits much harder below 30%% health (%.0f vs %.0f)" % [low, full])
+	var proto: String = root.get_node("Party").GAME_VERSION
+	check(proto == "legion-draft-18", "protocol bumped for the new units (%s)" % proto)
 	UnitLocks.set_locked_list(UnitLocks.defaults())
