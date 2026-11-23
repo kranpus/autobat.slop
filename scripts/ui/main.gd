@@ -36,6 +36,7 @@ var tutorial: CanvasLayer
 var _toast_box: VBoxContainer
 var _last_gold := -1
 var _rotate_layer: CanvasLayer
+var _rotate_labels: Array = []
 var _gold_float_parent: Control
 
 
@@ -359,6 +360,7 @@ func _build_rotate_prompt() -> void:
 	var s := UIKit.label("Autobat Legions plays in landscape.", 26, UIKit.TEXT_DIM)
 	s.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(s)
+	_rotate_labels = [[icon, 0.2], [t, 0.075], [s, 0.045]]
 	get_viewport().size_changed.connect(_update_rotate_prompt)
 	_update_rotate_prompt()
 
@@ -369,6 +371,9 @@ func _update_rotate_prompt() -> void:
 	if "--portrait-test" in OS.get_cmdline_user_args():
 		upright = size.y > size.x * 1.1
 	_rotate_layer.visible = upright
+	# Upright, the layout is far wider than the screen: size the words to it.
+	for e in _rotate_labels:
+		(e[0] as Label).add_theme_font_size_override("font_size", maxi(16, roundi(size.x * float(e[1]))))
 
 
 # --- tutorial -----------------------------------------------------------------------

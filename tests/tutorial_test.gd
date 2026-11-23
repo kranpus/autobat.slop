@@ -5,6 +5,8 @@ extends SceneTree
 ##
 ##   godot --headless -s res://tests/tutorial_test.gd
 ## With a display, `-- --shots=DIR` also saves a screenshot of every step.
+## `-- --existing`: a player who has already played isn't shown it, and
+## Settings' replay and the skip button work.
 ## Exit code 0 when everything passed.
 
 var main: Node
@@ -18,10 +20,13 @@ var _actions: Array = []
 var _start_units := 0
 var _shots := ""
 var _shot_at := -1
+var _existing := false
 
 
 func _initialize() -> void:
 	for arg in OS.get_cmdline_user_args():
+		if arg == "--existing":
+			_existing = true
 		if arg.begins_with("--shots="):
 			_shots = arg.get_slice("=", 1)
 			DirAccess.make_dir_recursive_absolute(_shots)
@@ -32,6 +37,8 @@ func _initialize() -> void:
 	profile.settings["server_address"] = "127.0.0.1:1"   # no server: offline opponents
 	profile.reset()
 	_start_units = profile.data["units"].size()
+	if _existing:
+		profile.data["wins"] = 4
 	main = load("res://scenes/main.tscn").instantiate()
 	root.add_child(main)
 
@@ -65,6 +72,8 @@ func _units_with_shards() -> int:
 
 func _process(_d: float) -> bool:
 	frames += 1
+	if _existing:
+		return _existing_player()
 	if frames == 5:
 		tut = main.get("tutorial")
 		check(tut != null and tut.is_running(), "a new player gets the tutorial")
@@ -129,3 +138,19 @@ func _act(step: Dictionary) -> void:
 		if str(n.get_meta("tut", "")) == target and n.is_visible_in_tree() and n is BaseButton and not n.disabled:
 			(n as BaseButton).pressed.emit()
 			return
+
+
+func _existing_player() -> bool:
+	tut = main.get("tutorial")
+	if frames == 10:
+		check(not tut.is_running() and bool(profile.settings["tutorial"]["off"]), "a player who already played isn't shown the tutorial")
+		tut.replay()
+	if frames == 20:
+		check(tut.is_running() and str(tut.get("_chapter")) == "first_battle", "Settings → Replay tutorial starts it from the beginning")
+		tut.skip_all()
+	if frames == 30:
+		check(not tut.is_running() and bool(profile.settings["tutorial"]["off"]), "Skip tutorial turns it off (and it stays off)")
+		print("\n%s (%d failure%s)" % ["ALL TUTORIAL TESTS PASSED" if _failures == 0 else "TUTORIAL TESTS FAILED", _failures, "" if _failures == 1 else "s"])
+		quit(1 if _failures > 0 else 0)
+		return true
+	return false

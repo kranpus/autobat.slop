@@ -7,14 +7,33 @@ var _detail: VBoxContainer
 var _selected := ""
 var _trinket_popup: PopupPanel
 var _trinket_list: VBoxContainer
+var _found_label: Label
+var _owned_only: CheckButton
 
 
 func _ready() -> void:
 	add_theme_constant_override("separation", 12)
+	var left := UIKit.vbox(8)
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_child(left)
+	var head := UIKit.hbox(12)
+	_found_label = UIKit.label("", 15, UIKit.ACCENT)
+	head.add_child(_found_label)
+	head.add_child(UIKit.spacer())
+	_owned_only = CheckButton.new()
+	_owned_only.text = "Owned only"
+	_owned_only.button_pressed = bool(Profile.settings.get("collection_owned_only", false))
+	_owned_only.toggled.connect(func(on: bool):
+		Profile.settings["collection_owned_only"] = on
+		Profile.save_settings()
+		refresh())
+	head.add_child(_owned_only)
+	left.add_child(head)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
+	left.add_child(scroll)
 	_grid = GridContainer.new()
 	# Start with as many columns as fit next to the details panel.
 	var detail_w := 310.0 if UIKit.is_compact(self) else 400.0
@@ -47,11 +66,19 @@ func refresh() -> void:
 	UIKit.clear(_grid)
 	if UnitLocks.is_locked(_selected) and not Profile.owns(_selected):
 		_selected = GameData.STARTER_UNITS[0]
+	var shown := 0
+	var found := 0
 	for id in GameData.unit_ids_sorted():
 		# Locked units stay hidden unless you already own one.
 		if UnitLocks.is_locked(id) and not Profile.owns(id):
 			continue
+		shown += 1
+		if Profile.owns(id):
+			found += 1
+		elif _owned_only.button_pressed:
+			continue
 		_grid.add_child(_make_card(id))
+	_found_label.text = "%d / %d units found" % [found, shown]
 	_build_detail()
 
 
@@ -79,7 +106,10 @@ func _make_card(id: String) -> Control:
 	name_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_l.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	v.add_child(name_l)
-	var info := "Lv %d  ·  x%d" % [int(Profile.unit(id)["level"]), Profile.squad_size(id)] if owned else "Not found"
+	var in_army := false
+	for sq in Profile.data["army"]:
+		in_army = in_army or sq["unit"] == id
+	var info := ("%sLv %d  ·  x%d" % ["★ " if in_army else "", int(Profile.unit(id)["level"]), Profile.squad_size(id)]) if owned else "Not found"
 	var info_l := UIKit.label(info, 12, UIKit.TEXT_DIM)
 	info_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(info_l)

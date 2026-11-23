@@ -184,7 +184,12 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Rewards:** a fixed reward for the first win: gold, maps, specific trinkets, and units
        such as the Ogre Brute, Lich, Phoenix and Golden Dragon. Replays pay nothing.
      - **Signed in:** the server runs the battle and pays the reward.
-   - **Patch Notes tab:** balance changes by version, newest first. Marked "(new)" until you've
+   - **Tutorial:** new players are guided through the basics by doing them, with a spotlight on the
+     next thing to press. It covers a first battle, a level up, an expedition, the army, a ranked
+     fight and a challenge. Tips appear the first time trinkets, Legion Draft and the leaderboard are
+     opened. Skip it at any time; replay it from Settings. The steps are in
+     `scripts/ui/tutorial.gd` (targets are marked with `UIKit.tut(control, "id")`).
+   - **Patch Notes tab:** balance changes by version, newest first. A red dot marks it until you've
      opened the current version's notes. Edit `scripts/core/patch_notes.gd` to add a patch.
    - **Leaderboard tab:** the top 50 signed-in players by rating (players need at least one
      ranked battle), with your own rank. Guests can view it but aren't on it.
@@ -407,6 +412,7 @@ scripts/battle/battle_screen.gd  HUD, start and result screens
 scripts/ui/*.gd               Menu tabs
 tests/test_battle.gd          Headless tests
 tests/net_account_test.gd     End-to-end account test against a running server
+tests/tutorial_test.gd        Plays through the whole tutorial as a new player
 assets/                       CC0 sprites, sounds, music + licenses
 ```
 
@@ -421,7 +427,13 @@ assets/                       CC0 sprites, sounds, music + licenses
 ```
 godot --headless --import                       # once, registers class names
 godot --headless -s res://tests/test_battle.gd
+godot --headless -s res://tests/tutorial_test.gd   # plays through the tutorial
+godot --headless -s res://tests/tutorial_test.gd -- --existing   # returning players, replay, skip
 ```
+
+`tutorial_test.gd` acts like a new player: it presses whatever the tutorial spotlights,
+fast-forwards battles and picks a recruit, then checks every chapter finished. With a
+display, `-- --shots=DIR` saves a screenshot of each step.
 
 The tests check army-code round trips and cheat clamping, that squads deploy uncapped, that
 every one of the 20 maps resolves a battle with no units stuck in terrain, a 1000+ vs 1000+

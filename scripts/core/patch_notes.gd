@@ -6,6 +6,23 @@ extends RefCounted
 ## kept under. Note kinds: "nerf", "buff", "change", "note".
 
 const LIST := [
+	{"version": "0.9.3", "date": "2026-11-23", "title": "Welcome, Commander",
+		"summary": "A guided tutorial for new players and a round of interface improvements. No balance changes.",
+		"sections": [
+			{"name": "Tutorial", "notes": [
+				{"kind": "change", "text": "New players are guided through the basics by doing them: a first battle, levelling up, recruiting on an expedition, building the army, a ranked fight and a challenge. A spotlight shows the one thing to press next, with a few words; nothing to read through."},
+				{"kind": "change", "text": "Short tips the first time you open trinket hunts, Legion Draft and the leaderboard."},
+				{"kind": "note", "text": "Skip it at any time, or replay it from Settings → Tutorial."},
+			]},
+			{"name": "Interface", "notes": [
+				{"kind": "change", "text": "Red dots on tabs with something waiting: a squad upgrade you can afford, scouting maps piling up or a recruit to choose, a challenge your army can take, unread patch notes."},
+				{"kind": "change", "text": "Short messages confirm what you did (level ups, squad upgrades, army built, codes copied), and incoming gold floats up from the gold counter."},
+				{"kind": "change", "text": "Battle tab: a big Find Opponents button. Friend challenges and live duels fold away under Play with friends."},
+				{"kind": "change", "text": "Army tab: your unused units wait on a Reserves bench; tap one to add it, or drag it into a column. Copy army code replaces the long code field."},
+				{"kind": "change", "text": "Collection: how many units you've found, an Owned only switch, and a ★ on units in your army."},
+				{"kind": "change", "text": "Phones: holding the browser version upright shows a prompt to turn the phone sideways instead of a tiny screen."},
+			]},
+		]},
 	{"version": "0.9.2", "date": "2026-11-22", "title": "Abilities",
 		"summary": "Splash is now rare, melee splash is nerfed, and 23 units have battle abilities of their own, including every epic and legendary.",
 		"sections": [
