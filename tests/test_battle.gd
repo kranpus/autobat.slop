@@ -37,6 +37,7 @@ func _initialize() -> void:
 	test_rating_speed()
 	test_difficulty()
 	test_abilities()
+	test_audio()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -1279,4 +1280,44 @@ func test_abilities() -> void:
 	pl.data["units"]["hill_giant"] = {"level": 1, "tier": 4, "shards": 0}
 	pl.data["units"]["ogre"] = {"level": 1, "tier": 4, "shards": 0}
 	check(int(pl.tier_up_cost("golden_dragon")["shards"]) == ceili(2 * 5 * 0.75 * 2.0) and int(pl.tier_up_cost("hill_giant")["shards"]) == ceili(3 * 5 * 0.75 * 1.75) and int(pl.tier_up_cost("ogre")["shards"]) == ceili(5 * 5 * 0.75), "epic and legendary squads need more shards to grow")
+	UnitLocks.set_locked_list(UnitLocks.defaults())
+
+
+func test_audio() -> void:
+	print("sound and music (0.9.4)")
+	var audio := root.get_node("Audio")
+	var missing: Array = []
+	for key in audio.SFX:
+		for path in audio.SFX[key]:
+			if not ResourceLoader.exists(path):
+				missing.append(path)
+	for key in audio.MUSIC:
+		for path in audio.MUSIC[key]:
+			if not ResourceLoader.exists(path):
+				missing.append(path)
+	check(missing.is_empty(), "every sound and music file exists %s" % [missing])
+	check((audio.MUSIC["menu"] as Array).size() >= 4 and "menu" in audio.PLAYLISTS, "the lobby plays a playlist of %d tracks" % (audio.MUSIC["menu"] as Array).size())
+	var repeats := 0
+	var last := ""
+	for i in 40:
+		audio.set("_music_path", last)
+		var next: String = audio.call("_pick_track", "menu")
+		if next == last:
+			repeats += 1
+		last = next
+	check(repeats == 0, "the playlist never plays the same track twice in a row")
+	check(audio.SFX.has("battle_start") and audio.SFX.has("ab_zap") and audio.SFX.has("ab_ice"), "a new battle start and ability sounds")
+	# Status abilities announce themselves, so the battle can play their sound.
+	UnitLocks.set_locked_list([])
+	var seen := {}
+	for u in ["ice_dragon", "salamander_firebrand", "frost_giant", "sphinx", "stone_giant", "bone_dragon"]:
+		var sim := BattleSim.new()
+		sim.setup([{"unit": u, "level": 10, "tier": 3, "row": GameData.default_row_for(u)}], [{"unit": "orc_warrior", "level": 5, "tier": 6, "row": "front"}, {"unit": "elf_archer", "level": 5, "tier": 4, "row": "back"}], 3, "open_arena")
+		while not sim.finished and sim.tick < 2500:
+			sim.step()
+			for e in sim.drain_events():
+				if e[0] == BattleSim.Ev.ABILITY:
+					seen[int(e[3])] = true
+	var want := [BattleSim.Ab.CHILL, BattleSim.Ab.BURN, BattleSim.Ab.CURSE, BattleSim.Ab.WEAKEN, BattleSim.Ab.KNOCKBACK, BattleSim.Ab.SOUL_HARVEST]
+	check(want.all(func(a): return seen.has(a)), "chill, burn, shatter, wither, knockback and soul harvest each play a sound (%d of %d seen)" % [want.filter(func(a): return seen.has(a)).size(), want.size()])
 	UnitLocks.set_locked_list(UnitLocks.defaults())

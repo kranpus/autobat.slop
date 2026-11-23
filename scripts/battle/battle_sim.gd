@@ -22,7 +22,7 @@ const RANGED_SPLASH_MULT := 0.35    # ...and of projectiles (0.6 before patch 0.
 const MAX_SPLASH_TARGETS := 6     # keeps splash damage from scaling with crowd density
 const HALF_NEIGHBOURS := [Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1)]
 
-enum Ev { MELEE_HIT, SHOT, IMPACT, BLAST, HEAL, DIE, CHAIN, STUN, REBIRTH, RAISE, CHARGE, QUAKE, RESURRECT, AURA }
+enum Ev { MELEE_HIT, SHOT, IMPACT, BLAST, HEAL, DIE, CHAIN, STUN, REBIRTH, RAISE, CHARGE, QUAKE, RESURRECT, AURA, ABILITY }
 ## Battle abilities (GameData "ability": {"id", "value"}); see GameData.ABILITIES.
 enum Ab { NONE, STUN, CHILL, BURN, CHAIN, REBIRTH, CHARGE, DOUBLE_STRIKE, CURSE, WEAKEN, UNSTOPPABLE, DEVOUR, RAISE_DEAD,
 	QUAKE, PREDATOR, KNOCKBACK, DEATH_BLAST, HEADS, SOUL_HARVEST, DREAD, RISING_STORM, RESURRECT, AEGIS }
@@ -713,12 +713,16 @@ func _on_hit(src: int, src_team: int, j: int, dealt: float, amount: float, dt_id
 		Ab.CHILL:
 			if alive[j] == 1 and ab_id[j] != Ab.UNSTOPPABLE:
 				chill_until[j] = maxi(chill_until[j], tick + secs_ticks)
+				events.append([Ev.ABILITY, px[j], py[j], Ab.CHILL])
 		Ab.CURSE:
 			curse_until[j] = maxi(curse_until[j], tick + secs_ticks)
+			events.append([Ev.ABILITY, px[j], py[j], Ab.CURSE])
 		Ab.WEAKEN:
 			weaken_until[j] = maxi(weaken_until[j], tick + secs_ticks)
+			events.append([Ev.ABILITY, px[j], py[j], Ab.WEAKEN])
 		Ab.BURN:
 			if alive[j] == 1:
+				events.append([Ev.ABILITY, px[j], py[j], Ab.BURN])
 				var dps := dealt * ab_val[src] / BURN_SECONDS
 				burn_dps[j] = maxf(burn_dps[j] if burn_until[j] > tick else 0.0, dps)
 				burn_until[j] = tick + int(BURN_SECONDS / DT)
@@ -730,6 +734,7 @@ func _on_hit(src: int, src_team: int, j: int, dealt: float, amount: float, dt_id
 				px[j] = clampf(px[j] + dx / d * ab_val[src], 8.0, map_w - 8.0)
 				py[j] = clampf(py[j] + dy / d * ab_val[src], 8.0, map_h - 8.0)
 				stun_until[j] = maxi(stun_until[j], tick + 4)   # a moment to get back up
+				events.append([Ev.ABILITY, px[j], py[j], Ab.KNOCKBACK])
 		Ab.CHAIN:
 			var hit := {j: true}
 			var last := j
@@ -879,6 +884,7 @@ func _kill(j: int, killer: int = -1) -> void:
 		ab_used[killer] = mini(ab_used[killer] + 1, HARVEST_MAX_STACKS)
 		dmg[killer] = ab_base[killer] * (1.0 + 0.1 * float(ab_used[killer]))
 		events.append([Ev.HEAL, px[killer], py[killer], killer])
+		events.append([Ev.ABILITY, px[killer], py[killer], Ab.SOUL_HARVEST])
 	if killer >= 0 and ab_id[killer] == Ab.RAISE_DEAD and alive[killer] == 1 and raised[j] == 0 \
 			and ab_used[killer] < int(ab_val[killer]) and ab_tpl[killer] >= 0:
 		# The necromancer raises its victim as a skeleton on its own side.

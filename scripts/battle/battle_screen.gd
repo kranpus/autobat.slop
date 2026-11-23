@@ -190,7 +190,8 @@ func _begin() -> void:
 		return
 	_start_panel.visible = false
 	view.running = true
-	Audio.play_sfx("horn", -2.0)
+	# War drums (0.9.4: the old horn was harsh).
+	Audio.play_sfx("battle_start", -3.0)
 	if _has_boss():
 		Audio.play_sfx("big_roar", 0.0)
 	_banner("FIGHT!", UIKit.ACCENT, 0.9)

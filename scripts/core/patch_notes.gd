@@ -6,6 +6,18 @@ extends RefCounted
 ## kept under. Note kinds: "nerf", "buff", "change", "note".
 
 const LIST := [
+	{"version": "0.9.4", "date": "2026-11-23", "title": "Songs of the Tavern",
+		"summary": "A new soundtrack for the lobby, a sound for every battle ability and a gentler start to each battle. No balance changes.",
+		"sections": [
+			{"name": "Music", "notes": [
+				{"kind": "change", "text": "Three new lobby tracks join the Town Theme: The Old Tower Inn, The Bard's Tale and Market Day. The lobby now plays them as a playlist, one after another and never the same twice in a row, instead of looping one tune."},
+			]},
+			{"name": "Battle sounds", "notes": [
+				{"kind": "change", "text": "Battles open to a roll of war drums instead of the harsh horn."},
+				{"kind": "change", "text": "Every ability has its own sound: crackling chain lightning, ice for chill, flames for burn and Molten Core, shattering glass for Shatter, a dark rasp for Wither, a ringing clang for stuns, rumbling stone for Quake, a thud for charges and knockback, holy chimes for resurrection and rebirth, ghostly breath for Raise Dead, Dread and Soul Harvest, and a soft bell for Divine Aegis."},
+				{"kind": "note", "text": "Ability sounds are spaced out, so huge battles stay pleasant to listen to."},
+			]},
+		]},
 	{"version": "0.9.3", "date": "2026-11-23", "title": "Welcome, Commander",
 		"summary": "A guided tutorial for new players, a fantasy look for the whole game and a round of interface improvements. No balance changes.",
 		"sections": [

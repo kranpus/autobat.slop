@@ -158,11 +158,13 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Healers:** Cave Bat, Phoenix; they go for ranged units once the healers are gone.
      - **The back line:** Hippogriff, Bone Dragon.
    - **Battles play out in full** (there's no skip button; use 2× or 4× speed).
-     - **The effects:** a war horn and FIGHT! banner, hit flashes, slash and spark effects,
+     - **The effects:** a roll of war drums and a FIGHT! banner, hit flashes, slash and spark effects,
        death puffs, shockwaves and screen shake for big splash attacks and falling giants, and
        a VICTORY / DEFEAT banner with a music sting.
-     - **Music:** battle music varies between three tracks, and challenge bosses get their own
-       theme.
+     - **Music:** the lobby plays four tracks as a playlist (never the same one twice in a row).
+       Battle music varies between three tracks, and challenge bosses get their own theme.
+     - **Ability sounds:** every battle ability has its own sound (zaps, ice, fire, shattering
+       glass, chimes, ghostly breath...), spaced out so big battles stay calm.
      - **Screen shake** can be turned off in Settings.
    - **Training opponents:** a hard ladder.
      - **Strength:** Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× your power by default (the server can change this with `difficulty`). Against an ordinary

@@ -13,11 +13,12 @@ const CREDITS := """[b]Art[/b]
 • Kenney: UI SFX Set and RPG Sounds (CC0). kenney.nl
 • StarNinjas: 20 sword sound effects (CC0). opengameart.org/content/20-sword-sound-effects-attacks-and-clashes
 • rubberduck: 80 CC0 RPG SFX, 75 CC0 hit SFX and 80 CC0 creature SFX (CC0). opengameart.org
-• Ogrebane, JaggedStone, NenadSimic, StumpyStrust, fvcalderan: battle swishes, spells, explosion, war horn, fanfare (CC0)
+• Ogrebane, JaggedStone, NenadSimic, fvcalderan: battle swishes, spells, explosion, fanfare (CC0)
+• William Hector: war drums; HaelDB, bart, artisticdude, Someoneman, qubodup, rubberduck: ability sounds (CC0)
 
 [b]Music[/b]
 • cynicmusic: "Battle Theme A", "Battle Theme B" and "Town Theme RPG" (CC0). opengameart.org
-• Emma_MA: "Determined Pursuit" and "QaziJamJam" (CC0); celestialghost8: "Victory"; RandomMind: "Medieval: Defeat Theme" (CC0)
+• Emma_MA: "Determined Pursuit" and "QaziJamJam" (CC0); celestialghost8: "Victory"; RandomMind: "Medieval: Defeat Theme", "The Old Tower Inn", "The Bard's Tale" and "Market Day" (CC0)
 
 [b]Interface[/b]
 • Cinzel font by The Cinzel Project Authors (SIL Open Font License). github.com/NDISCOVER/Cinzel

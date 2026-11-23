@@ -19,7 +19,20 @@ const SFX := {
 	"swish": ["res://assets/sfx/swish_1.ogg", "res://assets/sfx/swish_2.ogg", "res://assets/sfx/swish_3.ogg"],
 	"spell": ["res://assets/sfx/spell_1.ogg", "res://assets/sfx/spell_2.ogg", "res://assets/sfx/spell_3.ogg", "res://assets/sfx/spell_4.ogg"],
 	"big_roar": ["res://assets/sfx/roar.ogg", "res://assets/sfx/roar_2.ogg", "res://assets/sfx/roar_3.ogg"],
-	"horn": ["res://assets/sfx/war_horn.ogg"],
+	"battle_start": ["res://assets/sfx/battle_start.ogg"],
+	# Battle abilities (0.9.4).
+	"ab_zap": ["res://assets/sfx/ab_zap_1.ogg", "res://assets/sfx/ab_zap_2.ogg", "res://assets/sfx/ab_zap_3.ogg"],
+	"ab_ice": ["res://assets/sfx/ab_ice_1.ogg", "res://assets/sfx/ab_ice_2.ogg", "res://assets/sfx/ab_ice_3.ogg"],
+	"ab_fire": ["res://assets/sfx/ab_fire_1.ogg", "res://assets/sfx/ab_fire_2.ogg", "res://assets/sfx/ab_fire_3.ogg"],
+	"ab_rebirth": ["res://assets/sfx/ab_rebirth.ogg"],
+	"ab_shatter": ["res://assets/sfx/ab_shatter_1.ogg", "res://assets/sfx/ab_shatter_2.ogg"],
+	"ab_stun": ["res://assets/sfx/ab_stun_1.ogg", "res://assets/sfx/ab_stun_2.ogg"],
+	"ab_quake": ["res://assets/sfx/ab_quake_1.ogg", "res://assets/sfx/ab_quake_2.ogg"],
+	"ab_knock": ["res://assets/sfx/ab_knock_1.ogg", "res://assets/sfx/ab_knock_2.ogg"],
+	"ab_holy": ["res://assets/sfx/ab_holy_1.ogg", "res://assets/sfx/ab_holy_2.ogg", "res://assets/sfx/ab_holy_3.ogg", "res://assets/sfx/ab_holy_4.ogg"],
+	"ab_ghost": ["res://assets/sfx/ab_ghost_1.ogg", "res://assets/sfx/ab_ghost_2.ogg"],
+	"ab_wither": ["res://assets/sfx/ab_wither.ogg"],
+	"ab_bell": ["res://assets/sfx/ab_bell.ogg"],
 	"fanfare": ["res://assets/sfx/fanfare.ogg"],
 	"coins": ["res://assets/sfx/coins.ogg"],
 	"gem": ["res://assets/sfx/gem.ogg"],
@@ -28,10 +41,13 @@ const SFX := {
 }
 ## Each key can have several tracks; one is picked at random when it starts.
 const MUSIC := {
-	"menu": ["res://assets/music/town_theme.mp3"],
+	"menu": ["res://assets/music/town_theme.mp3", "res://assets/music/old_tower_inn.ogg", "res://assets/music/bards_tale.ogg", "res://assets/music/market_day.ogg"],
 	"battle": ["res://assets/music/battle_theme_a.mp3", "res://assets/music/battle_theme_b.mp3", "res://assets/music/determined_pursuit.ogg"],
 	"boss": ["res://assets/music/boss_battle.ogg"],
 }
+## Music that plays as a playlist: each track plays once, then another one
+## (never the same twice in a row). Others loop one track.
+const PLAYLISTS := ["menu"]
 ## Short pieces played once (no loop) at the end of a battle.
 const STINGERS := {
 	"victory": "res://assets/music/victory.ogg",
@@ -46,6 +62,7 @@ var _last_played := {}
 var _cache := {}
 var _music: AudioStreamPlayer
 var _music_key := ""
+var _music_path := ""
 var _rng := RandomNumberGenerator.new()
 var music_volume := 0.6
 var sfx_volume := 0.8
@@ -60,6 +77,7 @@ func _ready() -> void:
 		_pool.append(p)
 	_music = AudioStreamPlayer.new()
 	add_child(_music)
+	_music.finished.connect(_on_music_finished)
 	music_volume = float(Profile.settings.get("music_volume", 0.6))
 	sfx_volume = float(Profile.settings.get("sfx_volume", 0.8))
 	_apply_music_volume()
@@ -71,11 +89,13 @@ func _stream(path: String) -> AudioStream:
 	return _cache[path]
 
 
-func play_sfx(key: String, volume_db: float = 0.0) -> void:
+## min_interval_ms: the same sound won't repeat sooner than this (busy
+## battles trigger abilities dozens of times a second).
+func play_sfx(key: String, volume_db: float = 0.0, min_interval_ms: int = MIN_INTERVAL_MS) -> void:
 	if sfx_volume <= 0.001 or not SFX.has(key):
 		return
 	var now := Time.get_ticks_msec()
-	if now - int(_last_played.get(key, -100000)) < MIN_INTERVAL_MS:
+	if now - int(_last_played.get(key, -100000)) < min_interval_ms:
 		return
 	_last_played[key] = now
 	var list: Array = SFX[key]
@@ -91,12 +111,29 @@ func play_music(key: String) -> void:
 	if key == _music_key and _music.playing:
 		return
 	_music_key = key
+	_play_track(_pick_track(key), not key in PLAYLISTS)
+
+
+## A random track of `key`, not the one that just played.
+func _pick_track(key: String) -> String:
 	var tracks: Array = MUSIC[key]
-	var s := _stream(tracks[_rng.randi_range(0, tracks.size() - 1)])
-	_set_loop(s, true)
+	var options := tracks.filter(func(t): return t != _music_path) if tracks.size() > 1 else tracks
+	return options[_rng.randi_range(0, options.size() - 1)]
+
+
+func _play_track(path: String, loop: bool) -> void:
+	_music_path = path
+	var s := _stream(path)
+	_set_loop(s, loop)
 	_music.stream = s
 	_apply_music_volume()
 	_music.play()
+
+
+## Playlists move on to another track when one ends.
+func _on_music_finished() -> void:
+	if _music_key in PLAYLISTS:
+		_play_track(_pick_track(_music_key), false)
 
 
 ## A short piece instead of the music (victory / defeat). The next
@@ -105,6 +142,7 @@ func play_stinger(key: String) -> void:
 	if not STINGERS.has(key):
 		return
 	_music_key = "stinger:" + key
+	_music_path = ""
 	var s := _stream(STINGERS[key])
 	_set_loop(s, false)
 	_music.stream = s

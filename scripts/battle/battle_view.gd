@@ -281,6 +281,11 @@ func _handle_events(evs: Array) -> void:
 	var charges := 0
 	var rebirths := 0
 	var raises := 0
+	var ability_sounds: Array = []
+	var quakes := 0
+	var resurrects := 0
+	var stuns := 0
+	var auras: Array = []
 	for e in evs:
 		var room := spawned < MAX_NEW_FX_PER_STEP
 		match int(e[0]):
@@ -316,6 +321,7 @@ func _handle_events(evs: Array) -> void:
 					spawned += 1
 					zaps += 1
 			BattleSim.Ev.STUN:
+				stuns += 1
 				if room:
 					_add_fx(Fx.STARS, e[1], e[2] - 18.0, 8.0, 0.6, float(int(e[3]) % 7))
 					spawned += 1
@@ -334,15 +340,22 @@ func _handle_events(evs: Array) -> void:
 			BattleSim.Ev.RESURRECT:
 				_add_fx(Fx.GLOW, e[1], e[2], 30.0, 0.8)
 				_add_fx(Fx.RAISE, e[1], e[2], 18.0, 0.8)
-				raises += 1
+				resurrects += 1
 			BattleSim.Ev.QUAKE:
+				quakes += 1
 				_add_fx(Fx.SHOCKWAVE, e[1], e[2], float(e[3]) * 1.3, 0.5)
 				_add_fx(Fx.STARS, e[1], e[2] - 14.0, 14.0, 0.6)
 				big_blast = maxf(big_blast, 30.0)
+			BattleSim.Ev.ABILITY:
+				var ab := int(e[3])
+				if not ability_sounds.has(ab):
+					ability_sounds.append(ab)
 			BattleSim.Ev.AURA:
 				# A faint ring: purple for Dread, gold for Divine Aegis.
 				var dread := sim.ab_id[int(e[3])] == BattleSim.Ab.DREAD
 				_add_fx(Fx.RING, e[1], e[2], BattleSim.AURA_RADIUS, 1.2, 0.0 if dread else 1.0)
+				if not auras.has(dread):
+					auras.append(dread)
 			BattleSim.Ev.DIE:
 				deaths += 1
 				var j := int(e[3])
@@ -354,15 +367,39 @@ func _handle_events(evs: Array) -> void:
 				elif room:
 					_add_fx(Fx.PUFF, e[1], e[2], 13.0, 0.5)
 					spawned += 1
+	# Ability sounds (each kind has its own, throttled so big battles stay calm).
 	if rebirths > 0:
 		shake(6.0)
-		Audio.play_sfx("spell", -4.0)
+		Audio.play_sfx("ab_rebirth", -2.0)
+		Audio.play_sfx("ab_holy", -8.0)
 	if raises > 0:
-		Audio.play_sfx("spell", -12.0)
-	if zaps > 0 and randf() < 0.5:
-		Audio.play_sfx("spell", -16.0)
+		Audio.play_sfx("ab_ghost", -8.0, 250)
+	if resurrects > 0:
+		Audio.play_sfx("ab_holy", -6.0, 300)
+	if zaps > 0:
+		Audio.play_sfx("ab_zap", -12.0, 160)
 	if charges > 0:
-		Audio.play_sfx("impact", -10.0)
+		Audio.play_sfx("ab_knock", -10.0, 150)
+	if stuns > 0:
+		Audio.play_sfx("ab_stun", -14.0, 160)
+	if quakes > 0:
+		Audio.play_sfx("ab_quake", -6.0, 300)
+	for dread in auras:
+		Audio.play_sfx("ab_ghost" if dread else "ab_bell", -18.0, 1500)
+	for ab in ability_sounds:
+		match int(ab):
+			BattleSim.Ab.CHILL:
+				Audio.play_sfx("ab_ice", -12.0, 200)
+			BattleSim.Ab.BURN:
+				Audio.play_sfx("ab_fire", -14.0, 220)
+			BattleSim.Ab.CURSE:
+				Audio.play_sfx("ab_shatter", -13.0, 200)
+			BattleSim.Ab.WEAKEN:
+				Audio.play_sfx("ab_wither", -13.0, 220)
+			BattleSim.Ab.KNOCKBACK:
+				Audio.play_sfx("ab_knock", -10.0, 180)
+			BattleSim.Ab.SOUL_HARVEST:
+				Audio.play_sfx("ab_ghost", -12.0, 300)
 	if big_death:
 		shake(10.0)
 	elif big_blast > 0.0:

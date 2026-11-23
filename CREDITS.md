@@ -74,7 +74,16 @@ legion_helm (armor/headgear/helmet_art_1), titans_orb (misc/misc_orb).
 | swish_1–3.ogg | [Battle Sound Effects](https://opengameart.org/content/battle-sound-effects) (swish_2–4, converted to Ogg) | Ogrebane | CC0 |
 | spell_1–4.ogg | [Magic Spell SFX](https://opengameart.org/content/magic-spell-sfx) (magical_1–4) | JaggedStone | CC0 |
 | explosion.ogg | [Muffled Distant Explosion](https://opengameart.org/content/muffled-distant-explosion) (trimmed, Ogg) | NenadSimic | CC0 |
-| war_horn.ogg | [Their Coming (generic horn sound)](https://opengameart.org/content/their-coming-generic-horn-sound) (first 4.5 s) | StumpyStrust | CC0 |
+| battle_start.ogg | [Horde War Drums Loop](https://opengameart.org/content/horde-war-drums-loop) (first 3.6 s, softened, faded) | William Hector | CC0 |
+| ab_zap_1–3.ogg (chain lightning) | [Spell Sounds](https://opengameart.org/content/spell-sounds) (electricspell, cut) | HaelDB | CC0 (dual-licensed OGA-BY/CC0) |
+| ab_holy_3–4.ogg | [Spell Sounds](https://opengameart.org/content/spell-sounds) (healing, cut) | HaelDB | CC0 (dual-licensed OGA-BY/CC0) |
+| ab_ice_1, ab_ice_3.ogg (chill) | [Ice Spells](https://opengameart.org/content/ice-spells) (ice, coldsnap) | bart | CC0 |
+| ab_ice_2.ogg | [Freeze Spell](https://opengameart.org/content/freeze-spell-0) | artisticdude | CC0 |
+| ab_holy_1–2.ogg (resurrection, rebirth) | [Cure Magic](https://opengameart.org/content/cure-magic) (Cure1, Cure3) | Someoneman | CC0 |
+| ab_ghost_1.ogg (raise dead, dread, soul harvest) | [Ghost Breath](https://opengameart.org/content/ghost-breath) (trimmed) | qubodup | CC0 |
+| ab_fire_1–3, ab_rebirth, ab_ghost_2, ab_quake_1 .ogg | [80 CC0 RPG SFX](https://opengameart.org/content/80-cc0-rpg-sfx) (spell_fire_03/05/06/07, creature_misc_03, stones_01) | rubberduck | CC0 |
+| ab_shatter_1–2, ab_knock_1–2, ab_wither, ab_bell .ogg | [100 CC0 SFX](https://opengameart.org/content/100-cc0-sfx) (glass_03/04, slam_02/03, weird_02, bell_02) | rubberduck | CC0 |
+| ab_stun_1–2, ab_quake_2 .ogg | [100 CC0 SFX #2](https://opengameart.org/content/100-cc0-sfx-2) (metal_hit_01/02, thunder_01) | rubberduck | CC0 |
 | fanfare.ogg | [Classic fanfare lick](https://opengameart.org/content/classic-fanfare-lick) (fanfare_3) | fvcalderan | CC0 |
 
 ## Music — `assets/music/`
@@ -83,6 +92,9 @@ legion_helm (armor/headgear/helmet_art_1), titans_orb (misc/misc_orb).
 |---|---|---|---|
 | battle_theme_a.mp3 | [Battle Theme A](https://opengameart.org/content/battle-theme-a) | cynicmusic | CC0 |
 | town_theme.mp3 | [Town Theme RPG](https://opengameart.org/content/town-theme-rpg) | cynicmusic | CC0 |
+| old_tower_inn.ogg | [Medieval: The Old Tower Inn](https://opengameart.org/content/medieval-the-old-tower-inn) (loop version, levelled) | RandomMind | CC0 |
+| bards_tale.ogg | [Medieval: The Bard's Tale](https://opengameart.org/content/medieval-the-bards-tale) (loop version, levelled) | RandomMind | CC0 |
+| market_day.ogg | [Medieval: Market Day](https://opengameart.org/content/medieval-market-day) (loop version, levelled) | RandomMind | CC0 |
 | battle_theme_b.mp3 | [Battle Theme B for RPG](https://opengameart.org/content/battle-theme-b-for-rpg) | cynicmusic | CC0 |
 | determined_pursuit.ogg | [Determined Pursuit (epic orchestra loop)](https://opengameart.org/content/determined-pursuit-epic-orchestra-loop) (Ogg) | Emma_MA | CC0 |
 | boss_battle.ogg | [QaziJamJam (orchestral battle theme)](https://opengameart.org/content/qazijamjam-orchestral-battle-theme) (Ogg) | Emma_MA | CC0 |
