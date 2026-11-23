@@ -479,6 +479,327 @@ const UNITS := {
 		"desc": "A god's will in physical form, shielding all around it.",
 		"ability": {"id": "aegis", "value": 0.0},
 	},
+	# --- The 0.9.4 set: four new regions, every unit with an ability of its own ---
+	"cave_spider": {
+		"name": "Cave Spider", "rarity": "common", "role": "melee",
+		"hp": 50.0, "dmg": 7.0, "cooldown": 0.7, "range": 5.0, "speed": 95.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 6.0, "scale": 0.75, "flying": false,
+		"desc": "Quick, many-legged and venomous.",
+		"ability": {"id": "venom", "value": 0.4},
+	},
+	"sporeling": {
+		"name": "Sporeling", "rarity": "common", "role": "healer",
+		"hp": 55.0, "dmg": 4.0, "cooldown": 1.4, "range": 140.0, "speed": 50.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 12.0, "regen": 0.0,
+		"projectile": "magic", "radius": 7.0, "scale": 0.8, "flying": false,
+		"desc": "A walking mushroom whose spores soothe and cleanse.",
+		"ability": {"id": "purify", "value": 0.0},
+	},
+	"ooze": {
+		"name": "Ooze", "rarity": "common", "role": "tank",
+		"hp": 110.0, "dmg": 7.0, "cooldown": 1.1, "range": 5.0, "speed": 40.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 7.0, "scale": 0.8, "flying": false,
+		"desc": "Cut it in half and you have two problems.",
+		"ability": {"id": "split", "value": 0.5},
+	},
+	"giant_snail": {
+		"name": "Giant Snail", "rarity": "common", "role": "tank",
+		"hp": 140.0, "dmg": 8.0, "cooldown": 1.3, "range": 5.0, "speed": 30.0,
+		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 8.0, "scale": 0.85, "flying": false,
+		"desc": "Slow and stubborn; hides in its shell when hurt.",
+		"ability": {"id": "shell", "value": 4.0},
+	},
+	"trapdoor_spider": {
+		"name": "Trapdoor Spider", "rarity": "uncommon", "role": "ranged",
+		"hp": 90.0, "dmg": 12.0, "cooldown": 1.3, "range": 170.0, "speed": 60.0,
+		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 7.0, "scale": 0.85, "flying": false,
+		"desc": "Spits sticky webs that pin enemies in place.",
+		"ability": {"id": "ensnare", "value": 2.0},
+	},
+	"wolf_spider": {
+		"name": "Wolf Spider", "rarity": "uncommon", "role": "melee",
+		"hp": 140.0, "dmg": 15.0, "cooldown": 0.8, "range": 6.0, "speed": 95.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 8.0, "scale": 0.9, "flying": false,
+		"desc": "Hunts by leaping on its prey.",
+		"ability": {"id": "pounce", "value": 160.0},
+	},
+	"deathcap": {
+		"name": "Deathcap", "rarity": "uncommon", "role": "caster",
+		"hp": 90.0, "dmg": 18.0, "cooldown": 1.8, "range": 180.0, "speed": 45.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 7.0, "scale": 0.85, "flying": false,
+		"desc": "Its spores eat through armour and flesh alike.",
+		"ability": {"id": "corrode", "value": 0.06},
+	},
+	"acid_blob": {
+		"name": "Acid Blob", "rarity": "rare", "role": "tank",
+		"hp": 600.0, "dmg": 28.0, "cooldown": 1.4, "range": 8.0, "speed": 40.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 11.0, "scale": 1.2, "flying": false,
+		"desc": "Hitting it is a mistake you only make once.",
+		"ability": {"id": "spikes", "value": 0.4},
+	},
+	"spider_matriarch": {
+		"name": "Spider Matriarch", "rarity": "rare", "role": "caster",
+		"hp": 300.0, "dmg": 30.0, "cooldown": 1.6, "range": 170.0, "speed": 55.0,
+		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 10.0, "scale": 1.15, "flying": false,
+		"desc": "Mother of the hollows; her brood never stops hatching.",
+		"ability": {"id": "summon", "value": 4.0},
+	},
+	"vine_stalker": {
+		"name": "Vine Stalker", "rarity": "epic", "role": "melee",
+		"hp": 1100.0, "dmg": 60.0, "cooldown": 1.0, "range": 8.0, "speed": 80.0,
+		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 14.0, "scale": 1.6, "flying": false,
+		"desc": "It steps out of the undergrowth right beside you.",
+		"ability": {"id": "blink", "value": 2.5},
+	},
+	"snapping_turtle": {
+		"name": "Snapping Turtle", "rarity": "common", "role": "tank",
+		"hp": 150.0, "dmg": 9.0, "cooldown": 1.3, "range": 5.0, "speed": 35.0,
+		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 8.0, "scale": 0.85, "flying": false,
+		"desc": "A shell like a shield and a bite like a trap.",
+		"ability": {"id": "block", "value": 0.35},
+	},
+	"merfolk_javelineer": {
+		"name": "Merfolk Javelineer", "rarity": "common", "role": "ranged",
+		"hp": 45.0, "dmg": 8.0, "cooldown": 1.3, "range": 160.0, "speed": 55.0,
+		"damage": "pierce", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "javelin", "radius": 7.0, "scale": 0.8, "flying": false,
+		"desc": "Throws two javelins where others throw one.",
+		"ability": {"id": "volley", "value": 1.0},
+	},
+	"giant_newt": {
+		"name": "Giant Newt", "rarity": "common", "role": "melee",
+		"hp": 55.0, "dmg": 8.0, "cooldown": 0.8, "range": 5.0, "speed": 85.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 7.0, "scale": 0.8, "flying": false,
+		"desc": "Slippery, quick and hard to pin down.",
+		"ability": {"id": "evasion", "value": 0.3},
+	},
+	"mermaid": {
+		"name": "Mermaid", "rarity": "uncommon", "role": "healer",
+		"hp": 90.0, "dmg": 6.0, "cooldown": 1.4, "range": 160.0, "speed": 60.0,
+		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 18.0, "regen": 0.0,
+		"projectile": "magic", "radius": 7.0, "scale": 0.85, "flying": false,
+		"desc": "Her song mends wounds and quickens blades.",
+		"ability": {"id": "song", "value": 0.25},
+	},
+	"merfolk_aquamancer": {
+		"name": "Merfolk Aquamancer", "rarity": "uncommon", "role": "caster",
+		"hp": 85.0, "dmg": 20.0, "cooldown": 1.8, "range": 190.0, "speed": 55.0,
+		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 7.0, "scale": 0.85, "flying": false,
+		"desc": "Commands the tide to drag enemies back.",
+		"ability": {"id": "undertow", "value": 45.0},
+	},
+	"electric_eel": {
+		"name": "Electric Eel", "rarity": "uncommon", "role": "caster",
+		"hp": 100.0, "dmg": 18.0, "cooldown": 1.6, "range": 150.0, "speed": 70.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 8.0, "scale": 0.9, "flying": false,
+		"desc": "A living lightning bolt from the deep.",
+		"ability": {"id": "stun", "value": 0.4},
+	},
+	"shark": {
+		"name": "Shark", "rarity": "rare", "role": "melee",
+		"hp": 450.0, "dmg": 40.0, "cooldown": 1.0, "range": 8.0, "speed": 85.0,
+		"damage": "pierce", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 11.0, "scale": 1.2, "flying": false,
+		"desc": "The scent of blood drives it into a frenzy.",
+		"ability": {"id": "frenzy", "value": 0.15},
+	},
+	"guardian_serpent": {
+		"name": "Guardian Serpent", "rarity": "rare", "role": "tank",
+		"hp": 750.0, "dmg": 32.0, "cooldown": 1.4, "range": 8.0, "speed": 45.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 12.0, "scale": 1.3, "flying": false,
+		"desc": "A temple guardian that draws every blade to itself.",
+		"ability": {"id": "taunt", "value": 90.0},
+	},
+	"kraken": {
+		"name": "Kraken", "rarity": "epic", "role": "tank",
+		"hp": 1700.0, "dmg": 65.0, "cooldown": 1.6, "range": 30.0, "speed": 35.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
+		"desc": "Tentacles reach out of the dark water and pull.",
+		"ability": {"id": "pull", "value": 60.0},
+	},
+	"merfolk_avatar": {
+		"name": "Merfolk Avatar", "rarity": "legendary", "role": "caster",
+		"hp": 2600.0, "dmg": 75.0, "cooldown": 1.8, "range": 190.0, "speed": 70.0,
+		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 18.0, "scale": 2.0, "flying": false,
+		"desc": "The sea's chosen champion, crowned in surf.",
+		"ability": {"id": "tidal_wave", "value": 6.0},
+	},
+	"imp": {
+		"name": "Imp", "rarity": "common", "role": "melee",
+		"hp": 40.0, "dmg": 9.0, "cooldown": 0.8, "range": 5.0, "speed": 100.0,
+		"damage": "fire", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 6.0, "scale": 0.75, "flying": true,
+		"desc": "A cackling spark of hellfire that bursts on contact.",
+		"ability": {"id": "detonate", "value": 4.0},
+	},
+	"lemure": {
+		"name": "Lemure", "rarity": "common", "role": "tank",
+		"hp": 130.0, "dmg": 8.0, "cooldown": 1.2, "range": 5.0, "speed": 40.0,
+		"damage": "physical", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 8.0, "scale": 0.85, "flying": false,
+		"desc": "A lowly damned soul whose death enrages its kin.",
+		"ability": {"id": "martyr", "value": 5.0},
+	},
+	"hell_hound": {
+		"name": "Hell Hound", "rarity": "uncommon", "role": "melee",
+		"hp": 120.0, "dmg": 14.0, "cooldown": 0.7, "range": 6.0, "speed": 115.0,
+		"damage": "fire", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 8.0, "scale": 0.9, "flying": false,
+		"desc": "Hunts in packs, and the pack grows bolder together.",
+		"ability": {"id": "pack", "value": 0.08},
+	},
+	"quasit": {
+		"name": "Quasit", "rarity": "uncommon", "role": "caster",
+		"hp": 80.0, "dmg": 16.0, "cooldown": 1.6, "range": 170.0, "speed": 70.0,
+		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 6.0, "scale": 0.8, "flying": true,
+		"desc": "A spiteful little demon that saps strength.",
+		"ability": {"id": "weaken", "value": 3.0},
+	},
+	"rakshasa": {
+		"name": "Rakshasa", "rarity": "rare", "role": "melee",
+		"hp": 420.0, "dmg": 38.0, "cooldown": 1.1, "range": 8.0, "speed": 70.0,
+		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 10.0, "scale": 1.15, "flying": false,
+		"desc": "Its hide turns arrows and spells back on the shooter.",
+		"ability": {"id": "reflect", "value": 0.4},
+	},
+	"hairy_devil": {
+		"name": "Hairy Devil", "rarity": "rare", "role": "melee",
+		"hp": 480.0, "dmg": 36.0, "cooldown": 1.0, "range": 8.0, "speed": 70.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 11.0, "scale": 1.2, "flying": false,
+		"desc": "The more it bleeds, the harder it hits.",
+		"ability": {"id": "berserk", "value": 1.0},
+	},
+	"hellion": {
+		"name": "Hellion", "rarity": "rare", "role": "caster",
+		"hp": 260.0, "dmg": 38.0, "cooldown": 1.8, "range": 200.0, "speed": 60.0,
+		"damage": "fire", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "fire", "radius": 10.0, "scale": 1.15, "flying": true,
+		"desc": "Calls hellfire down on anyone, anywhere.",
+		"ability": {"id": "thunderstrike", "value": 4.0},
+	},
+	"balrug": {
+		"name": "Balrug", "rarity": "epic", "role": "tank",
+		"hp": 1800.0, "dmg": 70.0, "cooldown": 1.6, "range": 10.0, "speed": 45.0,
+		"damage": "fire", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
+		"desc": "Wreathed in flame that scorches all around it.",
+		"ability": {"id": "immolate", "value": 0.3},
+	},
+	"executioner": {
+		"name": "Executioner", "rarity": "epic", "role": "melee",
+		"hp": 1150.0, "dmg": 75.0, "cooldown": 1.4, "range": 10.0, "speed": 60.0,
+		"damage": "physical", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 15.0, "scale": 1.7, "flying": false,
+		"desc": "It finishes what others start.",
+		"ability": {"id": "execute", "value": 1.5},
+	},
+	"pit_fiend": {
+		"name": "Pit Fiend", "rarity": "legendary", "role": "melee",
+		"hp": 3600.0, "dmg": 95.0, "cooldown": 1.4, "range": 12.0, "speed": 60.0,
+		"damage": "fire", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 22.0, "scale": 2.4, "flying": true,
+		"desc": "A lord of the pit; armies break and run before it.",
+		"ability": {"id": "terror", "value": 2.0},
+	},
+	"yak": {
+		"name": "Yak", "rarity": "common", "role": "tank",
+		"hp": 160.0, "dmg": 9.0, "cooldown": 1.2, "range": 5.0, "speed": 45.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 9.0, "scale": 0.9, "flying": false,
+		"desc": "Shaggy, stubborn and hard to hurt with magic.",
+		"ability": {"id": "ward", "value": 0.4},
+	},
+	"warg": {
+		"name": "Warg", "rarity": "uncommon", "role": "melee",
+		"hp": 150.0, "dmg": 16.0, "cooldown": 0.8, "range": 6.0, "speed": 110.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 9.0, "scale": 0.95, "flying": false,
+		"desc": "Its howl drives the whole warband on.",
+		"ability": {"id": "inspire", "value": 0.2},
+	},
+	"ice_beast": {
+		"name": "Ice Beast", "rarity": "uncommon", "role": "melee",
+		"hp": 170.0, "dmg": 16.0, "cooldown": 1.0, "range": 6.0, "speed": 65.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 9.0, "scale": 0.95, "flying": false,
+		"desc": "Its touch numbs limbs and slows blades.",
+		"ability": {"id": "chill", "value": 2.0},
+	},
+	"ice_devil": {
+		"name": "Ice Devil", "rarity": "rare", "role": "tank",
+		"hp": 680.0, "dmg": 30.0, "cooldown": 1.3, "range": 8.0, "speed": 45.0,
+		"damage": "magic", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 11.0, "scale": 1.2, "flying": false,
+		"desc": "Strike it and the cold strikes back.",
+		"ability": {"id": "frost_armor", "value": 2.5},
+	},
+	"blizzard_demon": {
+		"name": "Blizzard Demon", "rarity": "rare", "role": "caster",
+		"hp": 280.0, "dmg": 32.0, "cooldown": 1.8, "range": 190.0, "speed": 55.0,
+		"damage": "magic", "armor": "light", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 10.0, "scale": 1.15, "flying": true,
+		"desc": "A living storm of snow and ice.",
+		"ability": {"id": "frost_aura", "value": 0.0},
+	},
+	"polar_bear": {
+		"name": "Polar Bear", "rarity": "rare", "role": "tank",
+		"hp": 700.0, "dmg": 40.0, "cooldown": 1.3, "range": 8.0, "speed": 55.0,
+		"damage": "physical", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 12.0, "scale": 1.3, "flying": false,
+		"desc": "Feeds as it fights.",
+		"ability": {"id": "devour", "value": 0.25},
+	},
+	"ice_fiend": {
+		"name": "Ice Fiend", "rarity": "epic", "role": "caster",
+		"hp": 1100.0, "dmg": 62.0, "cooldown": 1.8, "range": 190.0, "speed": 60.0,
+		"damage": "magic", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 15.0, "scale": 1.7, "flying": false,
+		"desc": "Its spells leave statues of ice behind.",
+		"ability": {"id": "entomb", "value": 2.5},
+	},
+	"crystal_golem": {
+		"name": "Crystal Golem", "rarity": "epic", "role": "tank",
+		"hp": 2000.0, "dmg": 55.0, "cooldown": 1.7, "range": 10.0, "speed": 35.0,
+		"damage": "physical", "armor": "heavy", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 16.0, "scale": 1.8, "flying": false,
+		"desc": "Every blow it takes only hardens it further.",
+		"ability": {"id": "fortify", "value": 0.02},
+	},
+	"spectral_dragon": {
+		"name": "Spectral Dragon", "rarity": "legendary", "role": "caster",
+		"hp": 2600.0, "dmg": 80.0, "cooldown": 1.8, "range": 180.0, "speed": 85.0,
+		"damage": "magic", "armor": "undead", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "magic", "radius": 22.0, "scale": 2.4, "flying": true,
+		"desc": "Half in this world, half in the next.",
+		"ability": {"id": "phase", "value": 6.0},
+	},
+	"rime_lindwurm": {
+		"name": "Rime Lindwurm", "rarity": "legendary", "role": "tank",
+		"hp": 3800.0, "dmg": 90.0, "cooldown": 1.8, "range": 14.0, "speed": 50.0,
+		"damage": "magic", "armor": "beast", "aoe": 0.0, "heal": 0.0, "regen": 0.0,
+		"projectile": "none", "radius": 22.0, "scale": 2.4, "flying": false,
+		"desc": "The mountains themselves come down at its call.",
+		"ability": {"id": "avalanche", "value": 7.0},
+	},
 }
 
 # Expedition regions: where specific units can be found.
@@ -549,6 +870,26 @@ const REGIONS := {
 		"name": "Celestial Spire", "tile": "celestial_spire", "cost_maps": 3, "min_rating": 3500, "locked": true,
 		"desc": "A tower above the clouds, home to winged hosts.",
 		"drops": {"tengu_warrior": 30, "hippogriff": 28, "sphinx": 10, "seraph": 3, "grand_avatar": 2},
+	},
+	"fungal_hollows": {
+		"name": "Fungal Hollows", "tile": "fungal_hollows", "cost_maps": 1, "min_rating": 600,
+		"desc": "Glowing caps and silk-choked tunnels under the forest floor.",
+		"drops": {"cave_spider": 34, "sporeling": 30, "ooze": 30, "giant_snail": 28, "trapdoor_spider": 18, "wolf_spider": 18, "deathcap": 16, "acid_blob": 7, "spider_matriarch": 6, "vine_stalker": 2},
+	},
+	"tidewater_grotto": {
+		"name": "Tidewater Grotto", "tile": "tidewater_grotto", "cost_maps": 2, "min_rating": 1400,
+		"desc": "Sea caves where the merfolk keep their sunken shrines.",
+		"drops": {"snapping_turtle": 32, "merfolk_javelineer": 32, "giant_newt": 30, "mermaid": 18, "merfolk_aquamancer": 18, "electric_eel": 16, "shark": 7, "guardian_serpent": 6, "kraken": 2, "merfolk_avatar": 1},
+	},
+	"abyssal_rift": {
+		"name": "Abyssal Rift", "tile": "abyssal_rift", "cost_maps": 2, "min_rating": 2000,
+		"desc": "A wound in the world, leaking demons and brimstone.",
+		"drops": {"imp": 34, "lemure": 32, "hell_hound": 20, "quasit": 18, "rakshasa": 8, "hairy_devil": 8, "hellion": 7, "balrug": 2, "executioner": 2, "pit_fiend": 1},
+	},
+	"frostfell_wastes": {
+		"name": "Frostfell Wastes", "tile": "frostfell_wastes", "cost_maps": 3, "min_rating": 2800,
+		"desc": "Endless ice where only the hardiest beasts survive.",
+		"drops": {"yak": 34, "warg": 20, "ice_beast": 20, "ice_devil": 8, "blizzard_demon": 8, "polar_bear": 8, "ice_fiend": 2, "crystal_golem": 2, "spectral_dragon": 1, "rime_lindwurm": 1},
 	},
 }
 
@@ -623,11 +964,50 @@ const ABILITIES := {
 	"rising_storm": {"name": "Rising Storm", "text": "Each blow adds +%s%% damage to the next, up to +100%%."},
 	"resurrect": {"name": "Resurrection", "text": "Every %ss it brings the most recently fallen ally nearby back with half its health (once each)."},
 	"aegis": {"name": "Divine Aegis", "text": "Allies near it take 20%% less damage.%s"},
+	# The 0.9.4 set.
+	"venom": {"name": "Venom", "text": "Its bites poison: each stack deals %s%% of its damage per second for 5s (up to 5 stacks)."},
+	"purify": {"name": "Purify", "text": "Its healing also cleanses poison, burns, chill, curses, roots and fear.%s"},
+	"split": {"name": "Split", "text": "When it dies it splits into two smaller oozes with %s%% of its strength."},
+	"shell": {"name": "Shell", "text": "The first time it drops below half health it hides in its shell: 60%% less damage for %ss."},
+	"ensnare": {"name": "Ensnare", "text": "Its webs root the target in place for %ss (it can still fight back)."},
+	"pounce": {"name": "Pounce", "text": "Leaps onto distant targets, closing the gap in an instant.%s"},
+	"corrode": {"name": "Corrode", "text": "Each hit makes the target take %s%% more damage for the rest of the battle (up to 30%%)."},
+	"spikes": {"name": "Acid Skin", "text": "Melee attackers take %s%% of the damage they deal."},
+	"summon": {"name": "Brood", "text": "Every 5s a Cave Spider hatches beside it (up to %s per Matriarch)."},
+	"blink": {"name": "Shadowstep", "text": "Steps out of the undergrowth beside its first target; that first blow deals %sx damage."},
+	"block": {"name": "Block", "text": "Its shell turns aside %s%% of melee blows completely."},
+	"volley": {"name": "Twin Throw", "text": "Each throw also hits %s more enemy nearby."},
+	"evasion": {"name": "Evasion", "text": "Slippery: dodges %s%% of attacks."},
+	"song": {"name": "Siren Song", "text": "Allies near it attack %s%% faster."},
+	"undertow": {"name": "Undertow", "text": "Every third spell sweeps the enemies around its target backwards.%s"},
+	"frenzy": {"name": "Blood Frenzy", "text": "Each kill makes it attack %s%% faster (up to 5 times)."},
+	"taunt": {"name": "Taunt", "text": "Its blows draw the enemies around it to attack it instead.%s"},
+	"pull": {"name": "Drag Under", "text": "Its tentacles pull the target in and hold it for 1.5s.%s"},
+	"tidal_wave": {"name": "Tidal Wave", "text": "Every %ss a wave crashes over its target's ranks, damaging and sweeping back up to 12 enemies."},
+	"detonate": {"name": "Unstable", "text": "Explodes on its first blow, dealing %sx its damage to every enemy nearby (and itself dies)."},
+	"martyr": {"name": "Martyr", "text": "When it dies, allies nearby rage: +25%% damage for %ss."},
+	"pack": {"name": "Pack Hunter", "text": "+%s%% damage for each other Hell Hound nearby (up to 5)."},
+	"reflect": {"name": "Mirror Hide", "text": "%s%% of the damage from arrows, stones and spells is reflected back at the shooter."},
+	"berserk": {"name": "Berserk", "text": "Deals up to +%s%% damage as its health drops."},
+	"thunderstrike": {"name": "Hellfire", "text": "Every %ss hellfire rains on a random enemy anywhere on the field (3x damage)."},
+	"immolate": {"name": "Burning Aura", "text": "Enemies near it take %s%% of its damage as fire every second."},
+	"execute": {"name": "Execute", "text": "+%s%% damage against enemies below 30%% health."},
+	"terror": {"name": "Terror", "text": "Its blows send the target and the enemies around it fleeing for %ss."},
+	"ward": {"name": "Thick Fur", "text": "Takes %s%% less damage from magic and fire."},
+	"inspire": {"name": "Howl", "text": "Allies near it deal %s%% more damage."},
+	"frost_armor": {"name": "Frost Armour", "text": "Melee attackers are chilled for %ss."},
+	"frost_aura": {"name": "Blizzard", "text": "Enemies near it are chilled (half speed).%s"},
+	"entomb": {"name": "Entomb", "text": "Every fourth spell freezes the target solid for %ss (taking half damage) and chills the enemies around it."},
+	"fortify": {"name": "Fortify", "text": "Takes %s%% less damage for every second of battle (up to 40%%)."},
+	"phase": {"name": "Phase Shift", "text": "Every %ss it fades from this world, untouchable for 1.5s."},
+	"avalanche": {"name": "Avalanche", "text": "Every %ss an avalanche buries its target's ranks: up to 12 enemies take heavy damage and are chilled."},
 }
 ## Values shown as percentages in the text.
-const ABILITY_PERCENT := ["burn", "rebirth", "unstoppable", "devour", "predator", "death_blast", "heads", "soul_harvest", "rising_storm"]
+const ABILITY_PERCENT := ["burn", "rebirth", "unstoppable", "devour", "predator", "death_blast", "heads", "soul_harvest", "rising_storm",
+	"venom", "split", "corrode", "spikes", "block", "evasion", "song", "frenzy", "pack", "reflect", "berserk", "immolate", "execute",
+	"ward", "inspire", "fortify"]
 ## Abilities whose text has no number in it.
-const ABILITY_NO_VALUE := ["dread", "aegis", "knockback"]
+const ABILITY_NO_VALUE := ["dread", "aegis", "knockback", "purify", "pounce", "undertow", "taunt", "pull", "frost_aura"]
 
 
 static func ability_of(unit_id: String) -> Dictionary:
@@ -664,9 +1044,23 @@ static func tile_texture(tile: String) -> Texture2D:
 	return load("res://assets/sprites/tiles/%s.png" % tile)
 
 
+## Region ids in the order they unlock (rating needed, then map cost, then name).
+static func region_ids_by_unlock() -> Array:
+	var ids: Array = REGIONS.keys()
+	ids.sort_custom(func(a, b):
+		var ra := int(REGIONS[a]["min_rating"])
+		var rb := int(REGIONS[b]["min_rating"])
+		if ra != rb:
+			return ra < rb
+		if int(REGIONS[a]["cost_maps"]) != int(REGIONS[b]["cost_maps"]):
+			return int(REGIONS[a]["cost_maps"]) < int(REGIONS[b]["cost_maps"])
+		return str(REGIONS[a]["name"]) < str(REGIONS[b]["name"]))
+	return ids
+
+
 static func regions_for_unit(id: String) -> Array:
 	var out: Array = []
-	for rid in REGIONS:
+	for rid in region_ids_by_unlock():
 		if REGIONS[rid]["drops"].has(id):
 			out.append(REGIONS[rid]["name"])
 	return out

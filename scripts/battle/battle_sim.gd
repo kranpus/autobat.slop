@@ -22,16 +22,27 @@ const RANGED_SPLASH_MULT := 0.35    # ...and of projectiles (0.6 before patch 0.
 const MAX_SPLASH_TARGETS := 6     # keeps splash damage from scaling with crowd density
 const HALF_NEIGHBOURS := [Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1)]
 
-enum Ev { MELEE_HIT, SHOT, IMPACT, BLAST, HEAL, DIE, CHAIN, STUN, REBIRTH, RAISE, CHARGE, QUAKE, RESURRECT, AURA, ABILITY }
+enum Ev { MELEE_HIT, SHOT, IMPACT, BLAST, HEAL, DIE, CHAIN, STUN, REBIRTH, RAISE, CHARGE, QUAKE, RESURRECT, AURA, ABILITY, STRIKE, WAVE }
 ## Battle abilities (GameData "ability": {"id", "value"}); see GameData.ABILITIES.
 enum Ab { NONE, STUN, CHILL, BURN, CHAIN, REBIRTH, CHARGE, DOUBLE_STRIKE, CURSE, WEAKEN, UNSTOPPABLE, DEVOUR, RAISE_DEAD,
-	QUAKE, PREDATOR, KNOCKBACK, DEATH_BLAST, HEADS, SOUL_HARVEST, DREAD, RISING_STORM, RESURRECT, AEGIS }
+	QUAKE, PREDATOR, KNOCKBACK, DEATH_BLAST, HEADS, SOUL_HARVEST, DREAD, RISING_STORM, RESURRECT, AEGIS,
+	VENOM, PURIFY, SPLIT, SHELL, ENSNARE, POUNCE, CORRODE, SPIKES, SUMMON, BLINK, BLOCK, VOLLEY, EVASION,
+	SONG, UNDERTOW, FRENZY, TAUNT, PULL, TIDAL_WAVE, DETONATE, MARTYR, PACK, REFLECT, BERSERK, THUNDERSTRIKE,
+	IMMOLATE, EXECUTE, TERROR, WARD, INSPIRE, FROST_ARMOR, FROST_AURA, ENTOMB, FORTIFY, PHASE, AVALANCHE }
 const AB_IDS := {"stun": Ab.STUN, "chill": Ab.CHILL, "burn": Ab.BURN, "chain": Ab.CHAIN, "rebirth": Ab.REBIRTH,
 	"charge": Ab.CHARGE, "double_strike": Ab.DOUBLE_STRIKE, "curse": Ab.CURSE, "weaken": Ab.WEAKEN,
 	"unstoppable": Ab.UNSTOPPABLE, "devour": Ab.DEVOUR, "raise_dead": Ab.RAISE_DEAD,
 	"quake": Ab.QUAKE, "predator": Ab.PREDATOR, "knockback": Ab.KNOCKBACK, "death_blast": Ab.DEATH_BLAST,
 	"heads": Ab.HEADS, "soul_harvest": Ab.SOUL_HARVEST, "dread": Ab.DREAD, "rising_storm": Ab.RISING_STORM,
-	"resurrect": Ab.RESURRECT, "aegis": Ab.AEGIS}
+	"resurrect": Ab.RESURRECT, "aegis": Ab.AEGIS,
+	"venom": Ab.VENOM, "purify": Ab.PURIFY, "split": Ab.SPLIT, "shell": Ab.SHELL, "ensnare": Ab.ENSNARE,
+	"pounce": Ab.POUNCE, "corrode": Ab.CORRODE, "spikes": Ab.SPIKES, "summon": Ab.SUMMON, "blink": Ab.BLINK,
+	"block": Ab.BLOCK, "volley": Ab.VOLLEY, "evasion": Ab.EVASION, "song": Ab.SONG, "undertow": Ab.UNDERTOW,
+	"frenzy": Ab.FRENZY, "taunt": Ab.TAUNT, "pull": Ab.PULL, "tidal_wave": Ab.TIDAL_WAVE, "detonate": Ab.DETONATE,
+	"martyr": Ab.MARTYR, "pack": Ab.PACK, "reflect": Ab.REFLECT, "berserk": Ab.BERSERK, "thunderstrike": Ab.THUNDERSTRIKE,
+	"immolate": Ab.IMMOLATE, "execute": Ab.EXECUTE, "terror": Ab.TERROR, "ward": Ab.WARD, "inspire": Ab.INSPIRE,
+	"frost_armor": Ab.FROST_ARMOR, "frost_aura": Ab.FROST_AURA, "entomb": Ab.ENTOMB, "fortify": Ab.FORTIFY,
+	"phase": Ab.PHASE, "avalanche": Ab.AVALANCHE}
 const QUAKE_EVERY := 3            # every 3rd blow shakes the ground
 const QUAKE_RADIUS := 70.0
 const DEATH_BLAST_RADIUS := 90.0
@@ -42,6 +53,31 @@ const HARVEST_MAX_STACKS := 5     # soul harvest: +10% damage per kill, up to +5
 const STORM_MAX_STACKS := 20      # rising storm: up to 20 stacks
 const RESURRECT_RANGE := 300.0
 const MAX_AREA_TARGETS := 10
+# The 0.9.4 set.
+const POISON_SECONDS := 5.0
+const POISON_MAX_STACKS := 5
+const SHELL_MULT := 0.4           # shell: 60% less damage
+const ENTOMB_MULT := 0.5          # entombed: half damage
+const CORRODE_MAX := 0.3
+const PACK_RADIUS := 70.0
+const PACK_MAX := 5
+const FRENZY_MAX := 5
+const MARTYR_RAGE := 0.25
+const MARTYR_RADIUS := 90.0
+const EXECUTE_BELOW := 0.3
+const FORTIFY_MAX := 0.4
+const SUMMON_EVERY := 5.0
+const SUMMON_UNIT := "cave_spider"
+const WAVE_RADIUS := 110.0
+const WAVE_MULT := 1.5            # tidal wave / avalanche damage, x the unit's damage
+const STRIKE_MULT := 3.0          # hellfire
+const DETONATE_RADIUS := 55.0
+const TERROR_RADIUS := 60.0
+const UNDERTOW_EVERY := 3
+const ENTOMB_EVERY := 4
+const PHASE_SECONDS := 1.5
+const PULL_ROOT := 1.5
+const POUNCE_COOLDOWN := 3.0
 const CHILL_MULT := 0.5           # chilled units move and attack at half speed
 const CURSE_MULT := 1.3           # cursed units take 30% more damage
 const WEAKEN_MULT := 0.65         # weakened units deal 35% less damage
@@ -106,6 +142,26 @@ var ab_base := PackedFloat32Array()   # base damage/cooldown for abilities that 
 var _aura_units: Array = []           # units with dread / divine aegis
 var _resurrectors: Array = []         # units with resurrection
 var ab_used := PackedInt32Array()     # rebirth used / dead raised / charge spent
+var ab_timer := PackedInt32Array()    # periodic abilities: the tick they next fire
+# 0.9.4 statuses.
+var poison_stacks := PackedInt32Array()
+var poison_until := PackedInt32Array()
+var poison_dps := PackedFloat32Array()   # per stack
+var root_until := PackedInt32Array()
+var fear_until := PackedInt32Array()
+var fear_x := PackedFloat32Array()
+var fear_y := PackedFloat32Array()
+var shell_until := PackedInt32Array()
+var inspire_until := PackedInt32Array()
+var inspire_amt := PackedFloat32Array()
+var haste_until := PackedInt32Array()
+var haste_amt := PackedFloat32Array()
+var corrode := PackedFloat32Array()
+var phase_until := PackedInt32Array()
+var entomb_until := PackedInt32Array()
+var taunt_until := PackedInt32Array()
+var taunt_src := PackedInt32Array()
+var _periodic: Array = []             # units with timed abilities
 var raised := PackedInt32Array()      # 1 for units raised from the dead mid-battle
 var _raise_templates: Array = []      # resolved stats of the units raise dead creates
 
@@ -302,6 +358,19 @@ func _resolve(uid: String, s: Dictionary) -> Dictionary:
 		# The raised dead fight at the necromancer's level.
 		r["tpl"] = _raise_templates.size()
 		_raise_templates.append(_resolve(RAISE_UNIT, Army.unit_stats(RAISE_UNIT, int(s.get("level", 1)))))
+	elif r["ab"] == Ab.SUMMON:
+		# The brood hatches at the matriarch's level.
+		r["tpl"] = _raise_templates.size()
+		_raise_templates.append(_resolve(SUMMON_UNIT, Army.unit_stats(SUMMON_UNIT, int(s.get("level", 1)))))
+	elif r["ab"] == Ab.SPLIT:
+		# The halves: weaker copies that don't split again.
+		var half := s.duplicate()
+		half["hp"] = float(s["hp"]) * r["ab_val"]
+		half["dmg"] = float(s["dmg"]) * r["ab_val"]
+		half["radius"] = float(s["radius"]) * 0.8
+		half.erase("ability")
+		r["tpl"] = _raise_templates.size()
+		_raise_templates.append(_resolve(uid, half))
 	return r
 
 
@@ -360,6 +429,36 @@ func _add_resolved(r: Dictionary, t: int, x: float, y: float) -> void:
 	ab_used.append(0)
 	raised.append(0)
 	burn_dps.append(0.0)
+	var first := 0
+	match int(r["ab"]):
+		Ab.SUMMON:
+			first = int(SUMMON_EVERY / DT)
+		Ab.THUNDERSTRIKE, Ab.TIDAL_WAVE, Ab.AVALANCHE, Ab.PHASE:
+			first = int(float(r["ab_val"]) / DT)
+		Ab.FORTIFY:
+			first = int(1.0 / DT)
+	ab_timer.append(first)
+	if first > 0:
+		_periodic.append(i)
+	if r["ab"] in [Ab.SONG, Ab.INSPIRE, Ab.IMMOLATE, Ab.FROST_AURA]:
+		_aura_units.append(i)
+	poison_stacks.append(0)
+	poison_until.append(0)
+	poison_dps.append(0.0)
+	root_until.append(0)
+	fear_until.append(0)
+	fear_x.append(0.0)
+	fear_y.append(0.0)
+	shell_until.append(0)
+	inspire_until.append(0)
+	inspire_amt.append(0.0)
+	haste_until.append(0)
+	haste_amt.append(0.0)
+	corrode.append(0.0)
+	phase_until.append(0)
+	entomb_until.append(0)
+	taunt_until.append(0)
+	taunt_src.append(-1)
 	alive_count[t] += 1
 	start_count[t] += 1
 	start_hp[t] += float(r["hp"])
@@ -383,6 +482,9 @@ func step() -> void:
 	for i in _resurrectors:
 		if alive[i] == 1 and tick >= ab_used[i]:
 			_try_resurrect(i)
+	for i in _periodic:
+		if alive[i] == 1 and tick >= ab_timer[i] and stun_until[i] <= tick:
+			_periodic_ability(i)
 	for i in n:
 		prev_x[i] = px[i]
 		prev_y[i] = py[i]
@@ -395,9 +497,19 @@ func step() -> void:
 			if hp[i] <= 0.0:
 				_kill(i, -1)
 				continue
+		if poison_until[i] > tick:
+			hp[i] -= poison_dps[i] * float(poison_stacks[i]) * DT
+			if hp[i] <= 0.0:
+				_kill(i, -1)
+				continue
+		elif poison_stacks[i] > 0:
+			poison_stacks[i] = 0
 		if stun_until[i] > tick:
 			continue   # stunned: no moving, no attacking, cooldown paused
-		cd_t[i] -= DT * (CHILL_MULT if chill_until[i] > tick else 1.0)
+		if fear_until[i] > tick:
+			_flee(i)
+			continue   # terrified: running away, not fighting
+		cd_t[i] -= DT * _attack_speed(i)
 		if role[i] == Role.HEALER:
 			_healer_ai(i)
 		else:
@@ -426,6 +538,12 @@ func drain_events() -> Array:
 
 func _combat_ai(i: int) -> void:
 	var t := target[i]
+	if taunt_until[i] > tick and taunt_src[i] >= 0 and alive[taunt_src[i]] == 1:
+		# Taunted: it has to fight the taunter.
+		target[i] = taunt_src[i]
+		target_ally[i] = 0
+		_approach_and_act(i, taunt_src[i], false)
+		return
 	if t < 0 or alive[t] == 0 or target_ally[i] == 1 or (tick + i) % RETARGET_TICKS == 0:
 		t = _find_enemy(i)
 		if t != target[i] and ab_id[i] == Ab.CHARGE:
@@ -462,7 +580,11 @@ func _approach_and_act(i: int, t: int, healing: bool) -> void:
 	var r := reach[i] + radius[i] + radius[t]
 	if d2 > r * r:
 		var d := sqrt(d2)
-		var spd := speed[i] * (CHILL_MULT if chill_until[i] > tick else 1.0)
+		if not healing and _leap(i, t, dx / d, dy / d, d, r):
+			return
+		if root_until[i] > tick:
+			return   # rooted: can't move (but can fight whatever is in reach)
+		var spd := speed[i] * (CHILL_MULT if chill_until[i] > tick else 1.0) * (1.0 + haste_amt[i] if haste_until[i] > tick else 1.0)
 		_move(i, dx / d, dy / d, minf(spd * DT, d - r + 0.5))
 		return
 	if cd_t[i] > 0.0:
@@ -472,10 +594,18 @@ func _approach_and_act(i: int, t: int, healing: bool) -> void:
 	if healing:
 		hp[t] = minf(max_hp[t], hp[t] + heal[i])
 		events.append([Ev.HEAL, px[t], py[t], t])
+		if ab_id[i] == Ab.PURIFY and _cleanse(t):
+			events.append([Ev.ABILITY, px[t], py[t], Ab.PURIFY])
 		return
 	if proj[i] == 0:
 		events.append([Ev.MELEE_HIT, px[t], py[t], i])
 		var amount := dmg[i]
+		if ab_id[i] == Ab.DETONATE:
+			_detonate(i, t)
+			return
+		if ab_id[i] == Ab.BLINK and ab_used[i] == 1:
+			amount *= ab_val[i]   # the ambush blow
+			ab_used[i] = 2
 		if ab_id[i] == Ab.RISING_STORM:
 			# Each blow builds the storm: more damage, up to a cap.
 			amount *= 1.0 + ab_val[i] * float(ab_used[i])
@@ -492,9 +622,155 @@ func _approach_and_act(i: int, t: int, healing: bool) -> void:
 			ab_used[i] += 1
 			if ab_used[i] % QUAKE_EVERY == 0:
 				_quake(i, px[t], py[t])
+		elif ab_id[i] == Ab.TAUNT:
+			_taunt(i)
 	else:
 		_spawn_projectile(i, t)
 		events.append([Ev.SHOT, px[i], py[i], proj[i]])
+		if ab_id[i] == Ab.VOLLEY:
+			# Extra throws at the enemies next to the target.
+			var hit := {t: true}
+			for _k in int(ab_val[i]):
+				var other := _nearest_enemy_near(px[t], py[t], 120.0, team[i], hit)
+				if other < 0:
+					break
+				hit[other] = true
+				_spawn_projectile(i, other)
+
+
+## Attack speed multiplier: chill slows it, siren song and blood frenzy speed it up.
+func _attack_speed(i: int) -> float:
+	var s := CHILL_MULT if chill_until[i] > tick else 1.0
+	if haste_until[i] > tick:
+		s *= 1.0 + haste_amt[i]
+	if ab_id[i] == Ab.FRENZY:
+		s *= 1.0 + ab_val[i] * float(ab_used[i])
+	return s
+
+
+## Pounce and shadowstep: close the gap to the target in one leap.
+func _leap(i: int, t: int, nx: float, ny: float, d: float, r: float) -> bool:
+	var ok := false
+	if ab_id[i] == Ab.POUNCE and tick >= ab_timer[i] and d <= ab_val[i]:
+		ab_timer[i] = tick + int(POUNCE_COOLDOWN / DT)
+		ok = true
+	elif ab_id[i] == Ab.BLINK and ab_used[i] == 0:
+		ab_used[i] = 1
+		ok = true
+	if not ok or root_until[i] > tick:
+		return false
+	px[i] = clampf(px[t] - nx * (r - 1.0), 8.0, map_w - 8.0)
+	py[i] = clampf(py[t] - ny * (r - 1.0), 8.0, map_h - 8.0)
+	events.append([Ev.ABILITY, px[i], py[i], ab_id[i]])
+	return true
+
+
+## Terrified units run from what scared them.
+func _flee(i: int) -> void:
+	var dx := px[i] - fear_x[i]
+	var dy := py[i] - fear_y[i]
+	var d := maxf(0.001, sqrt(dx * dx + dy * dy))
+	_move(i, dx / d, dy / d, speed[i] * 0.8 * DT)
+
+
+## Purify: wash every harmful effect off an ally. True if there was any.
+func _cleanse(t: int) -> bool:
+	var any := burn_until[t] > tick or poison_until[t] > tick or chill_until[t] > tick or curse_until[t] > tick \
+		or weaken_until[t] > tick or root_until[t] > tick or fear_until[t] > tick
+	burn_until[t] = 0
+	poison_until[t] = 0
+	poison_stacks[t] = 0
+	chill_until[t] = 0
+	curse_until[t] = 0
+	weaken_until[t] = 0
+	root_until[t] = 0
+	fear_until[t] = 0
+	return any
+
+
+## Imp: blows itself up on its first blow.
+func _detonate(i: int, t: int) -> void:
+	events.append([Ev.BLAST, px[t], py[t], DETONATE_RADIUS])
+	for k in _enemies_near(px[t], py[t], DETONATE_RADIUS, team[i], false, 8):
+		_damage_unit(k, dmg[i] * ab_val[i], dtype[i], false, -1)
+	if alive[i] == 1:
+		_kill(i, -1)
+
+
+## Guardian Serpent: the enemies around it have to attack it for a while.
+func _taunt(i: int) -> void:
+	for k in _enemies_near(px[i], py[i], ab_val[i], team[i], false, 8):
+		if role[k] != Role.HEALER:
+			taunt_until[k] = tick + int(2.0 / DT)
+			taunt_src[k] = i
+
+
+## Timed abilities: brood, hellfire, tidal wave, avalanche, phase shift, fortify.
+func _periodic_ability(i: int) -> void:
+	match ab_id[i]:
+		Ab.FORTIFY:
+			ab_used[i] = mini(ab_used[i] + 1, int(FORTIFY_MAX / maxf(0.001, ab_val[i])))
+			ab_timer[i] = tick + int(1.0 / DT)
+		Ab.SUMMON:
+			ab_timer[i] = tick + int(SUMMON_EVERY / DT)
+			if ab_used[i] < int(ab_val[i]) and ab_tpl[i] >= 0:
+				ab_used[i] += 1
+				var k := n
+				var side := 18.0 if team[i] == 0 else -18.0
+				_add_resolved(_raise_templates[ab_tpl[i]], team[i], clampf(px[i] + side, 8.0, map_w - 8.0), py[i] + rng.randf_range(-12.0, 12.0))
+				raised[k] = 1
+				cd_t[k] = cooldown[k]
+				events.append([Ev.RAISE, px[k], py[k], k])
+				events.append([Ev.ABILITY, px[k], py[k], Ab.SUMMON])
+		Ab.THUNDERSTRIKE:
+			ab_timer[i] = tick + int(ab_val[i] / DT)
+			var foes: PackedInt32Array = team_lists[1 - team[i]]
+			for _try in 6:
+				if foes.is_empty():
+					break
+				var k := foes[rng.randi_range(0, foes.size() - 1)]
+				if alive[k] == 1:
+					events.append([Ev.STRIKE, px[k], py[k], i])
+					_damage_unit(k, dmg[i] * STRIKE_MULT, dtype[i], false, i)
+					break
+		Ab.TIDAL_WAVE, Ab.AVALANCHE:
+			var t := target[i]
+			if t < 0 or alive[t] == 0 or target_ally[i] == 1:
+				return   # waits for a target
+			ab_timer[i] = tick + int(ab_val[i] / DT)
+			var x := px[t]
+			var y := py[t]
+			events.append([Ev.WAVE, x, y, ab_id[i]])
+			for k in _enemies_near(x, y, WAVE_RADIUS, team[i], false, 12):
+				_damage_unit(k, dmg[i] * WAVE_MULT, dtype[i], false, i)
+				if alive[k] == 0 or ab_id[k] == Ab.UNSTOPPABLE:
+					continue
+				if ab_id[i] == Ab.AVALANCHE:
+					chill_until[k] = maxi(chill_until[k], tick + int(2.5 / DT))
+				else:
+					_push(k, px[i], py[i], 40.0)
+		Ab.PHASE:
+			ab_timer[i] = tick + int(ab_val[i] / DT)
+			phase_until[i] = tick + int(PHASE_SECONDS / DT)
+			events.append([Ev.ABILITY, px[i], py[i], Ab.PHASE])
+
+
+## Push unit k directly away from (x, y).
+func _push(k: int, x: float, y: float, dist: float) -> void:
+	var dx := px[k] - x
+	var dy := py[k] - y
+	var d := maxf(0.001, sqrt(dx * dx + dy * dy))
+	px[k] = clampf(px[k] + dx / d * dist, 8.0, map_w - 8.0)
+	py[k] = clampf(py[k] + dy / d * dist, 8.0, map_h - 8.0)
+
+
+## Hell Hound: other hounds of its kind close by.
+func _pack_count(i: int) -> int:
+	var c := 0
+	for k in _enemies_near(px[i], py[i], PACK_RADIUS, team[i], true, PACK_MAX + 1):
+		if k != i and kind[k] == kind[i]:
+			c += 1
+	return mini(c, PACK_MAX)
 
 
 func _find_enemy(i: int) -> int:
@@ -666,7 +942,38 @@ func _deal_damage(src: int, src_team: int, dt_idx: int, amount: float, primary: 
 
 ## Returns the damage dealt.
 func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1) -> float:
+	if phase_until[j] > tick:
+		return 0.0   # phased out of this world
+	if src >= 0:
+		if ab_id[j] == Ab.EVASION and rng.randf() < ab_val[j]:
+			events.append([Ev.ABILITY, px[j], py[j], Ab.EVASION])
+			return 0.0
+		if melee and ab_id[j] == Ab.BLOCK and rng.randf() < ab_val[j]:
+			events.append([Ev.ABILITY, px[j], py[j], Ab.BLOCK])
+			return 0.0
 	var m: float = _dmg_mult[dt_idx * _armor_count + armor[j]]
+	match ab_id[j]:
+		Ab.WARD:
+			if dt_idx >= 2:   # magic, fire
+				m *= 1.0 - ab_val[j]
+		Ab.FORTIFY:
+			m *= 1.0 - minf(FORTIFY_MAX, ab_val[j] * float(ab_used[j]))
+	if shell_until[j] > tick:
+		m *= SHELL_MULT
+	if entomb_until[j] > tick:
+		m *= ENTOMB_MULT
+	m *= 1.0 + corrode[j]
+	if src >= 0:
+		if inspire_until[src] > tick:
+			m *= 1.0 + inspire_amt[src]
+		match ab_id[src]:
+			Ab.PACK:
+				m *= 1.0 + ab_val[src] * float(_pack_count(src))
+			Ab.BERSERK:
+				m *= 1.0 + ab_val[src] * clampf(1.0 - hp[src] / max_hp[src], 0.0, 1.0)
+			Ab.EXECUTE:
+				if hp[j] < max_hp[j] * EXECUTE_BELOW:
+					m *= 1.0 + ab_val[src]
 	if melee and flying[j] == 1:
 		m *= _flying_mult
 	if src >= 0 and weaken_until[src] > tick:
@@ -682,6 +989,19 @@ func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1
 	var dealt := amount * m * rng.randf_range(0.9, 1.1)
 	hp[j] -= dealt
 	hit_tick[j] = tick
+	if ab_id[j] == Ab.SHELL and ab_used[j] == 0 and hp[j] > 0.0 and hp[j] < max_hp[j] * 0.5:
+		ab_used[j] = 1
+		shell_until[j] = tick + int(ab_val[j] / DT)
+		events.append([Ev.ABILITY, px[j], py[j], Ab.SHELL])
+	if src >= 0 and alive[src] == 1:
+		if not melee and ab_id[j] == Ab.REFLECT:
+			hp[src] -= dealt * ab_val[j]
+			hit_tick[src] = tick
+			events.append([Ev.ABILITY, px[j], py[j], Ab.REFLECT])
+			if hp[src] <= 0.0:
+				_kill(src, j)
+		elif melee and ab_id[j] == Ab.FROST_ARMOR and ab_id[src] != Ab.UNSTOPPABLE:
+			chill_until[src] = maxi(chill_until[src], tick + int(ab_val[j] / DT))
 	if ab_id[j] == Ab.HEADS and hp[j] > 0.0:
 		# Every quarter of its health lost grows another head: faster attacks.
 		var heads := clampi(int((1.0 - hp[j] / max_hp[j]) * 4.0), 0, 3)
@@ -726,6 +1046,48 @@ func _on_hit(src: int, src_team: int, j: int, dealt: float, amount: float, dt_id
 				var dps := dealt * ab_val[src] / BURN_SECONDS
 				burn_dps[j] = maxf(burn_dps[j] if burn_until[j] > tick else 0.0, dps)
 				burn_until[j] = tick + int(BURN_SECONDS / DT)
+		Ab.VENOM:
+			if alive[j] == 1:
+				var active := poison_until[j] > tick
+				poison_stacks[j] = mini((poison_stacks[j] if active else 0) + 1, POISON_MAX_STACKS)
+				poison_dps[j] = maxf(poison_dps[j] if active else 0.0, dmg[src] * ab_val[src])
+				poison_until[j] = tick + int(POISON_SECONDS / DT)
+				events.append([Ev.ABILITY, px[j], py[j], Ab.VENOM])
+		Ab.ENSNARE:
+			if alive[j] == 1 and ab_id[j] != Ab.UNSTOPPABLE:
+				root_until[j] = maxi(root_until[j], tick + secs_ticks)
+				events.append([Ev.ABILITY, px[j], py[j], Ab.ENSNARE])
+		Ab.CORRODE:
+			corrode[j] = minf(CORRODE_MAX, corrode[j] + ab_val[src])
+			events.append([Ev.ABILITY, px[j], py[j], Ab.CORRODE])
+		Ab.PULL:
+			if alive[j] == 1 and ab_id[j] != Ab.UNSTOPPABLE:
+				_push(j, px[src], py[src], -minf(ab_val[src], maxf(0.0, sqrt(pow(px[j] - px[src], 2) + pow(py[j] - py[src], 2)) - radius[src] - radius[j] - 2.0)))
+				root_until[j] = maxi(root_until[j], tick + int(PULL_ROOT / DT))
+				events.append([Ev.ABILITY, px[j], py[j], Ab.PULL])
+		Ab.TERROR:
+			events.append([Ev.ABILITY, px[j], py[j], Ab.TERROR])
+			for k in _enemies_near(px[j], py[j], TERROR_RADIUS, src_team, false, 6):
+				if ab_id[k] != Ab.UNSTOPPABLE:
+					fear_until[k] = maxi(fear_until[k], tick + secs_ticks)
+					fear_x[k] = px[src]
+					fear_y[k] = py[src]
+		Ab.ENTOMB:
+			ab_used[src] += 1
+			if ab_used[src] % ENTOMB_EVERY == 0 and alive[j] == 1:
+				stun_until[j] = maxi(stun_until[j], tick + secs_ticks)
+				entomb_until[j] = maxi(entomb_until[j], tick + secs_ticks)
+				events.append([Ev.ABILITY, px[j], py[j], Ab.ENTOMB])
+				for k in _enemies_near(px[j], py[j], 60.0, src_team, false, 8):
+					if ab_id[k] != Ab.UNSTOPPABLE:
+						chill_until[k] = maxi(chill_until[k], tick + int(2.0 / DT))
+		Ab.UNDERTOW:
+			ab_used[src] += 1
+			if ab_used[src] % UNDERTOW_EVERY == 0:
+				events.append([Ev.ABILITY, px[j], py[j], Ab.UNDERTOW])
+				for k in _enemies_near(px[j], py[j], 70.0, src_team, false, 8):
+					if ab_id[k] != Ab.UNSTOPPABLE:
+						_push(k, px[src], py[src], ab_val[src])
 		Ab.KNOCKBACK:
 			if alive[j] == 1 and ab_id[j] != Ab.UNSTOPPABLE:
 				var dx := px[j] - px[src]
@@ -800,12 +1162,28 @@ func _apply_auras() -> void:
 		if alive[i] == 0:
 			continue
 		var until := tick + AURA_TICKS + 1
-		if ab_id[i] == Ab.DREAD:
-			for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], false, 40):
-				weaken_until[k] = maxi(weaken_until[k], until)
-		else:
-			for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], true, 40):
-				aegis_until[k] = maxi(aegis_until[k], until)
+		match ab_id[i]:
+			Ab.DREAD:
+				for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], false, 40):
+					weaken_until[k] = maxi(weaken_until[k], until)
+			Ab.AEGIS:
+				for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], true, 40):
+					aegis_until[k] = maxi(aegis_until[k], until)
+			Ab.SONG:
+				for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], true, 40):
+					haste_until[k] = maxi(haste_until[k], until)
+					haste_amt[k] = maxf(haste_amt[k], ab_val[i])
+			Ab.INSPIRE:
+				for k in _enemies_near(px[i], py[i], AURA_RADIUS, team[i], true, 40):
+					inspire_until[k] = maxi(inspire_until[k], until)
+					inspire_amt[k] = maxf(inspire_amt[k], ab_val[i])
+			Ab.IMMOLATE:
+				for k in _enemies_near(px[i], py[i], 80.0, team[i], false, 20):
+					_damage_unit(k, dmg[i] * ab_val[i] * float(AURA_TICKS) * DT, 3, false, -1)
+			Ab.FROST_AURA:
+				for k in _enemies_near(px[i], py[i], 110.0, team[i], false, 30):
+					if ab_id[k] != Ab.UNSTOPPABLE:
+						chill_until[k] = maxi(chill_until[k], until)
 		if tick % (AURA_TICKS * 4) == 1:
 			events.append([Ev.AURA, px[i], py[i], i])
 
@@ -872,6 +1250,21 @@ func _kill(j: int, killer: int = -1) -> void:
 	death_tick[j] = tick
 	alive_count[team[j]] -= 1
 	events.append([Ev.DIE, px[j], py[j], j])
+	if ab_id[j] == Ab.SPLIT and raised[j] == 0 and ab_tpl[j] >= 0:
+		# Splits into two smaller halves (which don't split again).
+		events.append([Ev.ABILITY, px[j], py[j], Ab.SPLIT])
+		for side in [-1.0, 1.0]:
+			var k := n
+			_add_resolved(_raise_templates[ab_tpl[j]], team[j], px[j], clampf(py[j] + side * 9.0, 8.0, map_h - 8.0))
+			raised[k] = 1
+			cd_t[k] = cooldown[k]
+	if ab_id[j] == Ab.MARTYR:
+		events.append([Ev.ABILITY, px[j], py[j], Ab.MARTYR])
+		for k in _enemies_near(px[j], py[j], MARTYR_RADIUS, team[j], true, 12):
+			inspire_until[k] = maxi(inspire_until[k], tick + int(ab_val[j] / DT))
+			inspire_amt[k] = maxf(inspire_amt[k], MARTYR_RAGE)
+	if killer >= 0 and ab_id[killer] == Ab.FRENZY and alive[killer] == 1:
+		ab_used[killer] = mini(ab_used[killer] + 1, FRENZY_MAX)
 	if ab_id[j] == Ab.DEATH_BLAST:
 		# Explodes on death, burning everything around it.
 		events.append([Ev.BLAST, px[j], py[j], DEATH_BLAST_RADIUS])

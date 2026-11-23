@@ -45,6 +45,8 @@ static func unit_stats(unit_id: String, level: int, mods: Dictionary = {}) -> Di
 	if typeof(ab) == TYPE_DICTIONARY and str(ab.get("id", "")) == "devour":
 		s["lifesteal"] = float(s["lifesteal"]) + float(ab.get("value", 0.0))
 	s["thorns"] = float(mods.get("thorns", 0.0))
+	if typeof(ab) == TYPE_DICTIONARY and str(ab.get("id", "")) == "spikes":
+		s["thorns"] = float(s["thorns"]) + float(ab.get("value", 0.0))
 	if bool(mods.get("flying", false)):
 		s["flying"] = true
 	if str(mods.get("armor", "")) in GameData.ARMOR_TYPES:
@@ -115,6 +117,13 @@ const ABILITY_TUNING := {
 	"rising_storm": 0.3,  # on damage (the cap is reached after ~20 blows)
 	"resurrect": 0.35,    # on toughness and damage
 	"aegis": 1.2,        # on toughness
+	# The 0.9.4 set (first estimates, then tuned with the simulator).
+	"venom": 2.0, "purify": 0.15, "split": 1.2, "shell": 0.4, "ensnare": 0.15, "pounce": 0.15,
+	"corrode": 0.6, "spikes": 0.5, "summon": 0.25, "blink": 0.1, "block": 0.6, "volley": 0.7,
+	"evasion": 1.0, "song": 1.0, "undertow": 0.1, "frenzy": 0.3, "taunt": 0.15, "pull": 0.1,
+	"tidal_wave": 0.3, "avalanche": 0.3, "detonate": 0.25, "martyr": 0.1, "pack": 0.5, "reflect": 0.5,
+	"berserk": 0.35, "thunderstrike": 0.5, "immolate": 0.5, "execute": 0.25, "terror": 0.3, "ward": 0.5,
+	"inspire": 1.0, "frost_armor": 0.15, "frost_aura": 0.2, "entomb": 0.3, "fortify": 0.6, "phase": 1.0,
 }
 const CHAIN_POWER_CAP := 1.2
 
@@ -177,6 +186,45 @@ static func ability_power(s: Dictionary) -> Vector2:
 			return Vector2(1.0 + ABILITY_TUNING["resurrect"], 1.0 + ABILITY_TUNING["resurrect"])
 		"aegis":
 			return Vector2(1.0 + ABILITY_TUNING["aegis"], 1.0)
+		# --- 0.9.4 ---
+		"venom", "volley", "song", "berserk", "execute", "inspire":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING[ab["id"]] * v)
+		"split", "spikes", "block", "evasion", "reflect", "ward":
+			return Vector2(1.0 + ABILITY_TUNING[ab["id"]] * v, 1.0)
+		"purify", "taunt", "martyr", "frost_aura", "undertow":
+			return Vector2(1.0 + ABILITY_TUNING[ab["id"]], 1.0)
+		"pounce":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["pounce"])
+		"pull", "summon":
+			var q: float = 1.0 + float(ABILITY_TUNING[ab["id"]])
+			return Vector2(q, q)
+		"shell":
+			return Vector2(1.0 + ABILITY_TUNING["shell"] * minf(v / 10.0, 1.0), 1.0)
+		"ensnare", "terror", "frost_armor":
+			return Vector2(1.0 + ABILITY_TUNING[ab["id"]] * minf(v / cd, 1.0), 1.0)
+		"corrode":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["corrode"] * minf(BattleSim.CORRODE_MAX, v * 4.0))
+		"blink":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["blink"] * (v - 1.0))
+		"frenzy":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["frenzy"] * v * float(BattleSim.FRENZY_MAX))
+		"pack":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["pack"] * v * float(BattleSim.PACK_MAX))
+		"tidal_wave", "avalanche":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING[ab["id"]] * BattleSim.WAVE_MULT * 6.0 * cd / maxf(1.0, v))
+		"thunderstrike":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["thunderstrike"] * BattleSim.STRIKE_MULT * cd / maxf(1.0, v))
+		"immolate":
+			return Vector2(1.0, 1.0 + ABILITY_TUNING["immolate"] * v * cd * 4.0)
+		"detonate":
+			return Vector2(0.7, 1.0 + ABILITY_TUNING["detonate"] * v)
+		"entomb":
+			var e := 1.0 + ABILITY_TUNING["entomb"] * minf(v / (cd * 4.0), 1.0)
+			return Vector2(e, e)
+		"fortify":
+			return Vector2(1.0 + ABILITY_TUNING["fortify"] * BattleSim.FORTIFY_MAX, 1.0)
+		"phase":
+			return Vector2(1.0 + ABILITY_TUNING["phase"] * BattleSim.PHASE_SECONDS / maxf(1.0, v), 1.0)
 	return Vector2.ONE
 
 

@@ -26,6 +26,13 @@ var _proj_mm: Array[MultiMesh] = []
 var _fx: Array = []                  # [type, x, y, radius, age, life, angle]
 var _shake := 0.0                    # camera shake strength (pixels), decays
 var _hit_seed := 0
+## Aura and wave ring colours, by ability.
+const AURA_COLORS := {
+	BattleSim.Ab.DREAD: Color(0.75, 0.45, 1.0), BattleSim.Ab.AEGIS: Color(1.0, 0.85, 0.35),
+	BattleSim.Ab.SONG: Color(0.45, 0.9, 1.0), BattleSim.Ab.INSPIRE: Color(1.0, 0.55, 0.3),
+	BattleSim.Ab.IMMOLATE: Color(1.0, 0.35, 0.15), BattleSim.Ab.FROST_AURA: Color(0.75, 0.9, 1.0),
+	BattleSim.Ab.TIDAL_WAVE: Color(0.3, 0.6, 1.0), BattleSim.Ab.AVALANCHE: Color(0.95, 0.97, 1.0),
+}
 ## FX types (purely visual: the simulation never sees them).
 enum Fx { BLAST, HEAL, PUFF, SPARK, SLASH, SHOCKWAVE, GLOW, BOLT, STARS, RAISE, RING }
 const MAX_FX := 450                  # keeps huge battles smooth
@@ -282,6 +289,8 @@ func _handle_events(evs: Array) -> void:
 	var rebirths := 0
 	var raises := 0
 	var ability_sounds: Array = []
+	var strikes := 0
+	var waves: Array = []
 	var quakes := 0
 	var resurrects := 0
 	var stuns := 0
@@ -351,11 +360,20 @@ func _handle_events(evs: Array) -> void:
 				if not ability_sounds.has(ab):
 					ability_sounds.append(ab)
 			BattleSim.Ev.AURA:
-				# A faint ring: purple for Dread, gold for Divine Aegis.
-				var dread := sim.ab_id[int(e[3])] == BattleSim.Ab.DREAD
-				_add_fx(Fx.RING, e[1], e[2], BattleSim.AURA_RADIUS, 1.2, 0.0 if dread else 1.0)
-				if not auras.has(dread):
-					auras.append(dread)
+				# A faint ring in the aura's colour.
+				var aura_ab := sim.ab_id[int(e[3])]
+				_add_fx(Fx.RING, e[1], e[2], BattleSim.AURA_RADIUS, 1.2, float(AURA_COLORS.keys().find(aura_ab)))
+				if not auras.has(aura_ab):
+					auras.append(aura_ab)
+			BattleSim.Ev.STRIKE:
+				# Hellfire from the sky.
+				_add_fx(Fx.BOLT, e[1], e[2] - 260.0, 0.0, 0.3, float(_hit_seed), e[1], e[2])
+				_add_fx(Fx.BLAST, e[1], e[2], 22.0, 0.4)
+				strikes += 1
+			BattleSim.Ev.WAVE:
+				_add_fx(Fx.SHOCKWAVE, e[1], e[2], BattleSim.WAVE_RADIUS * 1.2, 0.6)
+				_add_fx(Fx.RING, e[1], e[2], BattleSim.WAVE_RADIUS, 0.8, float(AURA_COLORS.keys().find(int(e[3]))))
+				waves.append(int(e[3]))
 			BattleSim.Ev.DIE:
 				deaths += 1
 				var j := int(e[3])
@@ -384,8 +402,23 @@ func _handle_events(evs: Array) -> void:
 		Audio.play_sfx("ab_stun", -14.0, 160)
 	if quakes > 0:
 		Audio.play_sfx("ab_quake", -6.0, 300)
-	for dread in auras:
-		Audio.play_sfx("ab_ghost" if dread else "ab_bell", -18.0, 1500)
+	for aura_ab in auras:
+		match int(aura_ab):
+			BattleSim.Ab.DREAD:
+				Audio.play_sfx("ab_ghost", -18.0, 1500)
+			BattleSim.Ab.IMMOLATE:
+				Audio.play_sfx("ab_fire", -18.0, 1500)
+			BattleSim.Ab.FROST_AURA:
+				Audio.play_sfx("ab_ice", -20.0, 1500)
+			_:
+				Audio.play_sfx("ab_bell", -18.0, 1500)
+	if strikes > 0:
+		Audio.play_sfx("ab_zap", -10.0, 250)
+		Audio.play_sfx("explosion", -12.0, 250)
+	for w in waves:
+		Audio.play_sfx("ab_quake", -6.0, 400)
+		if int(w) == BattleSim.Ab.AVALANCHE:
+			Audio.play_sfx("ab_ice", -8.0, 400)
 	for ab in ability_sounds:
 		match int(ab):
 			BattleSim.Ab.CHILL:
@@ -400,6 +433,25 @@ func _handle_events(evs: Array) -> void:
 				Audio.play_sfx("ab_knock", -10.0, 180)
 			BattleSim.Ab.SOUL_HARVEST:
 				Audio.play_sfx("ab_ghost", -12.0, 300)
+			BattleSim.Ab.VENOM, BattleSim.Ab.CORRODE:
+				Audio.play_sfx("ab_wither", -17.0, 260)
+			BattleSim.Ab.ENSNARE, BattleSim.Ab.POUNCE, BattleSim.Ab.BLINK, BattleSim.Ab.EVASION:
+				Audio.play_sfx("swish", -12.0, 200)
+			BattleSim.Ab.PULL, BattleSim.Ab.UNDERTOW:
+				Audio.play_sfx("ab_quake", -12.0, 300)
+			BattleSim.Ab.TERROR:
+				Audio.play_sfx("big_roar", -12.0, 900)
+			BattleSim.Ab.ENTOMB:
+				Audio.play_sfx("ab_ice", -8.0, 300)
+				Audio.play_sfx("ab_shatter", -14.0, 300)
+			BattleSim.Ab.SPLIT, BattleSim.Ab.SUMMON:
+				Audio.play_sfx("ab_ghost", -14.0, 300)
+			BattleSim.Ab.MARTYR:
+				Audio.play_sfx("ab_ghost", -10.0, 400)
+			BattleSim.Ab.PHASE, BattleSim.Ab.PURIFY:
+				Audio.play_sfx("ab_holy", -14.0, 400)
+			BattleSim.Ab.SHELL, BattleSim.Ab.BLOCK, BattleSim.Ab.REFLECT:
+				Audio.play_sfx("ab_stun", -15.0, 220)
 	if big_death:
 		shake(10.0)
 	elif big_blast > 0.0:
@@ -488,8 +540,20 @@ func _sync_visuals(alpha: float) -> void:
 					c = Color(0.78, 0.55, 1.0)
 				elif sim.weaken_until[i] > t:
 					c = Color(0.62, 0.62, 0.66)
+				elif sim.entomb_until[i] > t:
+					c = Color(0.85, 0.95, 1.0)
+				elif sim.fear_until[i] > t:
+					c = Color(0.55, 0.4, 0.75)
+				elif sim.poison_until[i] > t:
+					c = Color(0.55, 1.0, 0.45)
+				elif sim.root_until[i] > t:
+					c = Color(0.75, 0.6, 0.4)
+				elif sim.shell_until[i] > t:
+					c = Color(0.7, 0.7, 0.72)
 				elif sim.raised[i] == 1:
 					c = c * Color(0.7, 1.0, 0.7)
+				if sim.phase_until[i] > t:
+					c.a = 0.35   # phased: barely there
 				var since_hit := t - sim.hit_tick[i]
 				if since_hit < 1:
 					c = Color(1.0, 1.0, 1.0)          # white flash on the hit tick
@@ -615,7 +679,8 @@ func _draw_overlay() -> void:
 					var p := pos + Vector2(cos(ang) * r0, sin(ang) * r0 * 0.4)
 					_overlay.draw_circle(p, 2.2, Color(1.0, 0.92, 0.3, fade))
 			Fx.RING:
-				var col := Color(0.75, 0.45, 1.0) if float(f[6]) < 0.5 else Color(1.0, 0.85, 0.35)
+				var ci := int(f[6])
+				var col: Color = AURA_COLORS.values()[ci] if ci >= 0 and ci < AURA_COLORS.size() else Color(1.0, 0.85, 0.35)
 				col.a = 0.35 * sin(k * PI)
 				_overlay.draw_arc(pos, r0 * (0.85 + 0.15 * k), 0.0, TAU, 48, col, 3.0)
 			Fx.RAISE:

@@ -268,3 +268,13 @@ static func site_odds(site_id: String) -> Dictionary:
 	for r in RARITY_ORDER:
 		out[r] = float(weights.get(r, 0)) / maxf(1.0, total)
 	return out
+
+
+## Hunting sites in the order they unlock.
+static func site_ids_by_unlock() -> Array:
+	var ids: Array = SITES.keys()
+	ids.sort_custom(func(a, b):
+		if int(SITES[a]["min_rating"]) != int(SITES[b]["min_rating"]):
+			return int(SITES[a]["min_rating"]) < int(SITES[b]["min_rating"])
+		return str(SITES[a]["name"]) < str(SITES[b]["name"]))
+	return ids

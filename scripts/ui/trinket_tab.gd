@@ -78,7 +78,7 @@ func refresh() -> void:
 		return
 	_banner.visible = Profile.has_pending_trinket()
 	UIKit.clear(_sites)
-	for site_id in Trinkets.SITES:
+	for site_id in Trinkets.site_ids_by_unlock():
 		_sites.add_child(_make_site(site_id))
 	_header.text = "Trinket collection: %d / %d" % [Profile.trinket_count(), Trinkets.ALL.size()]
 	UIKit.clear(_grid)
