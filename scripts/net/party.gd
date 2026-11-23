@@ -517,6 +517,7 @@ func run_command(line: String) -> String:
                                   give a unit, or change one they own
   player <user> unit <unit> remove   take a unit away
   player <user> units all [level <n>] [tier <n>]   give every open unit
+  player <user> units max         every unit in the game, fully upgraded (top tier and level)
   player <user> trinket <trinket> [remove]   give (or take) a trinket
   player <user> trinkets all|none give every trinket / take them all
   player <user> challenge <id>|all [remove]   mark challenges cleared (or not)
@@ -2789,8 +2790,14 @@ func _player_command(a: PackedStringArray) -> String:
 		"unit":
 			out = _player_unit(pl, user, args)
 		"units":
+			if not args.is_empty() and args[0].to_lower() == "max":
+				for id in GameData.UNITS:
+					_player_set_unit(pl, id, {"tier": GameData.MAX_TIER, "level": 999})
+				out = "Gave %s every unit (%d) at tier %d and its top level. Units the server has locked sit out of battles until unlocked." % [user, GameData.UNITS.size(), GameData.MAX_TIER]
+				_player_changed(user, pl)
+				return out
 			if args.is_empty() or args[0].to_lower() != "all":
-				return "Usage: player <user> units all [level <n>] [tier <n>]"
+				return "Usage: player <user> units all [level <n>] [tier <n>] | player <user> units max"
 			var opts := _player_opts(args.slice(1))
 			var n := 0
 			for id in UnitLocks.unlocked_ids():

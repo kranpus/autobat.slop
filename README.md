@@ -159,9 +159,9 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      | Legendary | 10 | level 31 (41 before 0.9.8) |
 
      The cost of a level follows its strength: a rare's first level costs what a common's 21st
-     does (times the rare price). Epics and legendaries are cheaper (0.9.8): their first level-up
-     costs 5,000 and 10,000 gold, later ones follow the same curve from there
-     (`ProfileLogic.FIRST_LEVEL_COST`). Legion Draft and challenge enemies keep the old 1-50 scale
+     does (times the rare price). Since 0.9.8 levels above common are much cheaper: the first
+     level-up costs 250 (uncommon), 700 (rare), 5,000 (epic) or 10,000 gold (legendary), later
+     ones follow the same curve from there (`ProfileLogic.FIRST_LEVEL_COST`). Legion Draft and challenge enemies keep the old 1-50 scale
      (`Army.squad_stat_level`).
    **Trinkets:** each unit has **2 trinket slots**. Equip, swap or remove them in the unit's
    details panel. A trinket can only be on one unit at a time, so equipping it elsewhere moves

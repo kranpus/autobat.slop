@@ -460,6 +460,7 @@ online, sent to their game at once. Unit, trinket and challenge names can be ids
 | `player <user> unit <unit> [level <n>] [tier <n>] [shards <n>]` | Give them a unit, or change one they own, e.g. `player bob unit Storm Dragon level 20 tier 4`. Levels are capped by the tier, like in the game. Works for locked units too (they sit out of battles until unlocked). |
 | `player <user> unit <unit> remove` | Take a unit away (and out of their army). |
 | `player <user> units all [level <n>] [tier <n>]` | Give them every open unit. |
+| `player <user> units max` | Give them every unit in the game (all 100), fully upgraded: tier 10 and each unit's top level. Units the server has locked sit out of battles until unlocked. |
 | `player <user> trinket <trinket> [remove]` | Give (or take away) a trinket. |
 | `player <user> trinkets all` / `none` | Every trinket, or take them all away. |
 | `player <user> challenge <id>\|all [remove]` | Mark one challenge (or all) as cleared, which also opens the ones after it; `remove` un-clears it. |

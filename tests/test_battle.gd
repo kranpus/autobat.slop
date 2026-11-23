@@ -1599,6 +1599,8 @@ func test_player_command() -> void:
 	var reloaded := AccountStore.new(store.dir)
 	check(reloaded.logic("bob").rating() == 0 and reloaded.logic("bob").data["trinkets"].size() == Trinkets.ALL.size(), "changes are saved to the account file")
 	check(party.run_command("player bob reset").contains("reset confirm"), "reset asks for confirmation")
+	party.run_command("player bob units max")
+	check(pl.data["units"].size() == GameData.UNITS.size() and GameData.UNITS.keys().all(func(u): return int(pl.data["units"][u]["tier"]) == GameData.MAX_TIER and int(pl.data["units"][u]["level"]) == Army.max_level(u, GameData.MAX_TIER)), "'units max' gives every unit at tier 10 and its top level")
 	party.run_command("player bob reset confirm")
 	check(pl.data["units"].size() == GameData.STARTER_UNITS.size() and pl.rating() == 0 and str(pl.data["name"]) == "Lord Bob", "reset starts the profile over (name kept)")
 	party.accounts = saved_accounts
@@ -1671,7 +1673,9 @@ func test_rarity_levels() -> void:
 	var fresh := ProfileLogic.new()
 	fresh.data["gold"] = 1000000
 	fresh.data["units"]["ogre"] = {"level": 1, "tier": 0, "shards": 0}
-	check(fresh.level_up_cost("ogre") == roundi(40.0 * pow(21.0, 1.6) * 2.5), "a rare's first level costs what a common's 21st did (x the rare price)")
+	check(fresh.level_up_cost("ogre") == 700, "a rare's first level-up costs 700 gold (0.9.8)")
+	fresh.data["units"]["orc_warrior"] = {"level": 1, "tier": 0, "shards": 0}
+	check(fresh.level_up_cost("orc_warrior") == 250 and fresh.level_up_cost("goblin") == 40, "an uncommon's 250; commons unchanged")
 	var old_code := "AB1:" + Marshalls.utf8_to_base64(JSON.stringify({"n": "Old", "r": 1500, "s": [["ogre", 26, 5, 0], ["goblin", 17, 3, 0]]}))
 	var dec := Army.decode(old_code)
 	check(not dec.is_empty() and int(dec["squads"][0]["level"]) == 6 and int(dec["squads"][1]["level"]) == 17, "army codes from before 0.9.7 still work, converted")

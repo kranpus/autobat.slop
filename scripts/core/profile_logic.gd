@@ -229,9 +229,9 @@ func level_up_cost(id: String) -> int:
 	return roundi(40.0 * pow(float(lvl), 1.6) * mult)
 
 
-## 0.9.8: epic and legendary levels are much cheaper: the first level-up costs
-## this much, later ones follow the usual curve from there.
-const FIRST_LEVEL_COST := {"epic": 5000, "legendary": 10000}
+## 0.9.8: levels above common are much cheaper: the first level-up costs this
+## much, later ones follow the usual curve from there.
+const FIRST_LEVEL_COST := {"uncommon": 250, "rare": 700, "epic": 5000, "legendary": 10000}
 
 
 func can_level_up(id: String) -> bool:
