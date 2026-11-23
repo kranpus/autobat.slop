@@ -68,6 +68,26 @@ progress, or press **Play offline (guest)** to keep a local profile on this devi
 switch later in **Settings → Account**. See [HOSTING.md](HOSTING.md#accounts-and-security) for how
 accounts, password hashing and encryption work.
 
+## Commander level and quest log (0.9.7)
+
+- **Commander level:** XP from battles (15, +15 for a ranked win), expeditions (10), unit level-ups (5),
+  squad tiers (20), trinket hunts (10), challenges (40, +60 for a first clear), Legion Draft
+  matches (40, +40 for a win) and quests. Level 2 takes 100 XP, each further level 60 more; the
+  top level is 30. Rules and numbers: `scripts/core/progression.gd`.
+  - **Rewards:** every level pays 150 gold x the level; every 3rd adds 2 scouting maps, every 6th a
+    trinket (uncommon, rare, epic, epic, legendary).
+  - **Unlocks:** daily quests (2), trinket hunts (3), weekly quests (4), Legion Draft (5), a second
+    trinket slot (8), +2 scouting map storage (10 and 20), a 4th daily quest (15), a 4th weekly
+    quest (25). Locked tabs show the level they open at.
+  - **Existing players** start at level 8 or more (XP for their record), without back-paid rewards.
+- **Quest log (Quests tab):**
+  - **Story:** 50 quests in order (one at a time), from "Fight your first battle" to "Reach 3,000
+    rating". Counting quests count from when they become active; milestones ("Own 15 units",
+    "Reach 1,500 rating") count what you already have.
+  - **Daily:** 3 (4 from level 15) picked from a pool each day; **weekly:** 3 (4 from level 25).
+    They renew at a time the server sets (`quests reset`, UTC; default midnight, weeks from Monday).
+  - Signed in, the server tracks progress and pays rewards.
+
 ## The gameplay loop
 
 **Rating unlocks regions.** New commanders start at **0 rating** (1000 before 0.9.5), and

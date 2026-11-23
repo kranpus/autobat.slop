@@ -254,6 +254,8 @@ Ctrl+P then Ctrl+Q to detach again.
 | `difficulty ranked 1.2` | Scale the power of all three ranked tiers at once (1.2 = 20% stronger opponents). |
 | `difficulty challenges 1.3` | Multiply challenge enemies' HP and damage (1 = as designed, 0.25–5). The recommended power on each card scales with it. |
 | `difficulty training <slow from> <slower from> [divisor] [later divisor]` | When battles against training bands start counting for less rating: in full below the first rating, divided by the divisor from it (default a quarter from 1000), and by the later divisor from the second (default a tenth from 2500). E.g. `difficulty training 1500 3000`, or `difficulty training 1000 2500 4 10` for the defaults. `difficulty training` shows the current values. Players' games pick it up (their preview, offline play and the one-time message). |
+| `quests` | When the quest log renews: daily quests at a time of day, weekly ones on a weekday at that time (UTC). |
+| `quests reset 06:00 [monday]` | Set the daily reset time (UTC, HH:MM) and optionally the weekly reset day. Saved, and sent to players (offline play follows it too). Players get new quests from the next reset. |
 | `difficulty reset` | Back to the default difficulty. |
 | `drops` | Show the drop chance settings. |
 | `drops unit legendary 0.25` | Scale how often units of a rarity are offered on expeditions, in every region. 1 = the normal table, 2 = twice as likely, 0 = never. Default: legendary 0.5, everything else 1. |
@@ -452,6 +454,8 @@ online, sent to their game at once. Unit, trinket and challenge names can be ids
 | `player <user>` | Their rating (and leaderboard place), wins, losses, gold, maps, Legion Draft record, every unit they own with level and tier, their army, and how many trinkets and challenges they have. |
 | `player <user> set <stat> <n>` | Set `rating`, `gold`, `maps`, `wins`, `losses`, `draft_wins` or `draft_played`, e.g. `player bob set rating 1200`. Never below 0. |
 | `player <user> add <stat> <n>` | Add to one (a minus number takes away), e.g. `player bob add gold 500`. |
+| `player <user> set xp <n>` / `add xp <n>` | Commander XP. Levels reached this way pay their usual rewards. |
+| `player <user> set commander_level <n>` | Jump to the start of a commander level (1-30). The levels skipped pay no rewards. |
 | `player <user> name <new name>` | Change their commander name (shown on the leaderboard and to opponents). |
 | `player <user> unit <unit> [level <n>] [tier <n>] [shards <n>]` | Give them a unit, or change one they own, e.g. `player bob unit Storm Dragon level 20 tier 4`. Levels are capped by the tier, like in the game. Works for locked units too (they sit out of battles until unlocked). |
 | `player <user> unit <unit> remove` | Take a unit away (and out of their army). |

@@ -88,6 +88,18 @@ func _run() -> void:
 	await _wait_ms(800)
 	check(profile.gold() < 99999999, "a locally edited gold value is overwritten by the server's")
 
+	print("commander level and quests on the server")
+	check(profile.player_level() == 1 and not profile.can_hunt_trinkets("camp"), "a new account is commander level 1: trinket hunts are still locked")
+	var log0: Array = profile.quest_log()
+	check(log0.size() == 1 and log0[0]["kind"] == "story", "it starts on the first story quest")
+	var reply := await _admin("player %s set commander_level 8" % user)
+	await _wait_ms(800)
+	check(reply.contains("commander level 8") and profile.player_level() == 8 and profile.trinket_slots() == 2, "the admin command raised it to level 8, and the game got the update")
+	profile.refresh_quests()
+	await _wait_ms(800)
+	var daily_n: int = profile.quest_log().filter(func(e): return e["kind"] == "daily").size()
+	check(daily_n == 3, "level 8 has 3 daily quests from the server (%d)" % daily_n)
+
 	print("trinkets on the server")
 	var maps_before: int = profile.maps()
 	profile.hunt_trinkets("camp")
@@ -130,6 +142,15 @@ func _run() -> void:
 	check(party.last_ranked_summary == summary, "an offer can't be fought again without searching again")
 
 	check(cfg["squads_a"].any(func(sq): return sq.get("trinkets", []).has(trinket)), "the battle used the equipped trinket")
+
+	print("claiming a quest on the server")
+	var st: Dictionary = profile.quest_log()[0]
+	check(st["kind"] == "story" and bool(st["done"]), "the ranked battle completed '%s'" % st["text"])
+	var xp_before: int = profile.xp()
+	profile.claim_quest("story", 0)
+	var claimed: Dictionary = await profile.quest_claimed
+	await _wait_ms(300)
+	check(int(claimed.get("gold", 0)) == 150 and profile.xp() == xp_before + 50 and int(profile.data["quests"]["story"]["index"]) == 1, "the server paid the story reward (150 gold, 50 XP) and moved to quest 2")
 
 	print("unit stats on the server")
 	var unit_name: String = GameData.UNITS[owned[0]]["name"]

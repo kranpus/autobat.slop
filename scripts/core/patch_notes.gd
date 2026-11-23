@@ -9,9 +9,19 @@ extends RefCounted
 ## out; they belong in HOSTING.md.
 
 const LIST := [
-	{"version": "0.9.7", "date": "2026-11-24", "title": "Steady Hands",
-		"summary": "Rarer units now have fewer levels but start stronger, trinkets no longer give splash, training bands pick better units, plus bug fixes.",
+	{"version": "0.9.7", "date": "2026-11-24", "title": "The Commander's Ledger",
+		"summary": "Commander levels and a quest log with daily, weekly and 50 story quests; rarer units have fewer levels but start stronger; trinkets no longer give splash; training bands pick better units; plus bug fixes.",
 		"sections": [
+			{"name": "Commander levels", "notes": [
+				{"kind": "change", "text": "You now have a commander level (shown in the top bar). Earn XP from battles, expeditions, levelling and upgrading units, trinket hunts, challenges, Legion Draft matches and quests."},
+				{"kind": "change", "text": "Every level pays gold; every third level brings scouting maps and every sixth a trinket. Levels also open up the game: trinket hunts at level 3, Legion Draft at 5, a second trinket slot on every unit at 8, room for 2 more scouting maps at 10 and again at 20, and extra quests at 15 and 25."},
+				{"kind": "note", "text": "Commanders who played before this patch start at level 8 or higher (more for a long record), so nothing you could do before is locked."},
+			]},
+			{"name": "Quest log", "notes": [
+				{"kind": "change", "text": "New Quests tab. 50 story quests to work through one after another, from your first battle to reaching 3,000 rating, each with gold and XP, scouting maps every fifth and a trinket every tenth."},
+				{"kind": "change", "text": "Daily quests (from level 2): three a day, such as winning ranked battles or sending out scouts, renewed once a day. Weekly quests (from level 4): three bigger ones, renewed once a week. The Quests tab shows when the next ones arrive."},
+				{"kind": "note", "text": "A red dot on the Quests tab means a quest is ready to claim."},
+			]},
 			{"name": "Levels by rarity", "notes": [
 				{"kind": "change", "text": "Rarer units have fewer levels, but start further up: Common 50 levels, Uncommon 40, Rare 30, Epic 20, Legendary 10. Level 1 of an uncommon is as strong as a common at level 11, a rare as a level 21 common, an epic level 31 and a legendary level 41."},
 				{"kind": "change", "text": "Every rarity's top level is exactly as strong as before, so fully levelled units haven't changed. A newly found rare, epic or legendary is ready to fight straight away instead of needing dozens of levels."},
