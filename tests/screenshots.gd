@@ -97,18 +97,19 @@ func _process(_delta: float) -> bool:
 		return false
 	match step:
 		1:
+			main.show_tab("Collection")
 			main.collection_tab.refresh()
 			_shot("01_collection")
-			main.tabs.current_tab = 1
+			main.show_tab("Army")
 		2:
 			_shot("02_army")
-			main.tabs.current_tab = 3
+			main.show_tab("Expeditions")
 		3:
 			_shot("03_expeditions")
-			main.tabs.current_tab = 4
+			main.show_tab("Ranked")
 		4:
 			_shot("04_battle_tab")
-			main.tabs.current_tab = 8
+			main.show_tab("Legion Draft")
 		5:
 			_shot("05_legion_draft_tab")
 			_battle("twin_fords")
@@ -127,7 +128,7 @@ func _process(_delta: float) -> bool:
 		24:
 			_shot("09_battle_fight_forest")
 			main._battle.closed.emit()
-			main.tabs.current_tab = 3
+			main.show_tab("Expeditions")
 		25:
 			_shot("10_expeditions_pity")
 			var party = root.get_node("Party")
@@ -135,7 +136,7 @@ func _process(_delta: float) -> bool:
 				"use_lives": false, "use_wins": false, "use_timer": false, "max_rounds": 10})
 			for i in 3:
 				party.add_bot()
-			main.tabs.current_tab = 8
+			main.show_tab("Legion Draft")
 		26:
 			_shot("11_draft_lobby")
 			root.get_node("Party").start_match()
@@ -168,10 +169,10 @@ func _process(_delta: float) -> bool:
 			var run = root.get_node("Party").run
 			check_log.append("after drag 4 (sell): slot 6 = %s, gold = %d" % [run.board[5].get("unit", "empty"), run.gold])
 			root.get_node("Party").disconnect_all()
-			main.tabs.current_tab = 1
+			main.show_tab("Army")
 		36:
 			# Army tab: drag the first Front line squad onto the Back line column.
-			var army_tab = main.tabs.get_child(1)
+			var army_tab = main.find_tab("Army")
 			var front_list: VBoxContainer = army_tab._columns["front"]["list"]
 			var back_list: VBoxContainer = army_tab._columns["back"]["list"]
 			check_log.append("army before: %s" % [_rows()])

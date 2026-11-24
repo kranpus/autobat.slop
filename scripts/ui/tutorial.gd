@@ -4,7 +4,7 @@ extends CanvasLayer
 ## themselves; the tutorial notices and moves on.
 ##
 ## The guided first session is a chain of short chapters (first battle, level
-## up, recruit, army, ranked, challenges, finale). Afterwards, one-off tips
+## up, recruit, army, ranked, finale). Afterwards, one-off tips
 ## appear the first time a feature is opened (trinkets, Legion Draft,
 ## leaderboard). Progress is kept in the device settings ("tutorial");
 ## Settings → Replay tutorial starts again.
@@ -20,7 +20,7 @@ extends CanvasLayer
 ##   hide    true: no overlay (e.g. while a battle plays); `text` shows as a
 ##           small caption at the top for a few seconds
 
-const CHAIN := ["first_battle", "level_up", "recruit", "army", "ranked", "challenges", "finale"]
+const CHAIN := ["first_battle", "level_up", "recruit", "army", "ranked", "finale"]
 const DIM := Color(0.02, 0.03, 0.06, 0.62)
 const PAD := 6.0
 const CAPTION_SECONDS := 4.0
@@ -331,14 +331,19 @@ func _find_target(id: String) -> Rect2:
 	if id.begins_with("tab:"):
 		if not main.menu_layer.visible:
 			return Rect2()
-		var name := id.substr(4)
+		# Sub-tabs (0.9.9): point at its top tab first, then at the sub-tab.
+		var c: Control = main.find_tab(id.substr(4))
+		if c == null:
+			return Rect2()
+		var m := c.get_parent() as TabContainer
 		var tabs: TabContainer = main.tabs
-		for i in tabs.get_tab_count():
-			if tabs.get_tab_control(i).name == name:
-				var bar := tabs.get_tab_bar()
-				var r := bar.get_tab_rect(i)
-				return Rect2(bar.get_global_rect().position + r.position, r.size)
-		return Rect2()
+		var bar := tabs.get_tab_bar()
+		var i := m.get_index()
+		if tabs.current_tab == i:
+			bar = m.get_tab_bar()
+			i = c.get_index()
+		var r := bar.get_tab_rect(i)
+		return Rect2(bar.get_global_rect().position + r.position, r.size)
 	for n in get_tree().get_nodes_in_group("tut"):
 		var c := n as Control
 		if c == null or str(c.get_meta("tut", "")) != id or not c.is_visible_in_tree():
@@ -354,7 +359,7 @@ func _find_target(id: String) -> Rect2:
 # --- conditions ---------------------------------------------------------------------
 
 func _tab_is(name: String) -> bool:
-	return main.menu_layer.visible and str(main.tabs.get_current_tab_control().name) == name
+	return main.menu_layer.visible and main.current_tab_name() == name
 
 
 func _in_battle() -> bool:
@@ -377,10 +382,8 @@ func _total_levels() -> int:
 
 
 func _battle_tab_has_opponents() -> bool:
-	for c in main.tabs.get_children():
-		if c.name == "Battle":
-			return not (c.get("_opponents") as Array).is_empty()
-	return false
+	var c: Control = main.find_tab("Ranked")
+	return c != null and not (c.get("_opponents") as Array).is_empty()
 
 
 ## The usual end of a fight: press FIGHT, watch, then Continue.
@@ -421,10 +424,10 @@ func _chapter_steps(id: String) -> Array:
 			]
 		"ranked":
 			return [
-				{"target": "tab:Battle", "text": "Now fight other commanders' armies.", "done": func(): return _tab_is("Battle")},
+				{"target": "tab:Ranked", "text": "Now fight other commanders' armies.", "done": func(): return _tab_is("Ranked")},
 				{"target": "find_opponents", "text": "Find opponents.", "done": _battle_tab_has_opponents},
 				{"target": "attack", "text": "Easy ones come first.", "done": _in_battle},
-			] + _battle_steps("Ranked wins raise your rating and unlock new regions.")
+			] + _battle_steps("Ranked wins raise your rating, which unlocks new regions, and Challenges at %d." % ProfileLogic.CHALLENGES_RATING)
 		"challenges":
 			return [
 				{"target": "tab:Challenges", "text": "Challenges: set battles with big rewards.", "done": func(): return _tab_is("Challenges")},
@@ -444,6 +447,7 @@ var TIPS := {
 	"trinkets": {"target": "trinket_hunt", "text": "Trinkets: gear for your units, 2 slots each. Hunt for them here.", "button": "Got it"},
 	"draft": {"target": "draft_quick", "text": "Legion Draft: buy units in a shop each round and battle up to 7 other players.", "button": "Got it"},
 	"leaderboard": {"target": "", "text": "The top commanders by rating. Win ranked battles to climb.", "button": "Got it"},
+	"challenges": {"target": "challenge_fight", "text": "Challenges: set battles against named bosses. Win one for a big first-clear reward.", "button": "Got it"},
 }
 
 
@@ -453,11 +457,13 @@ func _check_tips() -> void:
 		return
 	var seen: Array = p.get("tips", [])
 	var want := ""
-	if _tab_is("Expeditions") and _find_target("trinket_hunt").has_area():
+	if _tab_is("Trinket Hunts") and _find_target("trinket_hunt").has_area():
 		want = "trinkets"
 	elif _tab_is("Legion Draft"):
 		want = "draft"
 	elif _tab_is("Leaderboard"):
 		want = "leaderboard"
+	elif _tab_is("Challenges"):
+		want = "challenges"
 	if want != "" and not seen.has(want):
 		_tip = want

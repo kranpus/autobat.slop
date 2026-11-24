@@ -26,6 +26,11 @@ const LIST := [
 				{"kind": "change", "text": "Army codes and the armies other commanders fight in Ranked carry your champion. From 1,000 rating, training bands are led by champions too."},
 				{"kind": "note", "text": "Champions count toward Strength. Their balance will be tuned in coming patches."},
 			]},
+			{"name": "Menus", "notes": [
+				{"kind": "change", "text": "The menu is now three tabs, each with its own sub-tabs: Battle (Ranked, Challenges, Legion Draft, Quests, Leaderboard), Army (Collection, Army, Champion, Expeditions, Trinket Hunts) and Settings (Settings, Patch Notes). A red dot on a tab means something inside it is waiting for you."},
+				{"kind": "change", "text": "Challenges now open at 200 rating, so new commanders learn the ropes in ranked battles first. If you've already cleared a challenge, they stay open for you."},
+				{"kind": "note", "text": "The early story quests are reordered to match: \"Win a challenge\" now comes after \"Reach 250 rating\"."},
+			]},
 			{"name": "Battle Stats", "notes": [
 				{"kind": "change", "text": "New Battle Stats tab on the results screen: see what every squad did in the battle, yours and the enemy's: damage dealt, kills, healing, damage taken and units lost, with the battle's MVP marked. Tap a column to sort by it."},
 				{"kind": "note", "text": "Burns, poison, thorns, explosions and auras count for the unit that caused them, and summoned or raised units are listed on their own."},

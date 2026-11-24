@@ -519,6 +519,10 @@ func challenge_cleared(id: String) -> bool:
 	return logic.challenge_cleared(id)
 
 
+func challenges_open() -> bool:
+	return logic.challenges_open()
+
+
 func challenge_unlocked(id: String) -> bool:
 	return logic.challenge_unlocked(id)
 

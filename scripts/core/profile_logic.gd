@@ -626,11 +626,20 @@ func challenges_cleared() -> int:
 	return data.get("challenges", {}).size()
 
 
+## Challenges open at 200 rating (0.9.9; anyone who already cleared one keeps
+## them open).
+const CHALLENGES_RATING := 200
+
+
+func challenges_open() -> bool:
+	return rating() >= CHALLENGES_RATING or challenges_cleared() > 0
+
+
 ## Challenges open one after another: the first, then each once the one
 ## before it is cleared.
 func challenge_unlocked(id: String) -> bool:
 	var i := Challenges.index_of(id)
-	if i < 0:
+	if i < 0 or not challenges_open():
 		return false
 	return i == 0 or challenge_cleared(Challenges.LIST[i - 1]["id"])
 
@@ -857,7 +866,8 @@ func refresh_quests(now: int = -1) -> bool:
 			changed = true
 		if (slot["list"] as Array).size() < want:
 			var pool: Array = (Progression.DAILY if kind == "daily" else Progression.WEEKLY).filter(func(d):
-				return lvl >= int(d.get("min_level", 1)) and not (slot["list"] as Array).any(func(e): return e["id"] == d["id"]))
+				return lvl >= int(d.get("min_level", 1)) and (d["goal"] != "challenge_win" or challenges_open()) \
+					and not (slot["list"] as Array).any(func(e): return e["id"] == d["id"]))
 			var rng := RandomNumberGenerator.new()
 			rng.randomize()
 			while (slot["list"] as Array).size() < want and not pool.is_empty():

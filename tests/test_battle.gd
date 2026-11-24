@@ -48,6 +48,7 @@ func _initialize() -> void:
 	test_quests()
 	test_champions()
 	test_battle_stats()
+	test_challenge_gate()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -927,6 +928,7 @@ func test_challenges() -> void:
 	var pl := ProfileLogic.new()
 	pl.data["xp"] = Progression.xp_for_level(Progression.MAX_LEVEL)   # no level-up rewards mixed in
 	pl.data["level_rewarded"] = Progression.MAX_LEVEL
+	pl.data["rating"] = ProfileLogic.CHALLENGES_RATING   # challenges open at 200 (0.9.9)
 	var sim := BattleSim.new()
 	sim.setup(pl.battle_squads(), Challenges.enemy_squads("rat_problem"), 5, "open_arena")
 	sim.run_to_end(200000)
@@ -1951,3 +1953,31 @@ func test_battle_stats() -> void:
 	again.setup(a, b, 3)
 	again.run_to_end()
 	check(again.battle_stats() == rows, "stats are the same every time the battle is replayed")
+
+
+func test_challenge_gate() -> void:
+	print("challenges open at 200 rating (patch 0.9.9)")
+	var pl := ProfileLogic.new()
+	var first: String = Challenges.LIST[0]["id"]
+	pl.data["rating"] = 199
+	check(not pl.challenges_open() and not pl.challenge_unlocked(first), "closed below 200 rating")
+	check(not bool(pl.complete_challenge(first, true)["first_clear"]), "...and a win can't be claimed")
+	pl.data["rating"] = 200
+	check(pl.challenges_open() and pl.challenge_unlocked(first), "open at 200")
+	pl.complete_challenge(first, true)
+	pl.data["rating"] = 50
+	check(pl.challenges_open(), "anyone who has cleared one keeps them open")
+	var fresh := ProfileLogic.new()
+	fresh.data["rating"] = 0
+	fresh.data["xp"] = 999999
+	fresh.data["quests"]["daily"]["period"] = -1
+	fresh.refresh_quests()
+	check((fresh.data["quests"]["daily"]["list"] as Array).all(func(e): return e["id"] != "d_challenge"), "no daily challenge quest while they're closed")
+	var idx := -1
+	var r250 := -1
+	for i in Progression.STORY.size():
+		if Progression.STORY[i]["goal"] == "challenge_win" and idx < 0:
+			idx = i
+		if Progression.STORY[i]["goal"] == "rating" and int(Progression.STORY[i]["n"]) >= 200 and r250 < 0:
+			r250 = i
+	check(r250 >= 0 and idx > r250, "the story's first challenge comes after reaching 200+ rating")

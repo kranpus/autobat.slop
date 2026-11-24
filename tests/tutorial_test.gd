@@ -129,10 +129,7 @@ func _act(step: Dictionary) -> void:
 		return
 	var target := str(step.get("target", ""))
 	if target.begins_with("tab:"):
-		var tabs: TabContainer = main.tabs
-		for i in tabs.get_tab_count():
-			if tabs.get_tab_control(i).name == target.substr(4):
-				tabs.current_tab = i
+		main.show_tab(target.substr(4))
 		return
 	for n in get_nodes_in_group("tut"):
 		if str(n.get_meta("tut", "")) == target and n.is_visible_in_tree() and n is BaseButton and not n.disabled:

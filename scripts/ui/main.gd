@@ -26,7 +26,7 @@ var trinket_tab: Control
 var _gold_label: Label
 var _maps_label: Label
 var _level_label: Label
-var _exp_tabs: TabContainer
+var _menus: Array = []   # the three top tabs (Battle, Army, Settings), each holding sub-tabs
 var _draft_tab: Control
 var _rating_label: Label
 var _battle: Node = null
@@ -74,59 +74,55 @@ func _ready() -> void:
 	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	layout.add_child(tabs)
 
-	collection_tab = CollectionTab.new()
-	collection_tab.name = "Collection"
-	tabs.add_child(collection_tab)
-	var army_tab := ArmyTab.new()
-	army_tab.name = "Army"
-	tabs.add_child(army_tab)
-	var champion_tab := ChampionTab.new()
-	champion_tab.name = "Champion"
-	tabs.add_child(champion_tab)
-	# Expeditions has two sub-tabs: regions (units) and trinket hunts.
-	var exp_tabs := TabContainer.new()
-	_exp_tabs = exp_tabs
-	exp_tabs.name = "Expeditions"
-	tabs.add_child(exp_tabs)
-	expedition_tab = ExpeditionTab.new()
-	expedition_tab.name = "Regions"
-	exp_tabs.add_child(expedition_tab)
-	trinket_tab = TrinketTab.new()
-	trinket_tab.name = "Trinkets"
-	exp_tabs.add_child(trinket_tab)
-	exp_tabs.tab_changed.connect(func(_i): Audio.play_sfx("toggle", -8.0))
+	# 0.9.9: three top tabs, each with its own sub-tabs.
+	var battle_menu := _menu("Battle", "BattleMenu")
 	var pvp_tab := PvpTab.new()
-	pvp_tab.name = "Battle"
+	pvp_tab.name = "Ranked"
 	pvp_tab.battle_requested.connect(start_battle)
-	tabs.add_child(pvp_tab)
+	battle_menu.add_child(pvp_tab)
 	var challenges_tab := ChallengesTab.new()
 	challenges_tab.name = "Challenges"
 	challenges_tab.battle_requested.connect(start_battle)
-	tabs.add_child(challenges_tab)
-	var quests_tab := QuestsTab.new()
-	quests_tab.name = "Quests"
-	tabs.add_child(quests_tab)
-	var board_tab := LeaderboardTab.new()
-	board_tab.name = "Leaderboard"
-	tabs.add_child(board_tab)
+	battle_menu.add_child(challenges_tab)
 	var draft_tab := DraftLobbyTab.new()
 	_draft_tab = draft_tab
 	draft_tab.name = "Legion Draft"
-	tabs.add_child(draft_tab)
-	var notes_tab := PatchNotesTab.new()
-	notes_tab.name = "Patch Notes"
-	tabs.add_child(notes_tab)
+	battle_menu.add_child(draft_tab)
+	var quests_tab := QuestsTab.new()
+	quests_tab.name = "Quests"
+	battle_menu.add_child(quests_tab)
+	var board_tab := LeaderboardTab.new()
+	board_tab.name = "Leaderboard"
+	battle_menu.add_child(board_tab)
+
+	var army_menu := _menu("Army", "ArmyMenu")
+	collection_tab = CollectionTab.new()
+	collection_tab.name = "Collection"
+	army_menu.add_child(collection_tab)
+	var army_tab := ArmyTab.new()
+	army_tab.name = "Army"
+	army_menu.add_child(army_tab)
+	var champion_tab := ChampionTab.new()
+	champion_tab.name = "Champion"
+	army_menu.add_child(champion_tab)
+	expedition_tab = ExpeditionTab.new()
+	expedition_tab.name = "Expeditions"
+	army_menu.add_child(expedition_tab)
+	trinket_tab = TrinketTab.new()
+	trinket_tab.name = "Trinket Hunts"
+	army_menu.add_child(trinket_tab)
+
+	var settings_menu := _menu("Settings", "SettingsMenu")
 	var settings_tab := SettingsTab.new()
 	settings_tab.name = "Settings"
-	tabs.add_child(settings_tab)
-	tabs.tab_changed.connect(func(_i): Audio.play_sfx("toggle", -8.0))
-	# Opening the Patch Notes tab marks this version's notes as read.
-	var notes_index := notes_tab.get_index()
-	tabs.tab_changed.connect(func(i: int):
-		if i == notes_index and str(Profile.settings.get("seen_patch", "")) != PatchNotes.latest():
-			Profile.settings["seen_patch"] = PatchNotes.latest()
-			Profile.save_settings()
-		_refresh_badges())
+	settings_menu.add_child(settings_tab)
+	var notes_tab := PatchNotesTab.new()
+	notes_tab.name = "Patch Notes"
+	settings_menu.add_child(notes_tab)
+
+	tabs.tab_changed.connect(func(_i):
+		Audio.play_sfx("toggle", -8.0)
+		_on_tab_shown())
 
 	Profile.changed.connect(_refresh_top_bar)
 	Profile.changed.connect(_refresh_badges)
@@ -333,52 +329,114 @@ func show_toast(text: String, color: Color = Color.WHITE) -> void:
 	tw.tween_callback(p.queue_free)
 
 
+## One of the top tabs, holding sub-tabs.
+func _menu(title: String, node_name: String) -> TabContainer:
+	var m := TabContainer.new()
+	m.name = node_name
+	tabs.add_child(m)
+	tabs.set_tab_title(m.get_index(), title)
+	m.tab_changed.connect(func(_i):
+		Audio.play_sfx("toggle", -8.0)
+		_on_tab_shown())
+	_menus.append(m)
+	return m
+
+
+## A sub-tab (Collection, Ranked, Patch Notes...) by name.
+func find_tab(tab_name: String) -> Control:
+	for m in _menus:
+		for c in m.get_children():
+			if str(c.name) == tab_name:
+				return c
+	return null
+
+
+## Opens a sub-tab and the top tab it's in.
+func show_tab(tab_name: String) -> void:
+	var c := find_tab(tab_name)
+	if c == null:
+		return
+	var m := c.get_parent() as TabContainer
+	tabs.current_tab = m.get_index()
+	m.current_tab = c.get_index()
+
+
+## The name of the sub-tab on screen.
+func current_tab_name() -> String:
+	var m := tabs.get_current_tab_control() as TabContainer
+	if m == null or m.get_current_tab_control() == null:
+		return ""
+	return str(m.get_current_tab_control().name)
+
+
+## Opening the Patch Notes marks this version's notes as read.
+func _on_tab_shown() -> void:
+	if current_tab_name() == "Patch Notes" and str(Profile.settings.get("seen_patch", "")) != PatchNotes.latest():
+		Profile.settings["seen_patch"] = PatchNotes.latest()
+		Profile.save_settings()
+	_refresh_badges()
+
+
 ## A red dot on tabs with something waiting: a squad upgrade you can afford,
 ## scouting maps piling up, a challenge your army can take, unread notes.
+## A top tab shows one when any of its sub-tabs does.
 func _refresh_badges() -> void:
 	if tabs == null:
 		return
 	var power := Army.army_power(Profile.battle_squads()) / 10.0
-	for i in tabs.get_tab_count():
-		var dot := false
-		match str(tabs.get_tab_control(i).name):
-			"Collection":
-				for id in Profile.data["units"]:
-					if Profile.can_tier_up(id):
-						dot = true
-						break
-			"Expeditions":
-				dot = Profile.maps() >= Profile.max_maps() or Profile.has_pending_choice() or Profile.has_pending_trinket()
-			"Quests":
-				dot = Profile.claimable_quests() > 0
-			"Challenges":
-				for c in Challenges.LIST:
-					if Profile.challenge_unlocked(c["id"]) and not Profile.challenge_cleared(c["id"]) and power >= Challenges.recommended(c["id"]):
-						dot = true
-						break
-			"Patch Notes":
-				dot = str(Profile.settings.get("seen_patch", "")) != PatchNotes.latest()
-		tabs.set_tab_icon(i, UIKit.badge_dot() if dot else null)
+	for m: TabContainer in _menus:
+		var any := false
+		for i in m.get_tab_count():
+			var dot := _tab_dot(str(m.get_tab_control(i).name), power)
+			any = any or dot
+			m.set_tab_icon(i, UIKit.badge_dot() if dot else null)
+		tabs.set_tab_icon(m.get_index(), UIKit.badge_dot() if any else null)
 	_refresh_gates()
 	_level_up_notice()
 
 
+func _tab_dot(tab_name: String, power: float) -> bool:
+	var dot := false
+	match tab_name:
+		"Collection":
+			for id in Profile.data["units"]:
+				if Profile.can_tier_up(id):
+					dot = true
+					break
+		"Expeditions":
+			dot = Profile.maps() >= Profile.max_maps() or Profile.has_pending_choice()
+		"Trinket Hunts":
+			dot = Profile.has_pending_trinket()
+		"Quests":
+			dot = Profile.claimable_quests() > 0
+		"Challenges":
+			for c in Challenges.LIST:
+				if Profile.challenge_unlocked(c["id"]) and not Profile.challenge_cleared(c["id"]) and power >= Challenges.recommended(c["id"]):
+					dot = true
+					break
+		"Patch Notes":
+			dot = str(Profile.settings.get("seen_patch", "")) != PatchNotes.latest()
+	return dot
+
+
 ## Parts of the game that open with the commander level (0.9.7).
 func _refresh_gates() -> void:
-	if _draft_tab:
-		var i := _draft_tab.get_index()
-		var open := Profile.feature_unlocked("draft")
-		tabs.set_tab_disabled(i, not open)
-		tabs.set_tab_title(i, "Legion Draft" if open else "Legion Draft (Lv %d)" % Progression.unlock_level("draft"))
-		if not open and tabs.current_tab == i:
-			tabs.current_tab = 0
-	if _exp_tabs:
-		var open := Profile.feature_unlocked("trinkets")
-		var j := trinket_tab.get_index()
-		_exp_tabs.set_tab_disabled(j, not open)
-		_exp_tabs.set_tab_title(j, "Trinkets" if open else "Trinkets (Lv %d)" % Progression.unlock_level("trinkets"))
-		if not open and _exp_tabs.current_tab == j:
-			_exp_tabs.current_tab = 0
+	var gates := [
+		[_draft_tab, Profile.feature_unlocked("draft"), "Legion Draft", "Lv %d" % Progression.unlock_level("draft")],
+		[trinket_tab, Profile.feature_unlocked("trinkets"), "Trinket Hunts", "Lv %d" % Progression.unlock_level("trinkets")],
+		[find_tab("Challenges"), Profile.challenges_open(), "Challenges", "%d rating" % ProfileLogic.CHALLENGES_RATING],
+	]
+	for gate in gates:
+		var c: Control = gate[0]
+		if c == null:
+			continue
+		var m := c.get_parent() as TabContainer
+		var i := c.get_index()
+		var open: bool = gate[1]
+		m.set_tab_disabled(i, not open)
+		m.set_tab_title(i, gate[2] if open else "%s (%s)" % [gate[2], gate[3]])
+		if not open and m.current_tab == i:
+			m.current_tab = 0
 
 
 ## A message for each commander level reached: its reward and what it opens.
@@ -603,8 +661,8 @@ func _notification(what: int) -> void:
 		return
 	if draft_layer.visible:
 		return  # use the Leave button so a match isn't quit by accident
-	if tabs.current_tab != 0:
-		tabs.current_tab = 0
+	if current_tab_name() != "Ranked":
+		show_tab("Ranked")
 	else:
 		get_tree().quit()
 

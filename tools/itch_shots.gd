@@ -104,21 +104,21 @@ func _run() -> void:
 	main._battle.closed.emit()
 	await _wait(0.5)
 	# Ranked: the Call to Arms scroll.
-	main.tabs.current_tab = 4
+	main.show_tab("Ranked")
 	await _wait(0.3)
-	var pvp = main.tabs.get_child(4)
+	var pvp = main.find_tab("Ranked")
 	pvp._searching = true
 	pvp._on_ranked_opponents([])   # offline: three training bands
 	await _wait(2.0)
 	await _shot("03_call_to_arms")
 	# Collection with a legendary picked.
-	main.tabs.current_tab = 0
+	main.show_tab("Collection")
 	main.collection_tab._selected = "golden_dragon"
 	main.collection_tab.refresh()
 	await _wait(0.6)
 	await _shot("04_collection")
 	# Expedition: the Scout's Report.
-	main.tabs.current_tab = 3
+	main.show_tab("Expeditions")
 	await _wait(0.3)
 	main.expedition_tab._explore("tidewater_grotto")
 	await _wait(3.0)
@@ -130,11 +130,11 @@ func _run() -> void:
 	profile.data["pending_choice"] = {}
 	main.expedition_tab.refresh()
 	# Army.
-	main.tabs.current_tab = 1
+	main.show_tab("Army")
 	await _wait(0.6)
 	await _shot("06_army")
 	# Challenges.
-	main.tabs.current_tab = 5
+	main.show_tab("Challenges")
 	await _wait(1.0)
 	await _shot("07_challenges")
 	# Legion Draft: a board mid-game.
@@ -143,7 +143,7 @@ func _run() -> void:
 		"use_lives": true, "use_wins": true, "use_timer": false, "max_rounds": 0})
 	for i in 3:
 		party.add_bot()
-	main.tabs.current_tab = 8
+	main.show_tab("Legion Draft")
 	await _wait(0.5)
 	party.start_match()
 	await _wait(1.0)

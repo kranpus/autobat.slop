@@ -168,6 +168,12 @@ func _run() -> void:
 	check(Difficulty.is_default(), "and the reset")
 
 	print("challenges on the server")
+	# Closed below 200 rating (0.9.9): the server refuses, then opens them at 200.
+	party.request_challenge_battle("rat_problem")
+	await _wait_ms(800)
+	check(profile.rating() >= 200 or party.last_ranked_summary.get("challenge", "") != "rat_problem", "below 200 rating the server refuses a challenge")
+	check((await _admin("player %s set rating 200" % user)).contains("200"), "the admin set the rating to 200")
+	await _wait_ms(500)
 	var gold_c: int = profile.gold()
 	party.request_challenge_battle("rat_problem")
 	var ccfg: Dictionary = await party.battle_ready
