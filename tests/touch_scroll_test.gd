@@ -159,8 +159,13 @@ func _expedition_drag() -> void:
 
 
 func _patch_notes_drag() -> void:
+	var audio := root.get_node("Audio")
+	var sounds_before := int(audio.played.get("scroll", 0))
 	main.show_tab("Patch Notes")
 	await create_timer(1.5).timeout   # the scrolls unroll
+	check(int(audio.played.get("scroll", 0)) - sounds_before == 1, "opening the Patch Notes plays the scroll sound once (%d)" % (int(audio.played.get("scroll", 0)) - sounds_before))
+	var all_open: bool = main.find_tab("Patch Notes").find_children("*", "ScrollUnroll", true, false).all(func(s): return (s.get("_clip") as Control).custom_minimum_size.y > 10.0)
+	check(all_open, "...and every patch's scroll is open")
 	var scroll: ScrollContainer = null
 	for s in main.find_tab("Patch Notes").find_children("*", "ScrollContainer", true, false):
 		if s.is_visible_in_tree() and _ts._can_scroll_v(s):

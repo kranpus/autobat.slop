@@ -14,6 +14,10 @@ var _scrolls: Array = []
 var _opened := false
 
 
+## How many of the newest patches unroll with an animation.
+const ANIMATED := 4
+
+
 func _ready() -> void:
 	add_theme_constant_override("separation", 10)
 	var top := UIKit.hbox(10)
@@ -35,9 +39,15 @@ func _ready() -> void:
 	visibility_changed.connect(func():
 		if is_visible_in_tree() and not _opened:
 			_opened = true
-			# Unroll the newest at once, the older ones just after.
+			# Unroll the newest at once (one scroll sound), the next few just
+			# after, silently, and open the older ones straight away (0.9.9:
+			# every patch used to play the sound).
 			for i in _scrolls.size():
-				get_tree().create_timer(0.15 * i).timeout.connect((_scrolls[i] as ScrollUnroll).unroll.bind(0.6)))
+				var s := _scrolls[i] as ScrollUnroll
+				if i < ANIMATED:
+					get_tree().create_timer(0.15 * i).timeout.connect(s.unroll.bind(0.6, i == 0))
+				else:
+					s.unroll(0.01, false))
 
 
 func _decree(patch: Dictionary) -> ScrollUnroll:

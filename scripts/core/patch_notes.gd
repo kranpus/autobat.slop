@@ -44,6 +44,7 @@ const LIST := [
 				{"kind": "fix", "text": "In a phone's web browser, the menus no longer shrink into a corner after signing in."},
 				{"kind": "fix", "text": "Phones and tablets whose browser asks for the desktop site (and iPads) now get the larger phone-sized interface too."},
 				{"kind": "fix", "text": "The \"Turn your phone sideways\" message fits on the screen."},
+				{"kind": "fix", "text": "Opening the Patch Notes plays the scroll sound once, not once for every patch ever."},
 			]},
 			{"name": "Battle Stats", "notes": [
 				{"kind": "change", "text": "New Battle Stats tab on the results screen: see what every squad did in the battle, yours and the enemy's: damage dealt, kills, healing, damage taken and units lost, with the battle's MVP marked. Tap a column to sort by it."},

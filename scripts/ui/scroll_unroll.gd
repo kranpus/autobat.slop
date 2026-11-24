@@ -62,8 +62,8 @@ func _on_content_size() -> void:
 		_clip.custom_minimum_size.y = _target
 
 
-## Unroll to show the content (with the scroll sound).
-func unroll(seconds: float = 0.55) -> void:
+## Unroll to show the content (with the scroll sound unless `sound` is false).
+func unroll(seconds: float = 0.55, sound: bool = true) -> void:
 	_target = _content_height()
 	if _tween:
 		_tween.kill()
@@ -71,7 +71,8 @@ func unroll(seconds: float = 0.55) -> void:
 	_tween = create_tween()
 	_tween.tween_property(_clip, "custom_minimum_size:y", _target, seconds).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
 	_tween.tween_callback(func(): unrolled.emit())
-	Audio.play_sfx("scroll")
+	if sound:
+		Audio.play_sfx("scroll")
 
 
 ## Roll up (closed: just the two rods).

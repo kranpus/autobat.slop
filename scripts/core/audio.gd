@@ -60,6 +60,7 @@ const MIN_INTERVAL_MS := 70
 var _pool: Array[AudioStreamPlayer] = []
 var _next := 0
 var _last_played := {}
+var played := {}   # sound -> times played (for tests)
 var _cache := {}
 var _music: AudioStreamPlayer
 var _music_key := ""
@@ -99,6 +100,7 @@ func play_sfx(key: String, volume_db: float = 0.0, min_interval_ms: int = MIN_IN
 	if now - int(_last_played.get(key, -100000)) < min_interval_ms:
 		return
 	_last_played[key] = now
+	played[key] = int(played.get(key, 0)) + 1
 	var list: Array = SFX[key]
 	var p := _pool[_next]
 	_next = (_next + 1) % POOL_SIZE
