@@ -284,8 +284,12 @@ static func squad_strip(squads: Array, px: int = 28, text_color: Color = TEXT_DI
 const UI_SCALES := ["auto", "1.0", "1.25", "1.5", "1.75", "2.0"]
 
 
+## Phones and tablets. In a browser, a touchscreen counts too: with "Desktop
+## site" on, or on an iPad, the browser says it's a computer (0.9.9).
 static func is_mobile() -> bool:
-	return OS.has_feature("mobile") or OS.has_feature("web_android") or OS.has_feature("web_ios")
+	if OS.has_feature("mobile") or OS.has_feature("web_android") or OS.has_feature("web_ios"):
+		return true
+	return OS.has_feature("web") and DisplayServer.is_touchscreen_available()
 
 
 ## Interface scale chosen from the physical screen size: 1.0 on desktop, larger
@@ -381,7 +385,10 @@ static func is_compact(node: Node) -> bool:
 ## rounded corners on phones. Zero on desktop.
 static func safe_margins(node: Node) -> Dictionary:
 	var out := {"left": 0.0, "top": 0.0, "right": 0.0, "bottom": 0.0}
-	if not is_mobile():
+	# In a browser the page already sits inside the safe area, and the
+	# browser's safe area doesn't use the same units as its screen size: the
+	# insets came out huge and squeezed the menus into a corner (0.9.9 fix).
+	if not is_mobile() or OS.has_feature("web"):
 		return out
 	var safe := DisplayServer.get_display_safe_area()
 	var screen := DisplayServer.screen_get_size()
@@ -393,6 +400,11 @@ static func safe_margins(node: Node) -> Dictionary:
 	out["top"] = float(safe.position.y) * k
 	out["right"] = float(screen.x - safe.end.x) * k
 	out["bottom"] = float(screen.y - safe.end.y) * k
+	# A notch never needs more than a sliver of the screen.
+	for side in ["left", "right"]:
+		out[side] = clampf(out[side], 0.0, view.x * 0.08)
+	for side in ["top", "bottom"]:
+		out[side] = clampf(out[side], 0.0, view.y * 0.08)
 	return out
 
 

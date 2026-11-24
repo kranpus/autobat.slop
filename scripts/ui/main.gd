@@ -518,7 +518,11 @@ func _update_rotate_prompt() -> void:
 	_rotate_layer.visible = upright
 	# Upright, the layout is far wider than the screen: size the words to it.
 	for e in _rotate_labels:
-		(e[0] as Label).add_theme_font_size_override("font_size", maxi(16, roundi(size.x * float(e[1]))))
+		var l := e[0] as Label
+		l.add_theme_font_size_override("font_size", maxi(16, roundi(size.x * float(e[1]))))
+		# Wrap to the screen's width rather than running off its edges.
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size.x = size.x * 0.9
 
 
 # --- tutorial -----------------------------------------------------------------------
