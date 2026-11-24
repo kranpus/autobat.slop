@@ -38,7 +38,7 @@ const LIST := [
 			]},
 			{"name": "Ranked training", "notes": [
 				{"kind": "change", "text": "Training bands now only field units a commander could have at their rating: the starting units plus the units of the regions open at that rating. No more Imps and Lemures at rating 0."},
-				{"kind": "change", "text": "Training bands are stronger at every rating: their power curve moved up by 610, so it starts at 750 at rating 0 (it was 140), is 990 at 1000 rating, 2,360 at 2000 and 8,610 at 3500."},
+				{"kind": "change", "text": "Training bands are stronger at every rating: about 750 power at rating 0 (it was 140), 2,000 at 1000 (was 380), 4,770 at 2000 (was 1,750) and 17,390 at 3500 (was 8,000)."},
 			]},
 			{"name": "Battle Stats", "notes": [
 				{"kind": "change", "text": "New Battle Stats tab on the results screen: see what every squad did in the battle, yours and the enemy's: damage dealt, kills, healing, damage taken and units lost, with the battle's MVP marked. Tap a column to sort by it."},

@@ -484,10 +484,11 @@ const RANKED_LABEL_GAP := 40
 ## straight lines in between. Past the last point it keeps growing 7% per
 ## 100 rating.
 ## (0.9.7: steeper above 1000, reaching 8,000 at 3500; it was 4,600.)
-## (0.9.9: the whole curve moved up 610, so it starts at 750 at rating 0; it
-## started at 140, about what a brand-new army has.)
-const RANK_POWER := [[0, 750.0], [250, 780.0], [500, 830.0], [800, 910.0], [1000, 990.0], [1200, 1130.0], [1500, 1460.0],
-	[1700, 1760.0], [2000, 2360.0], [2500, 3610.0], [3000, 5610.0], [3500, 8610.0], [4000, 12110.0]]
+## (0.9.9: 750 at rating 0 (it was 140, about a brand-new army), climbing to
+## 2,000 at 1000; above that the old curve's shape, about 2x as strong:
+## 4,770 at 2000, 17,390 at 3500.)
+const RANK_POWER := [[0, 750.0], [250, 1000.0], [500, 1300.0], [800, 1700.0], [1000, 2000.0], [1200, 2280.0], [1500, 2950.0],
+	[1700, 3560.0], [2000, 4770.0], [2500, 7290.0], [3000, 11330.0], [3500, 17390.0], [4000, 24460.0]]
 
 
 static func rank_power(rating: int) -> float:

@@ -240,8 +240,8 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
      - **Screen shake** can be turned off in Settings.
    - **Training opponents:** a hard ladder, sized by your **rating**, not your army (0.9.5).
      - **Strength:** each rating has an expected army power (`Army.RANK_POWER`): 750 at 0,
-       990 at 1000, 1,460 at 1500, 2,360 at 2000, 3,610 at 2500, 5,610 at 3000 and 8,610 at 3500
-       (0.9.9: the 0.9.7 curve moved up 610; it started at 140, about a starting army). Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× of that by default (the
+       1,300 at 500, 2,000 at 1000, 2,950 at 1500, 4,770 at 2000, 7,290 at 2500, 11,330 at 3000
+       and 17,390 at 3500 (0.9.9; it was 140 at 0, about a starting army, and 8,000 at 3500). Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× of that by default (the
        server can change this with `difficulty`). An army stronger than its rating beats them
        more easily; one that's behind has to catch up.
      - **Composition (0.9.7):** they favour units that fight well, weighted by each unit's win
