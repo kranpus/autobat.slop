@@ -47,6 +47,7 @@ func _initialize() -> void:
 	test_ghost_picks()
 	test_quests()
 	test_champions()
+	test_battle_stats()
 	print("\n%s (%d failure%s)" % ["ALL TESTS PASSED" if _failures == 0 else "TESTS FAILED", _failures, "" if _failures == 1 else "s"])
 	quit(1 if _failures > 0 else 0)
 
@@ -1913,3 +1914,40 @@ func test_champions() -> void:
 	party.run_command("player cara add sigils 10")
 	check(store.logic("cara").has_champion() and store.logic("cara").sigils() >= 10 and party.run_command("player cara").contains("champion"), "admin: level 7 brings the champion; 'add sigils' and the summary work")
 	party.accounts = saved_accounts
+
+
+func test_battle_stats() -> void:
+	print("battle stats (patch 0.9.9)")
+	var a := [{"unit": "orc_warrior", "level": 20, "tier": 6, "row": "front"}, {"unit": "mermaid", "level": 20, "tier": 6, "row": "back"},
+		{"unit": "spider_matriarch", "level": 15, "tier": 5, "row": "middle"}]
+	var b := [{"unit": "skeleton", "level": 20, "tier": 6, "row": "front"}, {"unit": "lich", "level": 12, "tier": 5, "row": "back"},
+		{"unit": "gnoll_shaman", "level": 20, "tier": 6, "row": "back"}]
+	var sim := BattleSim.new()
+	sim.setup(a, b, 3)
+	sim.run_to_end()
+	var rows := sim.battle_stats()
+	var by := {}
+	for r in rows:
+		by["%d %s %s" % [r["team"], r["unit"], r["summoned"]]] = r
+	var dealt := [0.0, 0.0]
+	var taken := [0.0, 0.0]
+	var kills := [0, 0]
+	var counted := [0, 0]
+	var lost := [0, 0]
+	for r in rows:
+		var t := int(r["team"])
+		dealt[t] += r["damage"]
+		taken[t] += r["taken"]
+		kills[t] += r["kills"]
+		counted[t] += r["count"]
+		lost[t] += r["lost"]
+	for t in 2:
+		check(counted[t] == sim.start_count[t] and lost[t] == sim.start_count[t] - sim.alive_count[t], "side %d: every unit counted once, losses match the battle" % t)
+		check(kills[t] <= lost[1 - t] and kills[t] >= int(0.9 * lost[1 - t]), "side %d: kills %d match enemy losses %d (nearly all credited)" % [t, kills[t], lost[1 - t]])
+		check(dealt[t] <= taken[1 - t] + 0.5 and dealt[t] >= 0.9 * taken[1 - t], "side %d: damage dealt %d matches what the enemy took %d" % [t, int(dealt[t]), int(taken[1 - t])])
+	check(float(by.get("0 mermaid false", {}).get("healing", 0.0)) > 1000.0, "healers' healing is counted")
+	check(by.has("0 cave_spider true"), "summoned spiders get their own row")
+	var again := BattleSim.new()
+	again.setup(a, b, 3)
+	again.run_to_end()
+	check(again.battle_stats() == rows, "stats are the same every time the battle is replayed")

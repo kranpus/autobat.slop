@@ -4,6 +4,8 @@ extends Node
 
 signal closed
 
+const BattleStatsView := preload("res://scripts/battle/battle_stats_view.gd")
+
 var config: Dictionary = {}
 var sim: BattleSim
 var view: BattleView
@@ -265,8 +267,20 @@ func _on_finished(winner: int) -> void:
 	if mode == "live":
 		Net.report_result(sim.checksum())
 
+	# Two tabs: the result and rewards, and the Battle Stats (0.9.9).
+	var outer := UIKit.vbox(8)
+	_result_panel.add_child(outer)
+	var tabs := TabContainer.new()
+	tabs.name = "ResultTabs"
+	outer.add_child(tabs)
 	var v := UIKit.vbox(8)
-	_result_panel.add_child(v)
+	v.name = "Summary"
+	tabs.add_child(v)
+	var stats_view := BattleStatsView.new()
+	stats_view.name = "Battle Stats"
+	stats_view.setup(sim.battle_stats(), _local_team)
+	tabs.add_child(stats_view)
+	tabs.tab_changed.connect(func(i: int): _result_panel.custom_minimum_size.x = 720.0 if i == 1 else 420.0)
 	var title_text := "DRAW"
 	var title_color := UIKit.ACCENT
 	if score >= 1.0:
@@ -278,7 +292,8 @@ func _on_finished(winner: int) -> void:
 		title_color = UIKit.BAD
 	var t := UIKit.label(title_text, 34, title_color)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(t)
+	outer.add_child(t)
+	outer.move_child(t, 0)
 	var mine := _local_team
 	v.add_child(UIKit.label("Your survivors: %d / %d" % [sim.alive_count[mine], sim.start_count[mine]], 15))
 	v.add_child(UIKit.label("Enemies defeated: %d / %d" % [killed, sim.start_count[enemy]], 15))
@@ -300,7 +315,7 @@ func _on_finished(winner: int) -> void:
 		v.add_child(_verify_label)
 	var cont := UIKit.accent_button("Continue", func(): closed.emit(), 17)
 	UIKit.tut(cont, "battle_continue")
-	v.add_child(cont)
+	outer.add_child(cont)
 	# The finish: a big banner and music sting, then the results.
 	_banner(title_text, title_color, 0.6)
 	if score >= 1.0:

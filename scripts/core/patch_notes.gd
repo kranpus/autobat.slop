@@ -26,6 +26,10 @@ const LIST := [
 				{"kind": "change", "text": "Army codes and the armies other commanders fight in Ranked carry your champion. From 1,000 rating, training bands are led by champions too."},
 				{"kind": "note", "text": "Champions count toward Strength. Their balance will be tuned in coming patches."},
 			]},
+			{"name": "Battle Stats", "notes": [
+				{"kind": "change", "text": "New Battle Stats tab on the results screen: see what every squad did in the battle, yours and the enemy's: damage dealt, kills, healing, damage taken and units lost, with the battle's MVP marked. Tap a column to sort by it."},
+				{"kind": "note", "text": "Burns, poison, thorns, explosions and auras count for the unit that caused them, and summoned or raised units are listed on their own."},
+			]},
 		]},
 	{"version": "0.9.7", "date": "2026-11-24", "title": "The Commander's Ledger",
 		"summary": "Commander levels and a quest log with daily, weekly and 50 story quests; rarer units have fewer levels but start stronger; trinkets no longer give splash; training bands pick better units; plus bug fixes.",

@@ -171,6 +171,16 @@ var _champions: Array = []            # {"i", "fx": effects, "next": per-effect 
 var regen_until := PackedInt32Array() # champion's healing ground: extra regeneration...
 var regen_pct := PackedFloat32Array() # ...as a share of max HP per second
 var raised := PackedInt32Array()      # 1 for units raised from the dead mid-battle
+# Battle stats (0.9.9): what each unit did, for the results screen. Only
+# counted, never read by the battle itself, so they can't change a result.
+var st_dmg := PackedFloat32Array()     # damage dealt (not counting overkill)
+var st_taken := PackedFloat32Array()   # damage taken
+var st_heal := PackedFloat32Array()    # health restored to itself or allies
+var st_kills := PackedInt32Array()
+var st_summoned := PackedByteArray()   # 1: joined mid-battle (summoned, raised, split)
+var burn_src := PackedInt32Array()     # who set it burning / poisoned it /
+var poison_src := PackedInt32Array()   # gave it the champion's regeneration,
+var regen_src := PackedInt32Array()    # for the stats
 var _raise_templates: Array = []      # resolved stats of the units raise dead creates
 
 # --- projectiles (pooled) ---------------------------------------------------
@@ -479,6 +489,14 @@ func _add_resolved(r: Dictionary, t: int, x: float, y: float) -> void:
 		_aura_units.append(i)
 	regen_until.append(0)
 	regen_pct.append(0.0)
+	st_dmg.append(0.0)
+	st_taken.append(0.0)
+	st_heal.append(0.0)
+	st_kills.append(0)
+	st_summoned.append(1 if tick > 0 else 0)
+	burn_src.append(-1)
+	poison_src.append(-1)
+	regen_src.append(-1)
 	if r.has("champ_fx"):
 		var nexts: Array = []
 		for fx in r["champ_fx"]:
@@ -535,18 +553,20 @@ func step() -> void:
 		if alive[i] == 0:
 			continue
 		if regen[i] > 0.0 and hp[i] < max_hp[i]:
-			hp[i] = minf(max_hp[i], hp[i] + regen[i] * DT)
+			_healed(i, i, regen[i] * DT)
 		if regen_until[i] > tick and hp[i] < max_hp[i]:
-			hp[i] = minf(max_hp[i], hp[i] + max_hp[i] * regen_pct[i] * DT)
+			_healed(regen_src[i], i, max_hp[i] * regen_pct[i] * DT)
 		if burn_until[i] > tick:
+			_dot(i, burn_dps[i] * DT, burn_src[i])
 			hp[i] -= burn_dps[i] * DT
 			if hp[i] <= 0.0:
-				_kill(i, -1)
+				_kill(i, -1, burn_src[i])
 				continue
 		if poison_until[i] > tick:
+			_dot(i, poison_dps[i] * float(poison_stacks[i]) * DT, poison_src[i])
 			hp[i] -= poison_dps[i] * float(poison_stacks[i]) * DT
 			if hp[i] <= 0.0:
-				_kill(i, -1)
+				_kill(i, -1, poison_src[i])
 				continue
 		elif poison_stacks[i] > 0:
 			poison_stacks[i] = 0
@@ -638,7 +658,7 @@ func _approach_and_act(i: int, t: int, healing: bool) -> void:
 	cd_t[i] = cooldown[i]
 	attack_tick[i] = tick
 	if healing:
-		hp[t] = minf(max_hp[t], hp[t] + heal[i])
+		_healed(i, t, heal[i])
 		events.append([Ev.HEAL, px[t], py[t], t])
 		if ab_id[i] == Ab.PURIFY and _cleanse(t):
 			events.append([Ev.ABILITY, px[t], py[t], Ab.PURIFY])
@@ -738,7 +758,7 @@ func _cleanse(t: int) -> bool:
 func _detonate(i: int, t: int) -> void:
 	events.append([Ev.BLAST, px[t], py[t], DETONATE_RADIUS])
 	for k in _enemies_near(px[t], py[t], DETONATE_RADIUS, team[i], false, 5):
-		_damage_unit(k, dmg[i] * ab_val[i], dtype[i], false, -1)
+		_damage_unit(k, dmg[i] * ab_val[i], dtype[i], false, -1, i)
 	if alive[i] == 1:
 		_kill(i, -1)
 
@@ -987,7 +1007,8 @@ func _deal_damage(src: int, src_team: int, dt_idx: int, amount: float, primary: 
 
 
 ## Returns the damage dealt.
-func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1) -> float:
+## credit: who the stats count it for when there's no src (explosions, auras).
+func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1, credit: int = -1) -> float:
 	if phase_until[j] > tick:
 		return 0.0   # phased out of this world
 	if src >= 0:
@@ -1033,6 +1054,9 @@ func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1
 	if not melee and ab_id[j] == Ab.UNSTOPPABLE:
 		m *= 1.0 - ab_val[j]
 	var dealt := amount * m * rng.randf_range(0.9, 1.1)
+	if src >= 0:
+		credit = src
+	_dot(j, dealt, credit)
 	hp[j] -= dealt
 	hit_tick[j] = tick
 	if ab_id[j] == Ab.SHELL and ab_used[j] == 0 and hp[j] > 0.0 and hp[j] < max_hp[j] * 0.5:
@@ -1041,6 +1065,7 @@ func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1
 		events.append([Ev.ABILITY, px[j], py[j], Ab.SHELL])
 	if src >= 0 and alive[src] == 1:
 		if not melee and ab_id[j] == Ab.REFLECT:
+			_dot(src, dealt * ab_val[j], j)
 			hp[src] -= dealt * ab_val[j]
 			hit_tick[src] = tick
 			events.append([Ev.ABILITY, px[j], py[j], Ab.REFLECT])
@@ -1056,14 +1081,15 @@ func _damage_unit(j: int, amount: float, dt_idx: int, melee: bool, src: int = -1
 			cooldown[j] = ab_base[j] / (1.0 + ab_val[j] * float(heads))
 	if src >= 0 and alive[src] == 1:
 		if lifesteal[src] > 0.0:
-			hp[src] = minf(max_hp[src], hp[src] + dealt * lifesteal[src])
+			_healed(src, src, dealt * lifesteal[src])
 		if melee and thorns[j] > 0.0:
+			_dot(src, dealt * thorns[j], j)
 			hp[src] -= dealt * thorns[j]
 			hit_tick[src] = tick
 			if hp[src] <= 0.0:
 				_kill(src, j)
 	if hp[j] <= 0.0 and alive[j] == 1:
-		_kill(j, src)
+		_kill(j, src, credit)
 	return dealt
 
 
@@ -1092,11 +1118,13 @@ func _on_hit(src: int, src_team: int, j: int, dealt: float, amount: float, dt_id
 				var dps := dealt * ab_val[src] / BURN_SECONDS
 				burn_dps[j] = maxf(burn_dps[j] if burn_until[j] > tick else 0.0, dps)
 				burn_until[j] = tick + int(BURN_SECONDS / DT)
+				burn_src[j] = src
 		Ab.VENOM:
 			if alive[j] == 1:
 				var active := poison_until[j] > tick
 				poison_stacks[j] = mini((poison_stacks[j] if active else 0) + 1, POISON_MAX_STACKS)
 				poison_dps[j] = maxf(poison_dps[j] if active else 0.0, dmg[src] * ab_val[src])
+				poison_src[j] = src
 				poison_until[j] = tick + int(POISON_SECONDS / DT)
 				events.append([Ev.ABILITY, px[j], py[j], Ab.VENOM])
 		Ab.ENSNARE:
@@ -1228,7 +1256,7 @@ func _apply_auras() -> void:
 					inspire_amt[k] = maxf(inspire_amt[k], ab_val[i])
 			Ab.IMMOLATE:
 				for k in _enemies_near(px[i], py[i], 80.0, team[i], false, 8):
-					_damage_unit(k, dmg[i] * ab_val[i] * float(AURA_TICKS) * DT, 3, false, -1)
+					_damage_unit(k, dmg[i] * ab_val[i] * float(AURA_TICKS) * DT, 3, false, -1, i)
 			Ab.FROST_AURA:
 				for k in _enemies_near(px[i], py[i], 110.0 * (CHAMPION_AURA_MULT if champ[i] == 1 else 1.0), team[i], false, CHAMPION_AURA_CAP if champ[i] == 1 else 30):
 					if ab_id[k] != Ab.UNSTOPPABLE:
@@ -1313,6 +1341,8 @@ func _champion_aura(i: int, fx: Dictionary) -> void:
 				aegis_until[k] = maxi(aegis_until[k], until)
 			"regen":
 				regen_until[k] = maxi(regen_until[k], until)
+				if amount >= regen_pct[k]:
+					regen_src[k] = i
 				regen_pct[k] = maxf(regen_pct[k], amount)
 			"weaken":
 				weaken_until[k] = maxi(weaken_until[k], until)
@@ -1337,6 +1367,7 @@ func _try_resurrect(i: int) -> void:
 		return   # nobody to bring back yet: try again next tick
 	alive[best] = 1
 	hp[best] = max_hp[best] * 0.5
+	st_heal[i] += hp[best]
 	raised[best] = 2      # brought back once already
 	burn_until[best] = 0
 	stun_until[best] = 0
@@ -1369,7 +1400,8 @@ func _nearest_enemy_near(x: float, y: float, r: float, my_team: int, skip: Dicti
 
 
 ## killer: the unit that dealt the blow, or -1.
-func _kill(j: int, killer: int = -1) -> void:
+## credit: who the stats count the kill for when there's no killer (burns, blasts).
+func _kill(j: int, killer: int = -1, credit: int = -1) -> void:
 	if ab_id[j] == Ab.REBIRTH and ab_used[j] == 0:
 		# Rises from the ashes once, with part of its health.
 		ab_used[j] = 1
@@ -1381,6 +1413,9 @@ func _kill(j: int, killer: int = -1) -> void:
 	hp[j] = 0.0
 	alive[j] = 0
 	death_tick[j] = tick
+	var by := killer if killer >= 0 else credit
+	if by >= 0 and team[by] != team[j]:
+		st_kills[by] += 1
 	alive_count[team[j]] -= 1
 	events.append([Ev.DIE, px[j], py[j], j])
 	if ab_id[j] == Ab.SPLIT and raised[j] == 0 and ab_tpl[j] >= 0:
@@ -1404,9 +1439,9 @@ func _kill(j: int, killer: int = -1) -> void:
 		var blast := max_hp[j] * ab_val[j]
 		for k in _enemies_near(px[j], py[j], DEATH_BLAST_RADIUS, team[j]):
 			if alive[k] == 1:
-				_damage_unit(k, blast, dtype[j], false, -1)
+				_damage_unit(k, blast, dtype[j], false, -1, j)
 	if killer >= 0 and ab_id[killer] == Ab.SOUL_HARVEST and alive[killer] == 1:
-		hp[killer] = minf(max_hp[killer], hp[killer] + max_hp[killer] * ab_val[killer])
+		_healed(killer, killer, max_hp[killer] * ab_val[killer])
 		ab_used[killer] = mini(ab_used[killer] + 1, HARVEST_MAX_STACKS)
 		dmg[killer] = ab_base[killer] * (1.0 + 0.1 * float(ab_used[killer]))
 		events.append([Ev.HEAL, px[killer], py[killer], killer])
@@ -1717,6 +1752,46 @@ func remaining_hp_ratio(t: int) -> float:
 
 ## Compact fingerprint of the final state, used to verify both PvP clients
 ## simulated the same battle.
+## Stats: damage dealt by `by` (-1: nobody) to j, counting only what j had
+## left. Call before taking the health off.
+func _dot(j: int, amount: float, by: int) -> void:
+	var real := clampf(amount, 0.0, maxf(hp[j], 0.0))
+	st_taken[j] += real
+	if by >= 0 and team[by] != team[j]:
+		st_dmg[by] += real
+
+
+## Heals j by amount (up to its max health), counted for `by`.
+func _healed(by: int, j: int, amount: float) -> void:
+	var real := minf(amount, max_hp[j] - hp[j])
+	hp[j] = minf(max_hp[j], hp[j] + amount)
+	if by >= 0 and real > 0.0:
+		st_heal[by] += real
+
+
+## What each squad did, for the battle stats screen: one row per unit type
+## and side (units summoned mid-battle get their own rows), best first.
+## {team, unit, summoned, count, lost, damage, taken, healing, kills}
+func battle_stats() -> Array:
+	var rows := {}
+	for i in n:
+		var key := "%d|%d|%d" % [team[i], kind[i], st_summoned[i]]
+		if not rows.has(key):
+			rows[key] = {"team": team[i], "unit": unit_ids[kind[i]], "summoned": st_summoned[i] == 1,
+				"count": 0, "lost": 0, "damage": 0.0, "taken": 0.0, "healing": 0.0, "kills": 0}
+		var r: Dictionary = rows[key]
+		r["count"] += 1
+		if alive[i] == 0:
+			r["lost"] += 1
+		r["damage"] += st_dmg[i]
+		r["taken"] += st_taken[i]
+		r["healing"] += st_heal[i]
+		r["kills"] += st_kills[i]
+	var out: Array = rows.values()
+	out.sort_custom(func(a, b): return a["damage"] + a["healing"] > b["damage"] + b["healing"])
+	return out
+
+
 func checksum() -> int:
 	var h := 1469598103
 	for i in n:
