@@ -417,7 +417,7 @@ func _chapter_steps(id: String) -> Array:
 			]
 		"army":
 			return [
-				{"target": "tab:Army", "text": "Put your new recruit to work.", "done": func(): return _tab_is("Army")},
+				{"target": "tab:Lineup", "text": "Put your new recruit to work.", "done": func(): return _tab_is("Lineup")},
 				{"target": "auto_build", "text": "Build your strongest army.", "enter": func(): _state["army"] = JSON.stringify(Profile.data["army"]),
 					"done": func(): return JSON.stringify(Profile.data["army"]) != str(_state.get("army", ""))},
 				{"target": "army_columns", "text": "Front line, middle, back line: drag squads to choose where they fight.", "button": "Got it"},

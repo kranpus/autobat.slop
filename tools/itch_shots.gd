@@ -130,7 +130,7 @@ func _run() -> void:
 	profile.data["pending_choice"] = {}
 	main.expedition_tab.refresh()
 	# Army.
-	main.show_tab("Army")
+	main.show_tab("Lineup")
 	await _wait(0.6)
 	await _shot("06_army")
 	# Challenges.

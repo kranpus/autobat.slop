@@ -27,9 +27,18 @@ const LIST := [
 				{"kind": "note", "text": "Champions count toward Strength. Their balance will be tuned in coming patches."},
 			]},
 			{"name": "Menus", "notes": [
-				{"kind": "change", "text": "The menu is now three tabs, each with its own sub-tabs: Battle (Ranked, Challenges, Legion Draft, Quests, Leaderboard), Army (Collection, Army, Champion, Expeditions, Trinket Hunts) and Settings (Settings, Patch Notes). A red dot on a tab means something inside it is waiting for you."},
+				{"kind": "change", "text": "The menu is now three tabs, each with its own sub-tabs: Battle (Ranked, Challenges, Legion Draft, Quests, Leaderboard), Army (Collection, Lineup, Champion, Expeditions, Trinket Hunts) and Settings (Settings, Patch Notes). A red dot on a tab means something inside it is waiting for you."},
+				{"kind": "change", "text": "The old Army tab is now called Lineup: it's where you choose your squads and their lines."},
 				{"kind": "change", "text": "Challenges now open at 200 rating, so new commanders learn the ropes in ranked battles first. If you've already cleared a challenge, they stay open for you."},
 				{"kind": "note", "text": "The early story quests are reordered to match: \"Win a challenge\" now comes after \"Reach 250 rating\"."},
+			]},
+			{"name": "New commanders", "notes": [
+				{"kind": "change", "text": "New commanders now start with three units from the Badlands Camp, the first region: Hobgoblins, Jackals and Goblin Archers. Goblins, Kobold Slingers and Giant Rats are still found in the Goblin Warrens. Existing armies are unchanged."},
+				{"kind": "change", "text": "A new commander's first expedition always offers at least one unit they don't have yet."},
+			]},
+			{"name": "Ranked training", "notes": [
+				{"kind": "change", "text": "Training bands now only field units a commander could have at their rating: the starting units plus the units of the regions open at that rating. No more Imps and Lemures at rating 0."},
+				{"kind": "change", "text": "Training bands start much stronger: about 750 power at rating 0 (it was 140), rising gently to 850 at 1500 rating and following the old curve from there."},
 			]},
 			{"name": "Battle Stats", "notes": [
 				{"kind": "change", "text": "New Battle Stats tab on the results screen: see what every squad did in the battle, yours and the enemy's: damage dealt, kills, healing, damage taken and units lost, with the battle's MVP marked. Tap a column to sort by it."},

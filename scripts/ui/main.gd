@@ -100,7 +100,7 @@ func _ready() -> void:
 	collection_tab.name = "Collection"
 	army_menu.add_child(collection_tab)
 	var army_tab := ArmyTab.new()
-	army_tab.name = "Army"
+	army_tab.name = "Lineup"
 	army_menu.add_child(army_tab)
 	var champion_tab := ChampionTab.new()
 	champion_tab.name = "Champion"

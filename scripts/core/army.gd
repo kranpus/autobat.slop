@@ -481,10 +481,12 @@ const RANKED_LABEL_GAP := 40
 
 ## Army power (as used internally, 10x what the game shows) that training
 ## opponents are built around at each rating: [rating, shown power] points,
-## straight lines in between. A new commander (0) starts with about 136.
-## Past the last point it keeps growing 7% per 100 rating.
+## straight lines in between. Past the last point it keeps growing 7% per
+## 100 rating.
 ## (0.9.7: steeper above 1000, reaching 8,000 at 3500; it was 4,600.)
-const RANK_POWER := [[0, 140.0], [250, 170.0], [500, 220.0], [800, 300.0], [1000, 380.0], [1200, 520.0], [1500, 850.0],
+## (0.9.9: 750 from rating 0, rising gently to the old curve at 1500; it
+## was 140 at 0, about what a brand-new army has.)
+const RANK_POWER := [[0, 750.0], [500, 780.0], [1000, 815.0], [1500, 850.0],
 	[1700, 1150.0], [2000, 1750.0], [2500, 3000.0], [3000, 5000.0], [3500, 8000.0], [4000, 11500.0]]
 
 
@@ -543,10 +545,14 @@ static func generate_opponent(target_power: float, rating: int, seed_value: int,
 		max_rarity = 3
 	if rating >= 2500:
 		max_rarity = 4
+	# 0.9.9: only units a commander at this rating could have: the starters
+	# and the drops of the regions open at it.
 	var pool: Array = []
-	for id in UnitLocks.unlocked_ids():
+	for id in GameData.units_at_rating(rating):
 		if int(GameData.RARITIES[GameData.UNITS[id]["rarity"]]["order"]) <= max_rarity:
 			pool.append(id)
+	if pool.is_empty():
+		pool = GameData.STARTER_UNITS.duplicate()
 	var squad_count := rng.randi_range(3, GameData.MAX_SQUADS)
 	var squads: Array = []
 	var used := {}

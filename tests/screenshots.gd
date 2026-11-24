@@ -100,7 +100,7 @@ func _process(_delta: float) -> bool:
 			main.show_tab("Collection")
 			main.collection_tab.refresh()
 			_shot("01_collection")
-			main.show_tab("Army")
+			main.show_tab("Lineup")
 		2:
 			_shot("02_army")
 			main.show_tab("Expeditions")
@@ -169,10 +169,10 @@ func _process(_delta: float) -> bool:
 			var run = root.get_node("Party").run
 			check_log.append("after drag 4 (sell): slot 6 = %s, gold = %d" % [run.board[5].get("unit", "empty"), run.gold])
 			root.get_node("Party").disconnect_all()
-			main.show_tab("Army")
+			main.show_tab("Lineup")
 		36:
 			# Army tab: drag the first Front line squad onto the Back line column.
-			var army_tab = main.find_tab("Army")
+			var army_tab = main.find_tab("Lineup")
 			var front_list: VBoxContainer = army_tab._columns["front"]["list"]
 			var back_list: VBoxContainer = army_tab._columns["back"]["list"]
 			check_log.append("army before: %s" % [_rows()])

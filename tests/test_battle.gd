@@ -447,7 +447,7 @@ func test_unit_locks() -> void:
 	var dec := Army.decode(code)
 	check(dec["squads"].size() == 1 and dec["squads"][0]["unit"] == "goblin", "army codes drop locked units")
 	profile.data["units"]["storm_dragon"] = {"level": 1, "tier": 0, "shards": 0}
-	profile.data["army"] = [{"unit": "storm_dragon", "row": "back"}, {"unit": "goblin", "row": "front"}]
+	profile.data["army"] = [{"unit": "storm_dragon", "row": "back"}, {"unit": "hobgoblin", "row": "front"}]
 	check(profile.army_squads().size() == 2 and profile.battle_squads().filter(func(sq): return not sq.has("champion")).size() == 1, "an owned locked unit stays in the army but doesn't deploy")
 	# Server commands.
 	party.run_command("unlock Storm Dragon")
@@ -689,7 +689,7 @@ func test_trinkets() -> void:
 	pl.data["rating"] = 1300
 	pl.data["xp"] = Progression.xp_for_level(8)   # trinket hunts and both slots open
 	pl.data["level_rewarded"] = 8
-	check(not pl.equip_trinket("goblin", 0, "octoring"), "can't equip a trinket you don't own")
+	check(not pl.equip_trinket("hobgoblin", 0, "octoring"), "can't equip a trinket you don't own")
 	var choice := pl.hunt_trinkets("trove")
 	check(choice.get("options", []).size() == 3 and pl.maps() == 7, "a hunt spends maps and offers 3 trinkets")
 	check(pl.hunt_trinkets("camp").is_empty(), "can't hunt again before choosing")
@@ -703,11 +703,11 @@ func test_trinkets() -> void:
 	check(not dup["new"] and pl.gold() == gold_before + int(Trinkets.DUPLICATE_GOLD["common"]), "a trinket you already own is sold for gold")
 	for t in ["octoring", "tiger_eye_ring", "standard_of_the_legion"]:
 		pl.data["trinkets"][t] = true
-	check(pl.equip_trinket("goblin", 0, "octoring") and pl.equip_trinket("goblin", 1, "tiger_eye_ring"), "two trinkets fit on a unit")
-	check(not pl.equip_trinket("goblin", 2, "iron_band"), "there is no third slot")
-	pl.equip_trinket("rat_swarm", 0, "octoring")
-	check(pl.trinket_holder("octoring") == "rat_swarm" and not pl.trinkets_of("goblin").has("octoring"), "equipping a trinket elsewhere moves it")
-	check(pl.unequip_trinket("rat_swarm", 0) and pl.trinkets_of("rat_swarm").is_empty(), "trinkets can be taken off")
+	check(pl.equip_trinket("hobgoblin", 0, "octoring") and pl.equip_trinket("hobgoblin", 1, "tiger_eye_ring"), "two trinkets fit on a unit")
+	check(not pl.equip_trinket("hobgoblin", 2, "iron_band"), "there is no third slot")
+	pl.equip_trinket("jackal", 0, "octoring")
+	check(pl.trinket_holder("octoring") == "jackal" and not pl.trinkets_of("hobgoblin").has("octoring"), "equipping a trinket elsewhere moves it")
+	check(pl.unequip_trinket("jackal", 0) and pl.trinkets_of("jackal").is_empty(), "trinkets can be taken off")
 	# Bad saved data is cleaned up.
 	var messy := ProfileLogic.new({"trinkets": {"octoring": true, "not_real": true}, "units": {"goblin": {"level": 1, "tier": 0, "trinkets": ["octoring", "not_real", "iron_band"]},
 		"rat_swarm": {"level": 1, "tier": 0, "trinkets": ["octoring"]}}})
@@ -1517,13 +1517,33 @@ func test_rank_scaling() -> void:
 	for id in GameData.STARTER_UNITS:
 		starter.append({"unit": id, "level": 1, "tier": 0, "row": GameData.default_row_for(id)})
 	var sp := Army.army_power(starter)
-	check(absf(Army.rank_power(0) / sp - 1.0) < 0.15, "training bands at 0 are built around a starting army (%.0f vs %.0f)" % [Army.rank_power(0), sp])
+	check(is_equal_approx(Army.rank_power(0), 7500.0) and sp < Army.rank_power(0), "training bands at 0 are built around 750 power (0.9.9), above a starting army (%.0f)" % (sp / 10.0))
 	var rising := true
 	for r in range(0, 5000, 50):
 		if Army.rank_power(r + 50) <= Army.rank_power(r):
 			rising = false
 	check(rising, "the expected power rises with every step of rating")
-	check(is_equal_approx(Army.rank_power(3500), 80000.0) and is_equal_approx(Army.rank_power(1000), 3800.0), "8,000 Strength at 3500 rating (0.9.7), 380 at 1000")
+	check(is_equal_approx(Army.rank_power(3500), 80000.0) and is_equal_approx(Army.rank_power(1000), 8150.0), "8,000 Strength at 3500 rating (0.9.7), 815 at 1000 (0.9.9)")
+	# 0.9.9: training bands only field units a commander could have at their rating.
+	var reach0 := GameData.units_at_rating(0)
+	var all_ok := true
+	for k in 20:
+		for q in Army.generate_opponent(Army.rank_power(0), 0, k)["squads"]:
+			if not reach0.has(q["unit"]):
+				all_ok = false
+	check(all_ok and reach0.has("hobgoblin") and reach0.has("jackal") and not reach0.has("goblin") and not reach0.has("lemure"), "rating-0 bands use only starters and Badlands Camp units")
+	check(GameData.units_at_rating(500).has("skeleton") and not GameData.units_at_rating(499).has("skeleton"), "the Haunted Crypt's units join at 500")
+	# 0.9.9: the starting units come from the first region, and a new
+	# commander's first expedition always offers someone new.
+	check(GameData.STARTER_UNITS.all(func(u): return GameData.REGIONS["badlands"]["drops"].has(u)), "the three starting units are from the Badlands Camp")
+	var always_new := true
+	for k in 60:
+		var np := ProfileLogic.new()
+		np.data["maps"] = 5
+		var offer: Dictionary = np.explore("badlands")
+		if (offer.get("options", []) as Array).all(func(o): return np.data["units"].has(o["unit"])):
+			always_new = false
+	check(always_new, "a new commander's first expedition always has a unit they don't own (60 tries)")
 	# The same rating gives the same strength of opponents, whatever your army.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7

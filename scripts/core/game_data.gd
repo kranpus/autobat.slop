@@ -904,11 +904,28 @@ const CHOICE_SHARD_MULT := 2      # shards per pick are doubled since only one o
 
 const ROWS := ["front", "middle", "back"]
 
-const STARTER_UNITS := ["goblin", "kobold_slinger", "rat_swarm"]
+const STARTER_UNITS := ["hobgoblin", "jackal", "goblin_archer"]   # 0.9.9: from the Badlands Camp (was goblin, kobold slinger, giant rat)
 
 
 ## A region's drop table: weights after the server's drop multipliers
 ## (DropRates), without locked units or units whose rarity is switched off.
+## Units a commander can have at this rating (0.9.9): the starters plus what
+## the regions open at that rating drop (training bands use only these).
+static func units_at_rating(rating: int) -> Array:
+	var out: Array = []
+	for id in STARTER_UNITS:
+		if not UnitLocks.is_locked(id):
+			out.append(id)
+	for rid in REGIONS:
+		if int(REGIONS[rid]["min_rating"]) > rating or UnitLocks.is_region_locked(rid):
+			continue
+		for id in region_drops(rid):
+			if not out.has(id):
+				out.append(id)
+	out.sort()
+	return out
+
+
 static func region_drops(region_id: String) -> Dictionary:
 	var out := {}
 	var drops: Dictionary = REGIONS[region_id]["drops"]

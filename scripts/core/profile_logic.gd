@@ -323,6 +323,19 @@ func explore(region_id: String) -> Dictionary:
 		pool.erase(picked)
 		picks.append(picked)
 	var guaranteed := _apply_pity(region_id, picks, rng)
+	# 0.9.9: the starters come from the Badlands Camp, so until a commander has
+	# recruited anyone, an offer always holds at least one unit they don't own.
+	if data["units"].size() <= GameData.STARTER_UNITS.size() and picks.all(func(u): return data["units"].has(u)):
+		var fresh := {}
+		var drops: Dictionary = GameData.region_drops(region_id)
+		for u in drops:
+			if not data["units"].has(u) and not picks.has(u):
+				fresh[u] = drops[u]
+		if not fresh.is_empty():
+			var k := picks.size() - 1
+			while k > 0 and str(picks[k]) == guaranteed:
+				k -= 1
+			picks[k] = _weighted_pick(fresh, rng)
 	var options: Array = []
 	for picked in picks:
 		var range_: Array = GameData.RARITIES[GameData.UNITS[picked]["rarity"]]["find_shards"]
