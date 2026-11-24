@@ -1523,7 +1523,7 @@ func test_rank_scaling() -> void:
 		if Army.rank_power(r + 50) <= Army.rank_power(r):
 			rising = false
 	check(rising, "the expected power rises with every step of rating")
-	check(is_equal_approx(Army.rank_power(3500), 80000.0) and is_equal_approx(Army.rank_power(1000), 8150.0), "8,000 Strength at 3500 rating (0.9.7), 815 at 1000 (0.9.9)")
+	check(is_equal_approx(Army.rank_power(3500), 86100.0) and is_equal_approx(Army.rank_power(1000), 9900.0), "the 0.9.7 curve moved up 610 (0.9.9): 8,610 at 3500, 990 at 1000")
 	# 0.9.9: training bands only field units a commander could have at their rating.
 	var reach0 := GameData.units_at_rating(0)
 	var all_ok := true

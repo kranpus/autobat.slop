@@ -239,9 +239,9 @@ use rarer units at roughly the same points (rare from 1200, epic from 1700, lege
        glass, chimes, ghostly breath...), spaced out so big battles stay calm.
      - **Screen shake** can be turned off in Settings.
    - **Training opponents:** a hard ladder, sized by your **rating**, not your army (0.9.5).
-     - **Strength:** each rating has an expected army power (`Army.RANK_POWER`): about 140 at
-       0 (a starting army), 380 at 1000, 850 at 1500, 1,750 at 2000, 3,000 at 2500, 5,000 at
-       3000 and 8,000 at 3500 (0.9.7; it was 4,600 at 3500). Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× of that by default (the
+     - **Strength:** each rating has an expected army power (`Army.RANK_POWER`): 750 at 0,
+       990 at 1000, 1,460 at 1500, 2,360 at 2000, 3,610 at 2500, 5,610 at 3000 and 8,610 at 3500
+       (0.9.9: the 0.9.7 curve moved up 610; it started at 140, about a starting army). Easy ≈ 0.9×, Even ≈ 1.1×, Hard ≈ 1.5× of that by default (the
        server can change this with `difficulty`). An army stronger than its rating beats them
        more easily; one that's behind has to catch up.
      - **Composition (0.9.7):** they favour units that fight well, weighted by each unit's win
